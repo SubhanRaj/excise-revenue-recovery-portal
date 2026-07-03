@@ -45,8 +45,24 @@
   convention — the CORS gate stayed on the legacy `api/middleware.ts` (Edge runtime), which
   still works and only emits a deprecation warning on build.
 
+## Milestone 6 — UI/UX pass (done)
+
+- [x] Fixed unstyled-flash bug: Tailwind CDN script moved off `next/script` (JS-hook
+      injection) onto a plain blocking `<script>` tag — the actual bug behind a report that
+      the CUG login field was effectively invisible on first paint
+- [x] Design system: indigo palette, `Button`/`TextField`/`Banner`/`AppHeader` components,
+      applied to login, verify, DEO entry, and admin
+- [x] Removed decorative icons from inside text inputs (Tabler webfont FOUT could flash a
+      fallback glyph over live input text — see CLAUDE.md)
+- [x] Replaced per-message SweetAlert popups with inline `Banner` SPA state everywhere
+      except the one genuinely irreversible confirm (final submit & lock)
+- [x] UI chrome anglicized; Hindi now scoped to the 6 PAC field labels + department name
+- [x] Styled HTML magic-link email (`api/lib/email.ts`) instead of bare `<p>` tags
+
 ## Backlog / not started
 
 - [ ] Admin UI to provision DEO users (currently manual DB insert — see CLAUDE.md "Known gaps")
 - [ ] Real domain + DNS, and (optional) collapse `/frontend` + `/api` onto one zone via a
       Worker route so the cross-origin cookie dance in CLAUDE.md's Auth section can be dropped
+- [ ] Verify `mail.upexciseonline.co` (or chosen domain) in Resend and switch `FROM_EMAIL`
+      off the shared sandbox sender

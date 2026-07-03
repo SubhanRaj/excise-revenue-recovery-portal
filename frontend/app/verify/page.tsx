@@ -4,16 +4,18 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch, ApiError } from "@/lib/api";
 import { saveClientSession } from "@/lib/session";
-import { alertError } from "@/lib/alerts";
 import Button from "@/components/ui/Button";
+import Banner from "@/components/ui/Banner";
 
 function VerifyForm() {
   const router = useRouter();
   const token = useSearchParams().get("token");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function verify() {
-    if (!token) return alertError("Invalid link.");
+    if (!token) return setError("Invalid link.");
+    setError(null);
     setBusy(true);
     try {
       const res = await apiFetch<{ role: "deo" | "admin"; districtId: number | null }>(
@@ -23,7 +25,7 @@ function VerifyForm() {
       saveClientSession(res);
       router.push(res.role === "admin" ? "/admin" : "/entry");
     } catch (err) {
-      await alertError(err instanceof ApiError ? err.message : "Verification failed.");
+      setError(err instanceof ApiError ? err.message : "Verification failed.");
     } finally {
       setBusy(false);
     }
@@ -37,6 +39,11 @@ function VerifyForm() {
         </div>
         <h1 className="mb-1 text-lg font-semibold text-slate-900">Verify Login</h1>
         <p className="mb-6 text-sm text-slate-500">Confirm below to complete signing in.</p>
+        {error && (
+          <div className="mb-4 text-left">
+            <Banner variant="error">{error}</Banner>
+          </div>
+        )}
         <Button onClick={verify} disabled={busy || !token} className="w-full">
           {busy ? "Verifying..." : "Verify & Continue"}
         </Button>

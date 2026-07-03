@@ -5,6 +5,7 @@ import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField } from
 import type { DraftYear } from "@/lib/db";
 import Button from "./ui/Button";
 import TextField from "./ui/TextField";
+import Banner from "./ui/Banner";
 
 type Props = {
   years: DraftYear[];
@@ -12,9 +13,10 @@ type Props = {
   onSubmittedByNameChange: (v: string) => void;
   onSubmit: () => void;
   busy: boolean;
+  error: string | null;
 };
 
-export default function MasterView({ years, submittedByName, onSubmittedByNameChange, onSubmit, busy }: Props) {
+export default function MasterView({ years, submittedByName, onSubmittedByNameChange, onSubmit, busy, error }: Props) {
   const [nameTouched, setNameTouched] = useState(false);
   const nameMissing = submittedByName.trim().length === 0;
 
@@ -57,7 +59,6 @@ export default function MasterView({ years, submittedByName, onSubmittedByNameCh
       <div className="max-w-sm">
         <TextField
           label="DEO Name (Submitting Officer)"
-          icon="ti-user"
           type="text"
           value={submittedByName}
           onChange={(e) => onSubmittedByNameChange(e.target.value)}
@@ -65,6 +66,8 @@ export default function MasterView({ years, submittedByName, onSubmittedByNameCh
         />
         {nameTouched && nameMissing && <span className="mt-1 block text-xs text-red-600">Name is required.</span>}
       </div>
+
+      {error && <Banner variant="error">{error}</Banner>}
 
       <Button type="button" variant="danger" onClick={onSubmit} disabled={busy || nameMissing}>
         <i className="ti ti-lock text-base" />

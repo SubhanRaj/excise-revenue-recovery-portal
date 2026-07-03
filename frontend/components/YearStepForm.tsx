@@ -4,15 +4,17 @@ import PacFieldInput from "./PacFieldInput";
 import { PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable } from "@/lib/pac-fields";
 import type { DraftYear } from "@/lib/db";
 import Button from "./ui/Button";
+import Banner from "./ui/Banner";
 
 type Props = {
   year: DraftYear;
   onFieldChange: (field: keyof DraftYear, value: string) => void;
   onSaveAndContinue: () => void;
   isLastYear: boolean;
+  blankErrorMessage: string | null;
 };
 
-export default function YearStepForm({ year, onFieldChange, onSaveAndContinue, isLastYear }: Props) {
+export default function YearStepForm({ year, onFieldChange, onSaveAndContinue, isLastYear, blankErrorMessage }: Props) {
   const gross = Number(year.grossArrears) || 0;
   const recovered = Number(year.recoveredAmount) || 0;
   const stay = Number(year.stayAmount) || 0;
@@ -39,12 +41,8 @@ export default function YearStepForm({ year, onFieldChange, onSaveAndContinue, i
         ))}
       </div>
 
-      {!parityOk && (
-        <p className="flex items-center gap-1.5 rounded-md bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
-          <i className="ti ti-alert-triangle text-base" />
-          Recovered Amount (3) must equal RC Amount (2.ii).
-        </p>
-      )}
+      {blankErrorMessage && <Banner variant="error">{blankErrorMessage}</Banner>}
+      {!parityOk && <Banner variant="error">Recovered Amount (3) must equal RC Amount (2.ii).</Banner>}
 
       <div className="flex items-center justify-between rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm">
         <span className="font-medium text-indigo-900">Net Recoverable / शुद्ध वसूली योग्य धनराशि</span>

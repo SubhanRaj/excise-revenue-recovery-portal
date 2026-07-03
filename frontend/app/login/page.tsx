@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { apiFetch, ApiError } from "@/lib/api";
 import { sha256Hex } from "@/lib/crypto";
 import { saveClientSession } from "@/lib/session";
-import { alertError, alertSuccess } from "@/lib/alerts";
 import Button from "@/components/ui/Button";
 import TextField from "@/components/ui/TextField";
+import Banner from "@/components/ui/Banner";
 
 type Tab = "cug" | "email";
 
@@ -17,11 +17,19 @@ export default function LoginPage() {
   const [mobile, setMobile] = useState("");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
+
+  function switchTab(next: Tab) {
+    setTab(next);
+    setError(null);
+  }
 
   async function submitCug(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
     if (!/^\d{10}$/.test(mobile)) {
-      return alertError("Please enter a valid 10-digit mobile number.");
+      return setError("Please enter a valid 10-digit mobile number.");
     }
     setBusy(true);
     try {
@@ -33,7 +41,7 @@ export default function LoginPage() {
       saveClientSession(res);
       router.push(res.role === "admin" ? "/admin" : "/entry");
     } catch (err) {
-      await alertError(err instanceof ApiError ? err.message : "Login failed.");
+      setError(err instanceof ApiError ? err.message : "Login failed.");
     } finally {
       setBusy(false);
     }
@@ -41,15 +49,16 @@ export default function LoginPage() {
 
   async function submitEmail(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return alertError("Please enter a valid email address.");
+      return setError("Please enter a valid email address.");
     }
     setBusy(true);
     try {
       await apiFetch("/api/auth/request-magic-link", { method: "POST", body: JSON.stringify({ email }) });
-      await alertSuccess("If this email is registered, a login link has been sent.");
+      setSent(true);
     } catch (err) {
-      await alertError(err instanceof ApiError ? err.message : "Request failed.");
+      setError(err instanceof ApiError ? err.message : "Request failed.");
     } finally {
       setBusy(false);
     }
@@ -72,7 +81,7 @@ export default function LoginPage() {
               className={`flex-1 rounded-md py-2 font-medium transition-colors ${
                 tab === "cug" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
               }`}
-              onClick={() => setTab("cug")}
+              onClick={() => switchTab("cug")}
               type="button"
             >
               CUG Mobile (DEO)
@@ -81,7 +90,7 @@ export default function LoginPage() {
               className={`flex-1 rounded-md py-2 font-medium transition-colors ${
                 tab === "email" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
               }`}
-              onClick={() => setTab("email")}
+              onClick={() => switchTab("email")}
               type="button"
             >
               Email (Admin)
@@ -92,7 +101,6 @@ export default function LoginPage() {
             <form onSubmit={submitCug} className="space-y-4">
               <TextField
                 label="CUG Mobile Number"
-                icon="ti-device-mobile"
                 type="tel"
                 inputMode="numeric"
                 maxLength={10}
@@ -100,20 +108,28 @@ export default function LoginPage() {
                 value={mobile}
                 onChange={(e) => setMobile(e.target.value.replace(/\D/g, ""))}
               />
+              {error && <Banner variant="error">{error}</Banner>}
               <Button type="submit" disabled={busy} className="w-full">
                 {busy ? "Signing in..." : "Login"}
               </Button>
             </form>
+          ) : sent ? (
+            <Banner variant="success">
+              <p className="font-medium">Check your email</p>
+              <p className="mt-0.5 font-normal text-emerald-600">
+                If <strong>{email}</strong> is registered, a sign-in link has been sent. It expires in 15 minutes.
+              </p>
+            </Banner>
           ) : (
             <form onSubmit={submitEmail} className="space-y-4">
               <TextField
                 label="Email Address"
-                icon="ti-mail"
                 type="email"
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
+              {error && <Banner variant="error">{error}</Banner>}
               <Button type="submit" disabled={busy} className="w-full">
                 {busy ? "Sending..." : "Send Login Link"}
               </Button>

@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { Resend } from "resend";
 import { getDb } from "@/lib/db";
 import { users, magicLinkTokens } from "@/db/schema";
+import { magicLinkHtml } from "@/lib/email";
 
 const TOKEN_TTL_MINUTES = 15;
 
@@ -34,10 +35,7 @@ export async function POST(req: NextRequest) {
     from: process.env.FROM_EMAIL ?? "onboarding@resend.dev",
     to: email,
     subject: "Excise Revenue Recovery Portal — Login Link",
-    html: `
-      <p>Click the link below to sign in. It expires in ${TOKEN_TTL_MINUTES} minutes.</p>
-      <p><a href="${verifyUrl}">Verify &amp; Continue</a></p>
-    `,
+    html: magicLinkHtml(verifyUrl, TOKEN_TTL_MINUTES),
   });
 
   return NextResponse.json({ ok: true });

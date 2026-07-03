@@ -68,8 +68,12 @@ Unified 7-day HttpOnly JWT cookie (`__session`, via `jose`), issued by either fl
   Web Crypto (`frontend/lib/crypto.ts`) before sending; server matches against
   `users.cug_hash`.
 - **Magic link flow**: `POST /api/auth/request-magic-link` issues a 15-minute token,
-  emailed via Resend; `frontend/app/verify/page.tsx` requires an explicit button click
-  (POST, not GET) so email-client link-prefetchers can't burn the token.
+  emailed via Resend (`api/lib/email.ts` for the HTML); `frontend/app/verify/page.tsx`
+  requires an explicit button click (POST, not GET) so email-client link-prefetchers can't
+  burn the token. Sender is `FROM_EMAIL` (env var, defaults to Resend's shared sandbox
+  `onboarding@resend.dev`) since `mail.upexciseonline.co` isn't a verified Resend domain
+  yet — the sandbox sender can only deliver to the Resend account owner's own address, so
+  don't be surprised if a test to a different email silently doesn't arrive.
 - `GET /api/auth/me` — the SPA has no server, so it can't read the HttpOnly cookie itself;
   every gated page calls this on load to learn `{role, districtId}` before trusting the
   cached copy in `frontend/lib/session.ts` (localStorage — UI routing hint only, never a
@@ -99,14 +103,40 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
 
 ## UI conventions
 
-- No native `alert`/`confirm` — always `window.Swal` (SweetAlert2, CDN global, typed via
-  `frontend/lib/globals.d.ts`). Helpers live in `frontend/lib/alerts.ts`.
-- No emojis anywhere in the UI — Tabler Icons (CDN, `<link>` in `layout.tsx`) instead.
+- **Language**: UI chrome (buttons, nav, labels, error/success messages) is English only.
+  The only Hindi in the app is the 6 PAC field labels (bilingual, `PAC_FIELD_LABELS` in
+  `frontend/lib/pac-fields.ts`) and the department name in a couple of headers/the page
+  title — because those mirror the actual government form and department name, not because
+  "Hindi UI" is a general goal. Don't add Hindi to new chrome text.
+- **Feedback is inline SPA state, not popups.** Each page keeps local `useState` for
+  error/success and renders `components/ui/Banner.tsx` next to the relevant control —
+  modeled on the `sent`/`error` state pattern in the sibling `up-excise-spatial-revenue-optimizer`
+  project's login form. `window.Swal` (SweetAlert2, CDN) is reserved for exactly one thing:
+  `confirmFinalSubmit()` in `frontend/lib/alerts.ts`, the blocking "are you sure" before an
+  irreversible DEO submit-and-lock. Don't reach for a new SweetAlert popup for routine
+  errors/success messages — add a `Banner` instead.
+- No emojis anywhere in the UI — Tabler Icons (CDN webfont, `<link>` in `layout.tsx`)
+  instead. Don't put a Tabler `<i>` icon directly inside/overlapping live input text —
+  the glyph renders via a CSS `::before` that loads async, so it can flash a fallback tofu
+  box on top of the text before the font loads (this happened once; `TextField` has no
+  icon slot as a result). Icons on buttons/badges next to static short label text are fine.
+- **Tailwind is a CDN script (`@tailwindcss/browser@4`), not a build step** — see
+  `frontend/app/layout.tsx`. It must be a plain `<script src=...>` tag, not `next/script`.
+  `next/script`'s `beforeInteractive` strategy injects the tag via a JS runtime hook rather
+  than blocking HTML parsing, so the static export's raw HTML can paint fully unstyled
+  before it runs. A native blocking `<script>` in `<head>` is also literally what Tailwind's
+  own CDN docs say to do (it installs a MutationObserver and expects to load before
+  `<body>`). Don't "fix" a styling flash by switching this back to `next/script`.
 - Money inputs use Cleave.js with `numeralThousandsGroupStyle: "lakh"` for native
   Indian-numeral (Lakh/Crore) grouping and a `₹` prefix — don't hand-roll this formatting.
 - SheetJS exports use the free/Community CDN build, which **cannot write frozen panes**
   (that's a SheetJS Pro feature) — see the `ponytail:` comment in `frontend/lib/export.ts`
   if you're asked to make the exported header row actually freeze.
+- Magic-link emails use a styled table-based HTML template (`api/lib/email.ts`,
+  `magicLinkHtml()`) — indigo header band, CTA button, plain-link fallback, footer — not a
+  couple of bare `<p>` tags. Modeled on the sibling `up-excise-spatial-revenue-optimizer`
+  project's `sendMagicLinkEmail`. Keep it a single self-contained inline-styled string;
+  email clients don't reliably support external stylesheets or `<style>` blocks.
 
 ## Known gaps / intentionally out of scope
 

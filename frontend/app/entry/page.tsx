@@ -6,10 +6,14 @@ import { db, type DraftYear } from "@/lib/db";
 import { FINANCIAL_YEARS, PAC_FIELD_ORDER } from "@/lib/pac-fields";
 import { apiFetch, ApiError } from "@/lib/api";
 import { readClientSession, clearClientSession } from "@/lib/session";
-import { alertBlankField, alertError, alertSuccess, confirmFinalSubmit } from "@/lib/alerts";
+import { confirmFinalSubmit } from "@/lib/alerts";
 import YearStepForm from "@/components/YearStepForm";
 import MasterView from "@/components/MasterView";
 import AppHeader from "@/components/ui/AppHeader";
+import Banner from "@/components/ui/Banner";
+
+const BLANK_FIELD_MESSAGE =
+  "Please do not leave any field blank. Enter 0 if there is no due amount or recovery.";
 
 function blankYear(financialYear: (typeof FINANCIAL_YEARS)[number]): DraftYear {
   return {
@@ -31,6 +35,9 @@ export default function EntryPage() {
   const [step, setStep] = useState(0); // 0..4 = year steps, 5 = master view
   const [submittedByName, setSubmittedByName] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [blankError, setBlankError] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -59,6 +66,7 @@ export default function EntryPage() {
   }, [router]);
 
   function updateField(index: number, field: keyof DraftYear, value: string) {
+    setBlankError(false);
     setYears((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], [field]: value };
@@ -70,7 +78,8 @@ export default function EntryPage() {
   async function saveAndContinue(index: number) {
     const year = years[index];
     const blank = PAC_FIELD_ORDER.some((field) => year[field].trim() === "");
-    if (blank) return alertBlankField();
+    if (blank) return setBlankError(true);
+    setBlankError(false);
 
     const updated = { ...year, completed: true };
     setYears((prev) => {
@@ -88,9 +97,12 @@ export default function EntryPage() {
 
   async function submitAll() {
     if (submittedByName.trim().length === 0) return;
+    // The one remaining confirm dialog: locking a district's submission is irreversible
+    // without an Admin unlock, so this warrants a blocking confirmation, unlike routine messages.
     const confirmed = await confirmFinalSubmit();
     if (!confirmed) return;
 
+    setSubmitError(null);
     setSubmitting(true);
     try {
       await apiFetch("/api/pac-data/submit", {
@@ -110,16 +122,30 @@ export default function EntryPage() {
       });
       await db.draftYears.clear();
       clearClientSession();
-      await alertSuccess("Data submitted and locked successfully.");
-      router.replace("/login");
+      setSubmitted(true);
+      setTimeout(() => router.replace("/login"), 1800);
     } catch (err) {
-      await alertError(err instanceof ApiError ? err.message : "Submit failed.");
+      setSubmitError(err instanceof ApiError ? err.message : "Submit failed.");
     } finally {
       setSubmitting(false);
     }
   }
 
   if (!ready) return null;
+
+  if (submitted) {
+    return (
+      <div className="flex flex-1 items-center justify-center bg-gradient-to-b from-slate-50 to-indigo-50 px-4">
+        <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 text-center shadow-xl shadow-slate-200/60">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+            <i className="ti ti-circle-check text-2xl" />
+          </div>
+          <h1 className="mb-1 text-lg font-semibold text-slate-900">Submitted &amp; Locked</h1>
+          <p className="text-sm text-slate-500">Redirecting to login...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-full flex-1 flex-col bg-slate-50">
@@ -169,6 +195,7 @@ export default function EntryPage() {
               onFieldChange={(field, value) => updateField(step, field, value)}
               onSaveAndContinue={() => saveAndContinue(step)}
               isLastYear={step === 4}
+              blankErrorMessage={blankError ? BLANK_FIELD_MESSAGE : null}
             />
           ) : (
             <MasterView
@@ -177,6 +204,7 @@ export default function EntryPage() {
               onSubmittedByNameChange={setSubmittedByName}
               onSubmit={submitAll}
               busy={submitting}
+              error={submitError}
             />
           )}
         </div>

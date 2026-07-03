@@ -1,22 +1,7 @@
 // SweetAlert2 loaded via CDN (see app/layout.tsx) — strictly no native window.alert/confirm.
-export function alertBlankField() {
-  return window.Swal.fire({
-    icon: "error",
-    title: "Error",
-    // Mandated verbatim by the portal's data-entry spec — do not translate or shorten.
-    text: "कृपया रिक्त स्थान छोड़ें नहीं। यदि कोई बकाया/वसूली नहीं है, तो अनिवार्य रूप से 0 दर्ज करें। (Please do not leave the field blank — enter 0 if there is no due/recovery.)",
-    confirmButtonText: "OK",
-  });
-}
-
-export function alertError(message: string) {
-  return window.Swal.fire({ icon: "error", title: "Error", text: message, confirmButtonText: "OK" });
-}
-
-export function alertSuccess(message: string) {
-  return window.Swal.fire({ icon: "success", title: "Success", text: message, confirmButtonText: "OK" });
-}
-
+// Reserved for the one interaction that actually warrants a blocking modal: confirming an
+// irreversible action. Everything else (validation, errors, success) is inline SPA state —
+// see components/ui/Banner.tsx — not a popup.
 export async function confirmFinalSubmit(): Promise<boolean> {
   const result = await window.Swal.fire({
     icon: "warning",

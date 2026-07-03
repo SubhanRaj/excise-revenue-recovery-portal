@@ -15,10 +15,10 @@ import { db, type CachedDistrict, type CachedPacData } from "@/lib/db";
 import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable } from "@/lib/pac-fields";
 import { apiFetch, ApiError } from "@/lib/api";
 import { readClientSession, clearClientSession } from "@/lib/session";
-import { alertError, alertSuccess } from "@/lib/alerts";
 import { exportDistrictsToXlsx } from "@/lib/export";
 import AppHeader from "@/components/ui/AppHeader";
 import Button from "@/components/ui/Button";
+import Banner from "@/components/ui/Banner";
 
 type Row = CachedDistrict & Record<(typeof PAC_FIELD_ORDER)[number], number>;
 
@@ -39,6 +39,7 @@ export default function AdminPage() {
   const [globalFilter, setGlobalFilter] = useState("");
   const [sorting, setSorting] = useState<SortingState>([]);
   const [syncing, setSyncing] = useState(false);
+  const [banner, setBanner] = useState<{ variant: "error" | "success"; message: string } | null>(null);
 
   async function sync() {
     setSyncing(true);
@@ -55,11 +56,17 @@ export default function AdminPage() {
       setDistricts(res.districts);
       setPacData(res.pacData);
     } catch (err) {
-      await alertError(err instanceof ApiError ? err.message : "Sync failed.");
+      setBanner({ variant: "error", message: err instanceof ApiError ? err.message : "Sync failed." });
     } finally {
       setSyncing(false);
     }
   }
+
+  useEffect(() => {
+    if (!banner || banner.variant === "error") return;
+    const t = setTimeout(() => setBanner(null), 3500);
+    return () => clearTimeout(t);
+  }, [banner]);
 
   useEffect(() => {
     (async () => {
@@ -97,9 +104,9 @@ export default function AdminPage() {
       await apiFetch("/api/admin/unlock", { method: "POST", body: JSON.stringify({ districtId }) });
       setDistricts((prev) => prev.map((d) => (d.id === districtId ? { ...d, lockStatus: 0 } : d)));
       await db.adminDistricts.update(districtId, { lockStatus: 0 });
-      await alertSuccess("District unlocked.");
+      setBanner({ variant: "success", message: "District unlocked." });
     } catch (err) {
-      await alertError(err instanceof ApiError ? err.message : "Unlock failed.");
+      setBanner({ variant: "error", message: err instanceof ApiError ? err.message : "Unlock failed." });
     }
   }
 
@@ -189,6 +196,11 @@ export default function AdminPage() {
     <div className="flex min-h-full flex-1 flex-col bg-slate-50">
       <AppHeader title="Admin Dashboard" />
       <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
+        {banner && (
+          <div className="mb-4">
+            <Banner variant={banner.variant}>{banner.message}</Banner>
+          </div>
+        )}
         <div className="mb-5 flex flex-wrap items-center gap-3">
           <div className="mr-auto">
             <h1 className="text-lg font-semibold text-slate-900">75 Districts</h1>
