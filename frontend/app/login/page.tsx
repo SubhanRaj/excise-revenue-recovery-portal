@@ -37,7 +37,7 @@ export default function LoginPage() {
       return setError("Please enter a valid 10-digit mobile number.");
     }
     if (mobile !== DEMO_CUG && !mobile.startsWith(CUG_PREFIX)) {
-      return setError(`CUG mobile numbers start with ${CUG_PREFIX}.`);
+      return setError("Invalid user.");
     }
     setBusy(true);
     try {
