@@ -12,7 +12,7 @@ function withCors(res: NextResponse, origin: string | null) {
   return res;
 }
 
-export function proxy(req: NextRequest) {
+export function middleware(req: NextRequest) {
   const origin = req.headers.get("origin");
   if (req.method === "OPTIONS") {
     return withCors(new NextResponse(null, { status: 204 }), origin);

@@ -16,6 +16,6 @@ INSERT INTO districts (district_name) VALUES
 ('Sant Kabir Nagar'), ('Shahjahanpur'), ('Shamli'), ('Shravasti'), ('Siddharthnagar'),
 ('Sitapur'), ('Sonbhadra'), ('Sultanpur'), ('Unnao'), ('Varanasi');
 
--- Bootstrap admin — sign in via Magic Link, then provision DEO users manually per district
+-- Bootstrap superadmin — sign in via Magic Link, then provision DEO users manually per district
 -- (cug_hash = SHA-256 of their 10-digit CUG mobile number, computed client-side).
-INSERT INTO users (role, email) VALUES ('admin', 'admin@upexciseonline.co');
+INSERT INTO users (role, email) VALUES ('admin', 'shubhanraj2002@gmail.com');

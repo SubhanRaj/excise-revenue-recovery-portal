@@ -11,8 +11,8 @@
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "cf-typegen": "wrangler types",
     "db:generate": "drizzle-kit generate",
-    "db:migrate:local": "wrangler d1 migrations apply excise-revenue-recovery-db --local",
-    "db:migrate:remote": "wrangler d1 migrations apply excise-revenue-recovery-db --remote",
+    "db:migrate:local": "for f in ./drizzle/[0-9]*.sql; do wrangler d1 execute excise-revenue-recovery-db --local --file=\"$f\"; done",
+    "db:migrate:remote": "for f in ./drizzle/[0-9]*.sql; do wrangler d1 execute excise-revenue-recovery-db --remote --file=\"$f\"; done",
     "db:seed:local": "wrangler d1 execute excise-revenue-recovery-db --local --file=./drizzle/seed.sql",
     "db:seed:remote": "wrangler d1 execute excise-revenue-recovery-db --remote --file=./drizzle/seed.sql"
   },
