@@ -4,7 +4,7 @@ import type { CachedDistrict, CachedPacData } from "./db";
 const RUPEE_FORMAT = '"₹"#,##0.00';
 
 export function exportDistrictsToXlsx(districts: CachedDistrict[], pacData: CachedPacData[]) {
-  const header = ["जिला (District)"];
+  const header = ["District"];
   for (const fy of FINANCIAL_YEARS) {
     for (const field of PAC_FIELD_ORDER) header.push(`${fy} — ${PAC_FIELD_LABELS[field]}`);
   }

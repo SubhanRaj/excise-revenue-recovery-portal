@@ -29,11 +29,13 @@ export async function POST(req: NextRequest) {
   const verifyUrl = `${process.env.FRONTEND_URL}/verify?token=${token}`;
 
   await resend.emails.send({
-    from: "noreply@mail.upexciseonline.co",
+    // ponytail: mail.upexciseonline.co isn't a verified Resend domain yet, so this falls
+    // back to Resend's shared sandbox sender — switch FROM_EMAIL once the domain is verified.
+    from: process.env.FROM_EMAIL ?? "onboarding@resend.dev",
     to: email,
-    subject: "Excise Revenue Recovery Portal — लॉगिन लिंक",
+    subject: "Excise Revenue Recovery Portal — Login Link",
     html: `
-      <p>अपने खाते में प्रवेश करने के लिए नीचे दिया गया लिंक खोलें। यह लिंक ${TOKEN_TTL_MINUTES} मिनट में समाप्त हो जाएगा।</p>
+      <p>Click the link below to sign in. It expires in ${TOKEN_TTL_MINUTES} minutes.</p>
       <p><a href="${verifyUrl}">Verify &amp; Continue</a></p>
     `,
   });

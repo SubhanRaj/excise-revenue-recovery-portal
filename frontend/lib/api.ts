@@ -15,7 +15,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new ApiError(body.error ?? "अज्ञात त्रुटि हुई (Unknown error)", res.status);
+    throw new ApiError(body.error ?? "Unknown error occurred.", res.status);
   }
   return body as T;
 }

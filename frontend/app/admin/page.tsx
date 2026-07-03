@@ -53,7 +53,7 @@ export default function AdminPage() {
       setDistricts(res.districts);
       setPacData(res.pacData);
     } catch (err) {
-      await alertError(err instanceof ApiError ? err.message : "सिंक विफल रहा।");
+      await alertError(err instanceof ApiError ? err.message : "Sync failed.");
     } finally {
       setSyncing(false);
     }
@@ -95,9 +95,9 @@ export default function AdminPage() {
       await apiFetch("/api/admin/unlock", { method: "POST", body: JSON.stringify({ districtId }) });
       setDistricts((prev) => prev.map((d) => (d.id === districtId ? { ...d, lockStatus: 0 } : d)));
       await db.adminDistricts.update(districtId, { lockStatus: 0 });
-      await alertSuccess("जिला अनलॉक कर दिया गया है।");
+      await alertSuccess("District unlocked.");
     } catch (err) {
-      await alertError(err instanceof ApiError ? err.message : "अनलॉक विफल रहा।");
+      await alertError(err instanceof ApiError ? err.message : "Unlock failed.");
     }
   }
 
@@ -121,18 +121,18 @@ export default function AdminPage() {
   const columns = useMemo(
     () => [
       columnHelper.accessor("districtName", {
-        header: "जिला (District)",
+        header: "District",
         cell: (info) => info.getValue(),
       }),
       columnHelper.accessor("lockStatus", {
-        header: "स्थिति",
+        header: "Status",
         cell: (info) => (
           <span
             className={`rounded px-2 py-0.5 text-xs font-medium ${
               info.getValue() === 1 ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
             }`}
           >
-            {info.getValue() === 1 ? "लॉक्ड" : "अनलॉक्ड"}
+            {info.getValue() === 1 ? "Locked" : "Unlocked"}
           </span>
         ),
       }),
@@ -144,7 +144,7 @@ export default function AdminPage() {
       ),
       columnHelper.display({
         id: "netRecoverable",
-        header: "शुद्ध वसूली योग्य",
+        header: "Net Recoverable",
         cell: ({ row }) =>
           `₹${netRecoverable(row.original.grossArrears, row.original.recoveredAmount, row.original.stayAmount).toLocaleString(
             "en-IN",
@@ -153,14 +153,14 @@ export default function AdminPage() {
       }),
       columnHelper.display({
         id: "actions",
-        header: "कार्रवाई",
+        header: "Action",
         cell: ({ row }) =>
           row.original.lockStatus === 1 ? (
             <button
               onClick={() => unlock(row.original.id)}
               className="rounded bg-zinc-900 px-2 py-1 text-xs font-medium text-white"
             >
-              अनलॉक करें
+              Unlock
             </button>
           ) : null,
       }),
@@ -185,7 +185,7 @@ export default function AdminPage() {
   return (
     <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <h1 className="mr-auto text-lg font-semibold text-zinc-900">Admin Dashboard — 75 जिले</h1>
+        <h1 className="mr-auto text-lg font-semibold text-zinc-900">Admin Dashboard — 75 Districts</h1>
         <select
           value={selectedYear}
           onChange={(e) => setSelectedYear(e.target.value as (typeof FINANCIAL_YEARS)[number])}
@@ -199,7 +199,7 @@ export default function AdminPage() {
         </select>
         <input
           type="text"
-          placeholder="जिला खोजें..."
+          placeholder="Search district..."
           value={globalFilter}
           onChange={(e) => setGlobalFilter(e.target.value)}
           className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm"
@@ -209,10 +209,10 @@ export default function AdminPage() {
           disabled={syncing}
           className="rounded-md bg-zinc-100 px-3 py-1.5 text-sm font-medium text-zinc-700 disabled:opacity-50"
         >
-          {syncing ? "सिंक हो रहा है..." : "सिंक करें"}
+          {syncing ? "Syncing..." : "Sync"}
         </button>
         <button onClick={exportExcel} className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white">
-          Excel में निर्यात करें
+          Export to Excel
         </button>
       </div>
 

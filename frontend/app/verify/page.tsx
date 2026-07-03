@@ -12,7 +12,7 @@ function VerifyForm() {
   const [busy, setBusy] = useState(false);
 
   async function verify() {
-    if (!token) return alertError("अमान्य लिंक।");
+    if (!token) return alertError("Invalid link.");
     setBusy(true);
     try {
       const res = await apiFetch<{ role: "deo" | "admin"; districtId: number | null }>(
@@ -22,7 +22,7 @@ function VerifyForm() {
       saveClientSession(res);
       router.push(res.role === "admin" ? "/admin" : "/entry");
     } catch (err) {
-      await alertError(err instanceof ApiError ? err.message : "सत्यापन विफल रहा।");
+      await alertError(err instanceof ApiError ? err.message : "Verification failed.");
     } finally {
       setBusy(false);
     }
@@ -31,7 +31,7 @@ function VerifyForm() {
   return (
     <div className="flex flex-1 items-center justify-center bg-zinc-50 px-4">
       <div className="w-full max-w-sm rounded-lg border border-zinc-200 bg-white p-6 text-center shadow-sm">
-        <h1 className="mb-4 text-lg font-semibold text-zinc-900">लॉगिन सत्यापित करें</h1>
+        <h1 className="mb-4 text-lg font-semibold text-zinc-900">Verify Login</h1>
         <button
           onClick={verify}
           disabled={busy || !token}

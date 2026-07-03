@@ -18,13 +18,13 @@ export default function MasterView({ years, submittedByName, onSubmittedByNameCh
 
   return (
     <div className="space-y-4">
-      <h2 className="text-base font-semibold text-zinc-900">मास्टर व्यू — सभी 5 वर्षों का सारांश</h2>
+      <h2 className="text-base font-semibold text-zinc-900">Master View — Summary of All 5 Years</h2>
 
       <div className="overflow-x-auto rounded-md border border-zinc-200">
         <table className="w-full min-w-[720px] border-collapse text-sm">
           <thead>
             <tr className="bg-zinc-100">
-              <th className="sticky left-0 bg-zinc-100 px-3 py-2 text-left font-medium text-zinc-700">विवरण</th>
+              <th className="sticky left-0 bg-zinc-100 px-3 py-2 text-left font-medium text-zinc-700">Field</th>
               {FINANCIAL_YEARS.map((fy) => (
                 <th key={fy} className="px-3 py-2 text-right font-medium text-zinc-700">
                   {fy}
@@ -50,7 +50,7 @@ export default function MasterView({ years, submittedByName, onSubmittedByNameCh
       </div>
 
       <label className="block max-w-sm">
-        <span className="mb-1 block text-sm font-medium text-zinc-700">DEO का नाम (सबमिट करने वाला अधिकारी)</span>
+        <span className="mb-1 block text-sm font-medium text-zinc-700">DEO Name (Submitting Officer)</span>
         <input
           type="text"
           value={submittedByName}
@@ -58,7 +58,7 @@ export default function MasterView({ years, submittedByName, onSubmittedByNameCh
           onBlur={() => setNameTouched(true)}
           className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
         />
-        {nameTouched && nameMissing && <span className="mt-1 block text-xs text-red-600">नाम आवश्यक है।</span>}
+        {nameTouched && nameMissing && <span className="mt-1 block text-xs text-red-600">Name is required.</span>}
       </label>
 
       <button
@@ -67,7 +67,7 @@ export default function MasterView({ years, submittedByName, onSubmittedByNameCh
         disabled={busy || nameMissing}
         className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
       >
-        अंतिम रूप से सबमिट करें और लॉक करें
+        Final Submit & Lock
       </button>
     </div>
   );

@@ -21,7 +21,7 @@ export default function YearStepForm({ year, onFieldChange, onSaveAndContinue, i
 
   return (
     <div className="space-y-4">
-      <h2 className="text-base font-semibold text-zinc-900">वित्तीय वर्ष {year.financialYear}</h2>
+      <h2 className="text-base font-semibold text-zinc-900">Financial Year {year.financialYear}</h2>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {PAC_FIELD_ORDER.map((field) => (
@@ -37,12 +37,12 @@ export default function YearStepForm({ year, onFieldChange, onSaveAndContinue, i
 
       {!parityOk && (
         <p className="text-sm font-medium text-red-600">
-          वसूल की गयी धनराशि (3), आर.सी. में निहित धनराशि (2.ii) के बराबर होनी चाहिए।
+          Recovered Amount (3) must equal RC Amount (2.ii).
         </p>
       )}
 
       <div className="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm">
-        <span className="font-medium text-zinc-700">शुद्ध वसूली योग्य धनराशि (Net Recoverable): </span>
+        <span className="font-medium text-zinc-700">Net Recoverable / शुद्ध वसूली योग्य धनराशि: </span>
         <span className="font-semibold text-zinc-900">
           ₹{netRecoverable(gross, recovered, stay).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
         </span>
@@ -54,7 +54,7 @@ export default function YearStepForm({ year, onFieldChange, onSaveAndContinue, i
         disabled={!parityOk}
         className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
       >
-        {isLastYear ? "सहेजें और सारांश देखें" : "सहेजें और आगे बढ़ें"}
+        {isLastYear ? "Save & View Summary" : "Save & Continue"}
       </button>
     </div>
   );

@@ -26,13 +26,15 @@ export const PAC_FIELD_ORDER: PacField[] = [
   "stayAmount",
 ];
 
+// Bilingual by design — these are the only labels in the UI required to carry Hindi
+// (the government PAC/RC form's field names). Everything else (buttons, nav, alerts) is English.
 export const PAC_FIELD_LABELS: Record<PacField, string> = {
-  grossArrears: "1. सकल बकाया धनराशि",
-  rcCount: "2. (i) प्रेषित आर.सी. (R.C.) की संख्या",
-  rcAmount: "2. (ii) आर.सी. में निहित धनराशि",
-  recoveredAmount: "3. वसूल की गयी धनराशि",
-  stayCount: "4. (i) स्थगन आदेशों की संख्या",
-  stayAmount: "4. (ii) सक्षम न्यायालय द्वारा स्थगित धनराशि",
+  grossArrears: "1. Gross Arrears / सकल बकाया धनराशि",
+  rcCount: "2. (i) RCs Sent / प्रेषित आर.सी. की संख्या",
+  rcAmount: "2. (ii) RC Amount / आर.सी. में निहित धनराशि",
+  recoveredAmount: "3. Recovered Amount / वसूल की गयी धनराशि",
+  stayCount: "4. (i) Stay Orders / स्थगन आदेशों की संख्या",
+  stayAmount: "4. (ii) Stayed Amount / सक्षम न्यायालय द्वारा स्थगित धनराशि",
 };
 
 export function isMoneyField(field: PacField): field is MoneyField {

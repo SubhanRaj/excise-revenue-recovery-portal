@@ -109,10 +109,10 @@ export default function EntryPage() {
       });
       await db.draftYears.clear();
       clearClientSession();
-      await alertSuccess("डेटा सफलतापूर्वक सबमिट और लॉक कर दिया गया है।");
+      await alertSuccess("Data submitted and locked successfully.");
       router.replace("/login");
     } catch (err) {
-      await alertError(err instanceof ApiError ? err.message : "सबमिट विफल रहा।");
+      await alertError(err instanceof ApiError ? err.message : "Submit failed.");
     } finally {
       setSubmitting(false);
     }
@@ -133,7 +133,7 @@ export default function EntryPage() {
               step === i ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600"
             } disabled:cursor-not-allowed disabled:opacity-40`}
           >
-            वर्ष {i + 1}
+            Year {i + 1}
           </button>
         ))}
         <button
@@ -144,7 +144,7 @@ export default function EntryPage() {
             step === 5 ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600"
           } disabled:cursor-not-allowed disabled:opacity-40`}
         >
-          मास्टर व्यू
+          Master View
         </button>
       </nav>
 

@@ -13,7 +13,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="hi" className="h-full antialiased">
+    <html lang="en" className="h-full antialiased">
       <head>
         {/* Google Fonts (CDN) — Noto Sans Devanagari for Hindi labels, Inter for Latin/numerals */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />

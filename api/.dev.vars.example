@@ -1,3 +1,7 @@
 JWT_SECRET=replace-with-a-long-random-string
 RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
 FRONTEND_URL=http://localhost:3000
+# Optional — defaults to Resend's shared sandbox sender (onboarding@resend.dev), which can
+# only email the Resend account owner's own address. Set once mail.upexciseonline.co (or
+# another domain) is verified in Resend.
+FROM_EMAIL=onboarding@resend.dev
