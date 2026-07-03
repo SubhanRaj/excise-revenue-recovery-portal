@@ -96,25 +96,37 @@ npx wrangler d1 execute excise-revenue-recovery-db --remote --command \
 
 ## Incidents (what actually broke, for future reference)
 
-**2026-07-03/04 — production intermittently served a "Node.JS Compatibility Error"
-(`no nodejs_compat compatibility flag set`) instead of the app, and a magic-link verify
-would silently bounce back to `/login` with no error shown.**
+**2026-07-03/04 — production repeatedly reverted to a "Node.JS Compatibility Error"
+(`no nodejs_compat compatibility flag set`) minutes after every manual redeploy, and a
+magic-link verify would silently bounce back to `/login` with no error shown.**
 
-Root cause: this repo's Pages project accumulated several rapid redeploys during
-development, including ones that landed as `Preview` instead of `Production` due to a
-`--branch` mismatch (the project's configured production branch is `main`, but this repo's
-actual local branch is `master` — see DEPLOY.md). That produced multiple simultaneously
-"Production"-tagged deployments in Cloudflare's deployment history, and different edges
-appear to have served different (including stale/broken) ones inconsistently. The frontend
-build output is 100% static (`next build` with `output: "export"`, verified no
-`_worker.js` or `functions/` directory ever gets produced), so it can't actually require
-`nodejs_compat` — the error page was Cloudflare's generic template for that failure class,
-served from a bad cached edge state, not a real defect in this app.
+First diagnosis (wrong, but left in git history — see below for the real one): initially
+attributed to stale Cloudflare edge cache from earlier `--branch main` vs `master` deploy
+flakiness. A clean `wrangler pages deploy` made `curl` return 200 immediately each time —
+but the error kept coming back a short while later, which the edge-cache theory didn't
+actually explain.
 
-Fix: a clean rebuild + redeploy (`npm run pages:deploy`, which uses `--branch master`)
-resolved it immediately, confirmed via `curl` returning 200 and the Playwright suite
-passing end-to-end including the magic-link round trip. No code change was needed for this
-specific incident. If it recurs: check
-`npx wrangler pages deployment list --project-name excise-revenue-recovery-portal` for
-multiple `Production` rows, redeploy, and verify with `curl -i <url>/login` before assuming
-it's a code bug.
+**Real root cause**, found by querying the Cloudflare API directly for the Pages project's
+config (`GET /accounts/:id/pages/projects/excise-revenue-recovery-portal`): the project had
+a **GitHub Git integration connected** (`source.type: "github"`, set up in an earlier,
+interrupted session before this one — never mentioned or intentionally configured in this
+session's work). Its `build_config` was `build_command: "npx @cloudflare/next-on-pages@1"`,
+`destination_dir: ".vercel/output/static"` — a completely different, Vercel-community Next
+adapter that this app has never used (this app is `output: "export"`, deployed via plain
+`wrangler pages deploy` of the static `out/` directory) — with `compatibility_flags: []`.
+Every `git push` silently triggered Cloudflare's own auto-build with that broken config,
+which raced and overwrote each manual `wrangler pages deploy`, producing exactly this error
+a few minutes after every fix looked confirmed.
+
+Fix: disconnected the GitHub repo from the Pages project in the Cloudflare dashboard
+(no more competing auto-build), and replaced it with the two GitHub Actions workflows in
+`.github/workflows/` (`ci.yml`, `deploy.yml`) that run the *correct* build/deploy commands
+this repo actually uses. Verified with `gh workflow run deploy.yml -f target=both` end to
+end, plus repeated `curl` checks staying at 200 afterward (no more reverting).
+
+**Lesson for next time a Cloudflare deployment looks fixed but un-fixes itself:** check for
+a competing deploy path before re-diagnosing the app. `GET .../pages/projects/<name>`
+(`source`/`build_config` fields) for Pages Git integration, or a Worker's
+`.../workers/scripts/<name>/settings` `annotations["workers/triggered_by"]` (should say
+`version_upload` for a CLI/Action deploy, not something implying a separate build service)
+for Workers Builds.

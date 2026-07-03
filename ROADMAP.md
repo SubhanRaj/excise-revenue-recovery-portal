@@ -65,13 +65,28 @@
       against live production — see TESTING.md
 - [x] Regression tests for: unstyled-flash bug, popup-vs-inline-Banner pattern, and the
       full magic-link verify round trip against live D1
-- [x] Diagnosed and fixed a production incident where the frontend intermittently served
-      Cloudflare's generic "Node.JS Compatibility Error" page instead of the app, which
-      also explained an earlier report of magic-link verify silently bouncing to `/login`
-      — root cause was a stale/inconsistent Pages deployment (multiple simultaneously
-      `Production`-tagged deployments from earlier `--branch` flakiness), not a code
-      defect; fixed by a clean redeploy. Full writeup in TESTING.md's Incidents section.
+- [x] Investigated a production incident where the frontend intermittently served
+      Cloudflare's generic "Node.JS Compatibility Error" page instead of the app (also
+      explained an earlier report of magic-link verify silently bouncing to `/login`) —
+      root cause found in Milestone 8. Full writeup in TESTING.md's Incidents section.
 - [x] TESTING.md: e2e docs, manual DEO+Admin demo script, incident notes
+
+## Milestone 8 — CI/CD via GitHub Actions (done)
+
+- [x] Found the real root cause of Milestone 7's incident: the Pages project had a
+      Cloudflare **Git integration** (set up in an earlier, interrupted session) silently
+      auto-building on every push with `@cloudflare/next-on-pages` and no `nodejs_compat`
+      flag — completely wrong for this app's static-export setup — racing every manual
+      `wrangler pages deploy` and re-breaking production a few minutes after each fix
+- [x] Disconnected the Git integration via the Cloudflare dashboard; confirmed the API
+      Worker had no equivalent Workers Builds integration (clean, `version_upload`-only)
+- [x] `.github/workflows/ci.yml` + `deploy.yml`: path-filtered (only `api/**`/`frontend/**`
+      changes trigger anything — a docs-only commit doesn't), `deploy.yml` also supports
+      `workflow_dispatch` with a both/api/frontend target picker for on-demand deploys
+- [x] `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID` set as GitHub repo secrets; verified
+      end-to-end via `gh workflow run deploy.yml -f target=both`, both jobs green
+- [x] Docs updated (DEPLOY.md, TESTING.md) to make GitHub Actions the documented primary
+      deploy path, manual `wrangler` commands kept as local-dev/fallback reference
 
 ## Backlog / not started
 

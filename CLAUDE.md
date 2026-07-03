@@ -147,6 +147,17 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   project's `sendMagicLinkEmail`. Keep it a single self-contained inline-styled string;
   email clients don't reliably support external stylesheets or `<style>` blocks.
 
+## CI/CD
+
+`.github/workflows/ci.yml` and `deploy.yml` are the only things that deploy this project —
+see DEPLOY.md. **Do not connect a Cloudflare Pages Git integration for this repo.** One was
+briefly (accidentally, from an earlier session) configured with a wrong build command
+(`@cloudflare/next-on-pages`, not this app's actual static-export build) and no
+`nodejs_compat` flag; it silently auto-built on every push and raced/overwrote real
+deploys, causing a real production incident — see TESTING.md's Incidents section. It's been
+disconnected. If a Cloudflare dashboard nudges you to "connect to Git" for this Pages
+project, don't.
+
 ## Known gaps / intentionally out of scope
 
 - No admin UI to provision new DEO users (add `cug_hash`/`email` rows) — currently a

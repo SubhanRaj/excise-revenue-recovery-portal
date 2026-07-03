@@ -17,6 +17,28 @@ current production state and the exact commands to redeploy or rebuild from scra
 Auth to Cloudflare: `npx wrangler whoami` (already logged in via OAuth on this machine).
 Re-auth elsewhere with `npx wrangler login`.
 
+## CI/CD — GitHub Actions is the primary deploy path
+
+`.github/workflows/ci.yml` and `deploy.yml` typecheck/build/deploy `api/` and `frontend/`
+independently, path-filtered so a docs-only commit doesn't trigger anything. Deploys run
+automatically on push to `master` when `api/**` or `frontend/**` actually changed, and can
+always be triggered manually regardless of what changed:
+
+```bash
+gh workflow run deploy.yml -f target=both     # or target=api / target=frontend
+gh run watch <run-id> --exit-status           # follow it live
+```
+
+Secrets used by the workflows (`gh secret list --repo SubhanRaj/excise-revenue-recovery-portal`):
+`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`. Manual `wrangler` commands below still work
+for local development and emergency redeploys, but treat GitHub Actions as the source of
+truth for what's actually live — see TESTING.md's Incidents section for why: this Pages
+project used to also have a **Cloudflare Git integration** silently auto-building on every
+push with a completely wrong config, racing every manual deploy. That's been disconnected;
+these two workflows are the only thing that deploys this project now. If production ever
+looks fixed after a manual `wrangler` deploy but reverts a few minutes later, suspect a
+competing deploy path before re-diagnosing the app (see TESTING.md).
+
 ## One-time setup (already done — for reference / disaster recovery)
 
 ```bash
@@ -100,11 +122,13 @@ npm run pages:deploy   # = wrangler pages deploy out --project-name ... --branch
 A `--branch` matching the Pages project's production branch is required for a *Production*
 deployment with the stable `https://excise-revenue-recovery-portal.pages.dev` URL — anything
 else lands as a *Preview* on a random per-deploy subdomain (harmless to try, but not what
-users will see). The project was created with `--production-branch main`, but this is a
-direct-upload project with no Git integration, and in practice `--branch master` (this
-repo's actual local branch) is what reliably produces a `Production` deployment — confirm
-with `npx wrangler pages deployment list --project-name excise-revenue-recovery-portal`
-after any deploy rather than trusting the `--branch` value blindly.
+users will see). The project was created with `--production-branch main`, but this repo's actual branch is
+`master`, and in practice `--branch master` is what reliably produces a `Production`
+deployment — confirm with
+`npx wrangler pages deployment list --project-name excise-revenue-recovery-portal` after
+any deploy rather than trusting the `--branch` value blindly. This is now a direct-upload
+project with no Git integration (see the CI/CD section above for why that matters) — all
+deploys are either the GitHub Actions workflows or a manual `wrangler`/`npm run` command.
 
 `NEXT_PUBLIC_API_URL` is baked in at build time (`frontend/lib/config.ts`) since this is a
 static export with no server to read env vars at request time. Changing it means rebuilding
