@@ -12,7 +12,7 @@
 
 - [x] CUG mobile hash flow (`/api/auth/verify-cug`)
 - [x] Magic link flow (`/api/auth/request-magic-link`, `/api/auth/verify-magic-link`)
-- [x] Unified `__session` JWT cookie, cross-origin CORS (`api/proxy.ts`)
+- [x] Unified `__session` JWT cookie, cross-origin CORS (`api/middleware.ts`)
 - [x] `/api/auth/me` session check + `/api/auth/logout`
 - [x] Frontend `/login` and `/verify` pages
 
@@ -32,14 +32,18 @@
       SheetJS Community — see CLAUDE.md)
 - [x] Unlock endpoint + UI action
 
-## Milestone 5 — Deploy
+## Milestone 5 — Deploy (done)
 
-- [ ] Create production D1 database, wire `database_id` into `api/wrangler.jsonc`
-- [ ] Deploy API to Cloudflare Workers (OpenNext build + `wrangler deploy`)
-- [ ] Deploy frontend to Cloudflare Pages (static export)
-- [ ] Set production secrets (`JWT_SECRET`, `RESEND_API_KEY`, `FRONTEND_URL`,
-      `NEXT_PUBLIC_API_URL`)
-- [ ] Run remote migrations + seed against production D1
+- [x] Production D1 database created, `database_id` wired into `api/wrangler.jsonc`
+- [x] API deployed to Cloudflare Workers: https://excise-revenue-recovery-api.shubhanraj2002.workers.dev
+- [x] Frontend deployed to Cloudflare Pages: https://excise-revenue-recovery-portal.pages.dev
+- [x] Production secrets set via `wrangler secret put` (`JWT_SECRET`, `RESEND_API_KEY`,
+      `FRONTEND_URL`); `NEXT_PUBLIC_API_URL` passed at frontend build time
+- [x] Remote migration + seed applied (75 districts + superadmin
+      `shubhanraj2002@gmail.com`, sign in via Magic Link)
+- Note: OpenNext Cloudflare 1.20.1 doesn't yet support Next 16's Node-runtime `proxy.ts`
+  convention — the CORS gate stayed on the legacy `api/middleware.ts` (Edge runtime), which
+  still works and only emits a deprecation warning on build.
 
 ## Backlog / not started
 

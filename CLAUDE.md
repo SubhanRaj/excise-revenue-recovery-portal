@@ -21,7 +21,7 @@ both (financial years, PAC field order/labels) are deliberately duplicated —
 or the parity/validation rules, change both sides and keep them in sync by hand.
 
 They communicate only over HTTP, cross-origin, with credentials (cookies) included. See
-"Auth" below for why the cookie is `SameSite=None` and why `api/proxy.ts` exists.
+"Auth" below for why the cookie is `SameSite=None` and why `api/middleware.ts` exists.
 
 ## Data model (`api/db/schema.ts`)
 
@@ -60,7 +60,7 @@ They communicate only over HTTP, cross-origin, with credentials (cookies) includ
    not assume the frontend's validation ran. If you add a new client-side rule, mirror it
    in `validateRow()` in the submit route.
 
-## Auth (`api/lib/session.ts`, `api/lib/auth-guard.ts`, `api/proxy.ts`)
+## Auth (`api/lib/session.ts`, `api/lib/auth-guard.ts`, `api/middleware.ts`)
 
 Unified 7-day HttpOnly JWT cookie (`__session`, via `jose`), issued by either flow:
 
@@ -79,7 +79,7 @@ Unified 7-day HttpOnly JWT cookie (`__session`, via `jose`), issued by either fl
   nothing left for that DEO to do.
 
 Because `/frontend` (Pages) and `/api` (Worker) are separate origins in production, the
-cookie is `SameSite=None; Secure`, and `api/proxy.ts` adds matching CORS headers
+cookie is `SameSite=None; Secure`, and `api/middleware.ts` adds matching CORS headers
 (`Access-Control-Allow-Origin` echoed only when it equals `FRONTEND_URL`, plus
 `Allow-Credentials: true` — never a wildcard origin with credentials). If you ever put
 both apps behind one zone (e.g. `/api/*` routed to the Worker on the same domain), this

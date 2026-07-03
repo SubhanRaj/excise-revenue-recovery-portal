@@ -42,23 +42,13 @@ npm run dev                       # http://localhost:8787 (default Next dev port
 
 ## Deploying
 
-```bash
-cd api
-wrangler d1 create excise-revenue-recovery-db   # once — paste the returned database_id into wrangler.jsonc
-npm run db:migrate:remote
-npm run db:seed:remote
-npm run deploy                                   # builds with OpenNext, deploys the Worker
-
-cd ../frontend
-npm run build                                    # static export to frontend/out
-npx wrangler pages deploy out --project-name excise-revenue-recovery-portal
-```
-
-Set `FRONTEND_URL` (api) and `NEXT_PUBLIC_API_URL` (frontend, at build time) to each other's
-deployed origin, and set the same secrets in `wrangler.jsonc` / the Cloudflare dashboard as in
-`.dev.vars`.
+Live at: API `https://excise-revenue-recovery-api.shubhanraj2002.workers.dev`, frontend
+`https://excise-revenue-recovery-portal.pages.dev`. Full deploy/redeploy commands,
+required secrets, and the OpenNext/Next-16-middleware gotcha that blocks a naive deploy
+are in [DEPLOY.md](./DEPLOY.md).
 
 ## Documentation
 
 - [CLAUDE.md](./CLAUDE.md) — data model, auth flows, validation rules, and conventions for AI agents working in this repo.
+- [DEPLOY.md](./DEPLOY.md) — production deployment state, secrets, and redeploy commands.
 - [ROADMAP.md](./ROADMAP.md) — milestones and progress tracking.
