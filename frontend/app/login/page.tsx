@@ -11,10 +11,11 @@ import Banner from "@/components/ui/Banner";
 
 type Tab = "cug" | "email";
 
-// Excise Dept. CUG mobile numbers all start with this prefix. The demo/test
-// number (see TESTING.md) is exempted so the seeded demo account keeps working.
+// Excise Dept. CUG mobile numbers all start with this prefix. The seeded
+// demo/test account is exempted (by hash, not by number, so the raw value
+// never appears in shipped source) so it keeps working outside that range.
 const CUG_PREFIX = "94544";
-const DEMO_CUG = "9999999999";
+const DEMO_CUG_HASH = "ce3a598687c8d2e5aa6bedad20e059b4a78cca0adad7e563b07998d5cd226b8c";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -36,12 +37,13 @@ export default function LoginPage() {
     if (!/^\d{10}$/.test(mobile)) {
       return setError("Please enter a valid 10-digit mobile number.");
     }
-    if (mobile !== DEMO_CUG && !mobile.startsWith(CUG_PREFIX)) {
-      return setError("Invalid user.");
-    }
     setBusy(true);
     try {
       const cugHash = await sha256Hex(mobile);
+      if (cugHash !== DEMO_CUG_HASH && !mobile.startsWith(CUG_PREFIX)) {
+        setBusy(false);
+        return setError("Invalid user.");
+      }
       const res = await apiFetch<{ role: "deo" | "admin"; districtId: number | null }>(
         "/api/auth/verify-cug",
         { method: "POST", body: JSON.stringify({ cugHash }) }

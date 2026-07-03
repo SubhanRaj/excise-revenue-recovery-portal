@@ -64,7 +64,7 @@ DEO-role account, since none is seeded by default (DEO provisioning is a manual 
 operation — see CLAUDE.md's "Known gaps"). To add a disposable one:
 
 ```bash
-MOBILE="9999999999"
+MOBILE="<demo CUG — see the DEMO_CUG Worker secret, not written here>"
 HASH=$(printf '%s' "$MOBILE" | shasum -a 256 | cut -d' ' -f1)
 cd api
 npx wrangler d1 execute excise-revenue-recovery-db --remote --command \
@@ -76,7 +76,7 @@ Then:
 1. **Admin**: `/login` → Email tab → `shubhanraj2002@gmail.com` → check inbox for the
    styled login-link email (`api/lib/email.ts`) → Verify & Continue → `/admin` shows all
    75 districts. Try Sync, switching financial years, Export to Excel.
-2. **DEO**: `/login` → CUG tab → `9999999999` → lands on `/entry`. Walk Year 1 → 5: leave
+2. **DEO**: `/login` → CUG tab → the demo CUG → lands on `/entry`. Walk Year 1 → 5: leave
    a field blank and hit "Save & Continue" (inline anti-blank Banner, no popup), make
    Recovered Amount ≠ RC Amount (inline parity Banner, button disabled), watch Net
    Recoverable update live. On Year 5, reach Master View, type a name, hit "Final Submit &
