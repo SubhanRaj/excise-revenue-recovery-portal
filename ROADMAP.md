@@ -59,6 +59,20 @@
 - [x] UI chrome anglicized; Hindi now scoped to the 6 PAC field labels + department name
 - [x] Styled HTML magic-link email (`api/lib/email.ts`) instead of bare `<p>` tags
 
+## Milestone 7 — Testing + production incident (done)
+
+- [x] Playwright e2e suite (`frontend/e2e/login.spec.ts`) driving real installed Chrome
+      against live production — see TESTING.md
+- [x] Regression tests for: unstyled-flash bug, popup-vs-inline-Banner pattern, and the
+      full magic-link verify round trip against live D1
+- [x] Diagnosed and fixed a production incident where the frontend intermittently served
+      Cloudflare's generic "Node.JS Compatibility Error" page instead of the app, which
+      also explained an earlier report of magic-link verify silently bouncing to `/login`
+      — root cause was a stale/inconsistent Pages deployment (multiple simultaneously
+      `Production`-tagged deployments from earlier `--branch` flakiness), not a code
+      defect; fixed by a clean redeploy. Full writeup in TESTING.md's Incidents section.
+- [x] TESTING.md: e2e docs, manual DEO+Admin demo script, incident notes
+
 ## Backlog / not started
 
 - [ ] Admin UI to provision DEO users (currently manual DB insert — see CLAUDE.md "Known gaps")

@@ -51,4 +51,5 @@ are in [DEPLOY.md](./DEPLOY.md).
 
 - [CLAUDE.md](./CLAUDE.md) — data model, auth flows, validation rules, and conventions for AI agents working in this repo.
 - [DEPLOY.md](./DEPLOY.md) — production deployment state, secrets, and redeploy commands.
+- [TESTING.md](./TESTING.md) — Playwright e2e suite (real Chrome, against live production), manual demo script, and incident notes.
 - [ROADMAP.md](./ROADMAP.md) — milestones and progress tracking.

@@ -89,6 +89,15 @@ cookie is `SameSite=None; Secure`, and `api/middleware.ts` adds matching CORS he
 both apps behind one zone (e.g. `/api/*` routed to the Worker on the same domain), this
 whole cross-origin dance becomes unnecessary — simplify it if that happens.
 
+**Open risk, not yet hit:** `SameSite=None` cross-site cookies between two different public
+suffix domains (`pages.dev`, `workers.dev`) are exactly what Safari's Intelligent Tracking
+Prevention and Chrome's third-party-cookie deprecation target. `frontend/e2e/login.spec.ts`
+verifies the full magic-link round trip in real Chrome and it currently works, but that's
+not proof it works in Safari — if a user ever reports auth silently failing (verify
+"succeeds" but every subsequent `/api/auth/me` call 401s) on Safari specifically, this is
+the first thing to check, and the real fix is collapsing both apps onto one zone (see
+above), not a cookie-flag workaround.
+
 ## Frontend offline flow (`frontend/lib/db.ts`, Dexie)
 
 DEO data entry is 5 sequential year steps + a Master View, gated so year `N+1` unlocks

@@ -122,11 +122,16 @@ curl -s -i -X OPTIONS "$API/api/auth/request-magic-link" \
   -H "Origin: $FRONT" -H "Access-Control-Request-Method: POST" \
   | grep -i access-control                                    # expect the Pages origin echoed back
 
-curl -s -o /dev/null -w "%{http_code}\n" "$FRONT/login"        # expect 200
+curl -s -i "$FRONT/login" | head -1                            # expect HTTP/2 200, not 503
 ```
 
-Then in a real browser: sign in at `$FRONT/login` with the superadmin email, confirm the
-Magic Link email arrives, click through, and confirm `/admin` loads the 75 districts.
+A `503` with title "Node.JS Compatibility Error" on `$FRONT` means you're looking at a
+stale/broken Pages deployment, not a real code issue — see TESTING.md's Incidents section.
+Redeploy (`npm run pages:deploy` in `frontend/`) and recheck before assuming it's a defect.
+
+Then in a real browser (or run `npm run e2e` in `frontend/` — see TESTING.md): sign in at
+`$FRONT/login` with the superadmin email, confirm the Magic Link email arrives, click
+through, and confirm `/admin` loads the 75 districts.
 
 ## Known deployment constraints
 
@@ -141,3 +146,10 @@ Magic Link email arrives, click through, and confirm `/admin` loads the 75 distr
   `.xlsx` header row to actually freeze; see `frontend/lib/export.ts`.
 - D1 database region is APAC (set at creation, `wrangler d1 create` doesn't currently
   expose a region flag — Cloudflare places it near where you ran the command).
+- **A deploy that lands as `Preview` instead of `Production`** (wrong `--branch`, see the
+  redeploy section above) doesn't just miss the stable URL — it can leave multiple
+  deployments simultaneously tagged `Production` in Cloudflare's history, and different
+  edges have been observed serving different (including stale) ones inconsistently until a
+  clean redeploy settles it. Always confirm with
+  `npx wrangler pages deployment list --project-name excise-revenue-recovery-portal` and a
+  `curl -i` status-code check after deploying, not just "the command exited 0."
