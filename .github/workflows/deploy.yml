@@ -1,0 +1,92 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Which app to deploy
+        required: true
+        default: both
+        type: choice
+        options: [both, api, frontend]
+  push:
+    branches: [master]
+    paths:
+      - "api/**"
+      - "frontend/**"
+      - ".github/workflows/deploy.yml"
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            api:
+              - 'api/**'
+            frontend:
+              - 'frontend/**'
+
+  deploy-api:
+    name: Deploy API Worker
+    needs: changes
+    if: >
+      github.event_name == 'workflow_dispatch' && (inputs.target == 'both' || inputs.target == 'api') ||
+      (github.event_name == 'push' && needs.changes.outputs.api == 'true')
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: api/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - name: Build & deploy API Worker
+        run: npm run deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  deploy-frontend:
+    name: Deploy Frontend (Pages)
+    needs: changes
+    if: >
+      github.event_name == 'workflow_dispatch' && (inputs.target == 'both' || inputs.target == 'frontend') ||
+      (github.event_name == 'push' && needs.changes.outputs.frontend == 'true')
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - name: Build static export
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: https://excise-revenue-recovery-api.shubhanraj2002.workers.dev
+      # pages:deploy already hardcodes --branch master, which is this Pages project's
+      # actual production branch — see DEPLOY.md for why that matters.
+      - name: Deploy to Cloudflare Pages
+        run: npm run pages:deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
