@@ -94,14 +94,17 @@ npm run db:migrate:remote   # and db:migrate:local for your local D1 too
 ```bash
 cd frontend
 NEXT_PUBLIC_API_URL="https://excise-revenue-recovery-api.shubhanraj2002.workers.dev" npm run build
-npm run pages:deploy   # = wrangler pages deploy out --project-name ... --branch main
+npm run pages:deploy   # = wrangler pages deploy out --project-name ... --branch master
 ```
 
-`--branch main` is required for a *Production* deployment with the stable
-`https://excise-revenue-recovery-portal.pages.dev` URL. Omitting it (or deploying from a
-branch other than the project's configured production branch, currently `main`) creates a
-*Preview* deployment on a random per-deploy subdomain instead — harmless to try, but not
-what users will see.
+A `--branch` matching the Pages project's production branch is required for a *Production*
+deployment with the stable `https://excise-revenue-recovery-portal.pages.dev` URL — anything
+else lands as a *Preview* on a random per-deploy subdomain (harmless to try, but not what
+users will see). The project was created with `--production-branch main`, but this is a
+direct-upload project with no Git integration, and in practice `--branch master` (this
+repo's actual local branch) is what reliably produces a `Production` deployment — confirm
+with `npx wrangler pages deployment list --project-name excise-revenue-recovery-portal`
+after any deploy rather than trusting the `--branch` value blindly.
 
 `NEXT_PUBLIC_API_URL` is baked in at build time (`frontend/lib/config.ts`) since this is a
 static export with no server to read env vars at request time. Changing it means rebuilding

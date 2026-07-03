@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "pages:deploy": "wrangler pages deploy out --project-name excise-revenue-recovery-portal --branch main"
+    "pages:deploy": "wrangler pages deploy out --project-name excise-revenue-recovery-portal --branch master"
   },
   "dependencies": {
     "@tanstack/react-table": "^8.21.3",
