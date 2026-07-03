@@ -11,6 +11,11 @@ import Banner from "@/components/ui/Banner";
 
 type Tab = "cug" | "email";
 
+// Excise Dept. CUG mobile numbers all start with this prefix. The demo/test
+// number (see TESTING.md) is exempted so the seeded demo account keeps working.
+const CUG_PREFIX = "94544";
+const DEMO_CUG = "9999999999";
+
 export default function LoginPage() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("cug");
@@ -30,6 +35,9 @@ export default function LoginPage() {
     setError(null);
     if (!/^\d{10}$/.test(mobile)) {
       return setError("Please enter a valid 10-digit mobile number.");
+    }
+    if (mobile !== DEMO_CUG && !mobile.startsWith(CUG_PREFIX)) {
+      return setError(`CUG mobile numbers start with ${CUG_PREFIX}.`);
     }
     setBusy(true);
     try {
