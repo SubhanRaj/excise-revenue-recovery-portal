@@ -9,6 +9,7 @@ import { readClientSession, clearClientSession } from "@/lib/session";
 import { alertBlankField, alertError, alertSuccess, confirmFinalSubmit } from "@/lib/alerts";
 import YearStepForm from "@/components/YearStepForm";
 import MasterView from "@/components/MasterView";
+import AppHeader from "@/components/ui/AppHeader";
 
 function blankYear(financialYear: (typeof FINANCIAL_YEARS)[number]): DraftYear {
   return {
@@ -121,49 +122,65 @@ export default function EntryPage() {
   if (!ready) return null;
 
   return (
-    <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
-      <nav className="mb-6 flex flex-wrap gap-2">
-        {FINANCIAL_YEARS.map((fy, i) => (
+    <div className="flex min-h-full flex-1 flex-col bg-slate-50">
+      <AppHeader title="DEO Data Entry" />
+      <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
+        <nav className="mb-6 flex flex-wrap items-center gap-2">
+          {FINANCIAL_YEARS.map((fy, i) => {
+            const done = years[i]?.completed;
+            const locked = i !== 0 && !years[i - 1]?.completed;
+            return (
+              <button
+                key={fy}
+                type="button"
+                onClick={() => goToStep(i)}
+                disabled={locked}
+                className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                  step === i
+                    ? "bg-indigo-600 text-white shadow-sm"
+                    : done
+                      ? "bg-indigo-50 text-indigo-700"
+                      : "bg-slate-100 text-slate-500"
+                } disabled:cursor-not-allowed disabled:opacity-40`}
+              >
+                {done && step !== i && <i className="ti ti-check text-base" />}
+                Year {i + 1}
+              </button>
+            );
+          })}
+          <span className="mx-1 h-px flex-1 bg-slate-200" />
           <button
-            key={fy}
             type="button"
-            onClick={() => goToStep(i)}
-            disabled={i !== 0 && !years[i - 1]?.completed}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-              step === i ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600"
+            onClick={() => goToStep(5)}
+            disabled={!years.every((y) => y.completed)}
+            className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+              step === 5 ? "bg-indigo-600 text-white shadow-sm" : "bg-slate-100 text-slate-500"
             } disabled:cursor-not-allowed disabled:opacity-40`}
           >
-            Year {i + 1}
+            <i className="ti ti-clipboard-list text-base" />
+            Master View
           </button>
-        ))}
-        <button
-          type="button"
-          onClick={() => goToStep(5)}
-          disabled={!years.every((y) => y.completed)}
-          className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-            step === 5 ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600"
-          } disabled:cursor-not-allowed disabled:opacity-40`}
-        >
-          Master View
-        </button>
-      </nav>
+        </nav>
 
-      {step < 5 ? (
-        <YearStepForm
-          year={years[step]}
-          onFieldChange={(field, value) => updateField(step, field, value)}
-          onSaveAndContinue={() => saveAndContinue(step)}
-          isLastYear={step === 4}
-        />
-      ) : (
-        <MasterView
-          years={years}
-          submittedByName={submittedByName}
-          onSubmittedByNameChange={setSubmittedByName}
-          onSubmit={submitAll}
-          busy={submitting}
-        />
-      )}
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          {step < 5 ? (
+            <YearStepForm
+              year={years[step]}
+              onFieldChange={(field, value) => updateField(step, field, value)}
+              onSaveAndContinue={() => saveAndContinue(step)}
+              isLastYear={step === 4}
+            />
+          ) : (
+            <MasterView
+              years={years}
+              submittedByName={submittedByName}
+              onSubmittedByNameChange={setSubmittedByName}
+              onSubmit={submitAll}
+              busy={submitting}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 }

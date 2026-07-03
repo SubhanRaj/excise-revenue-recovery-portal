@@ -17,6 +17,8 @@ import { apiFetch, ApiError } from "@/lib/api";
 import { readClientSession, clearClientSession } from "@/lib/session";
 import { alertError, alertSuccess } from "@/lib/alerts";
 import { exportDistrictsToXlsx } from "@/lib/export";
+import AppHeader from "@/components/ui/AppHeader";
+import Button from "@/components/ui/Button";
 
 type Row = CachedDistrict & Record<(typeof PAC_FIELD_ORDER)[number], number>;
 
@@ -128,10 +130,11 @@ export default function AdminPage() {
         header: "Status",
         cell: (info) => (
           <span
-            className={`rounded px-2 py-0.5 text-xs font-medium ${
-              info.getValue() === 1 ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+              info.getValue() === 1 ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"
             }`}
           >
+            <i className={`ti ${info.getValue() === 1 ? "ti-lock" : "ti-lock-open"} text-sm`} />
             {info.getValue() === 1 ? "Locked" : "Unlocked"}
           </span>
         ),
@@ -158,7 +161,7 @@ export default function AdminPage() {
           row.original.lockStatus === 1 ? (
             <button
               onClick={() => unlock(row.original.id)}
-              className="rounded bg-zinc-900 px-2 py-1 text-xs font-medium text-white"
+              className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
             >
               Unlock
             </button>
@@ -183,76 +186,83 @@ export default function AdminPage() {
   if (!ready) return null;
 
   return (
-    <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <h1 className="mr-auto text-lg font-semibold text-zinc-900">Admin Dashboard — 75 Districts</h1>
-        <select
-          value={selectedYear}
-          onChange={(e) => setSelectedYear(e.target.value as (typeof FINANCIAL_YEARS)[number])}
-          className="rounded-md border border-zinc-300 px-2 py-1.5 text-sm"
-        >
-          {FINANCIAL_YEARS.map((fy) => (
-            <option key={fy} value={fy}>
-              {fy}
-            </option>
-          ))}
-        </select>
-        <input
-          type="text"
-          placeholder="Search district..."
-          value={globalFilter}
-          onChange={(e) => setGlobalFilter(e.target.value)}
-          className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm"
-        />
-        <button
-          onClick={sync}
-          disabled={syncing}
-          className="rounded-md bg-zinc-100 px-3 py-1.5 text-sm font-medium text-zinc-700 disabled:opacity-50"
-        >
-          {syncing ? "Syncing..." : "Sync"}
-        </button>
-        <button onClick={exportExcel} className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white">
-          Export to Excel
-        </button>
-      </div>
+    <div className="flex min-h-full flex-1 flex-col bg-slate-50">
+      <AppHeader title="Admin Dashboard" />
+      <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
+        <div className="mb-5 flex flex-wrap items-center gap-3">
+          <div className="mr-auto">
+            <h1 className="text-lg font-semibold text-slate-900">75 Districts</h1>
+            <p className="text-sm text-slate-500">Review, sync, and export PAC recovery data.</p>
+          </div>
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(e.target.value as (typeof FINANCIAL_YEARS)[number])}
+            className="rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+          >
+            {FINANCIAL_YEARS.map((fy) => (
+              <option key={fy} value={fy}>
+                {fy}
+              </option>
+            ))}
+          </select>
+          <span className="relative flex items-center">
+            <i className="ti ti-search pointer-events-none absolute left-3 text-base text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search district..."
+              value={globalFilter}
+              onChange={(e) => setGlobalFilter(e.target.value)}
+              className="rounded-md border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+            />
+          </span>
+          <Button variant="secondary" onClick={sync} disabled={syncing}>
+            <i className={`ti ti-refresh text-base ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Syncing..." : "Sync"}
+          </Button>
+          <Button onClick={exportExcel}>
+            <i className="ti ti-file-spreadsheet text-base" />
+            Export to Excel
+          </Button>
+        </div>
 
-      <div className="overflow-x-auto rounded-md border border-zinc-200">
-        <table className="w-full min-w-[1100px] border-collapse text-sm">
-          <thead>
-            {table.getHeaderGroups().map((hg) => (
-              <tr key={hg.id} className="bg-zinc-100">
-                {hg.headers.map((header) => (
-                  <th
-                    key={header.id}
-                    onClick={header.column.getToggleSortingHandler()}
-                    className={`sticky top-0 whitespace-nowrap px-3 py-2 text-left font-medium text-zinc-700 ${
-                      header.column.getCanSort() ? "cursor-pointer select-none" : ""
-                    } ${header.column.getIsPinned() ? "left-0 z-10 bg-zinc-100" : ""}`}
-                  >
-                    {flexRender(header.column.columnDef.header, header.getContext())}
-                    {{ asc: " ▲", desc: " ▼" }[header.column.getIsSorted() as string] ?? ""}
-                  </th>
-                ))}
-              </tr>
-            ))}
-          </thead>
-          <tbody>
-            {table.getRowModel().rows.map((row) => (
-              <tr key={row.id} className="border-t border-zinc-200">
-                {row.getVisibleCells().map((cell) => (
-                  <td
-                    key={cell.id}
-                    className={`whitespace-nowrap px-3 py-2 ${
-                      cell.column.getIsPinned() ? "sticky left-0 z-10 bg-white" : ""
-                    }`}
-                  >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+          <table className="w-full min-w-[1100px] border-collapse text-sm">
+            <thead>
+              {table.getHeaderGroups().map((hg) => (
+                <tr key={hg.id} className="bg-slate-50">
+                  {hg.headers.map((header) => (
+                    <th
+                      key={header.id}
+                      onClick={header.column.getToggleSortingHandler()}
+                      className={`sticky top-0 whitespace-nowrap px-3 py-2.5 text-left font-medium text-slate-600 ${
+                        header.column.getCanSort() ? "cursor-pointer select-none hover:text-slate-900" : ""
+                      } ${header.column.getIsPinned() ? "left-0 z-10 bg-slate-50" : ""}`}
+                    >
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                      {{ asc: " ▲", desc: " ▼" }[header.column.getIsSorted() as string] ?? ""}
+                    </th>
+                  ))}
+                </tr>
+              ))}
+            </thead>
+            <tbody>
+              {table.getRowModel().rows.map((row) => (
+                <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50">
+                  {row.getVisibleCells().map((cell) => (
+                    <td
+                      key={cell.id}
+                      className={`whitespace-nowrap px-3 py-2.5 text-slate-800 ${
+                        cell.column.getIsPinned() ? "sticky left-0 z-10 bg-inherit font-medium" : ""
+                      }`}
+                    >
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

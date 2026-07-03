@@ -2,6 +2,13 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import "./globals.css";
 
+// next/script's beforeInteractive strategy injects scripts via a JS runtime hook, so it
+// doesn't block the initial HTML paint — the page can flash unstyled before it runs. A
+// plain synchronous <script> tag in <head> (no async/defer) *does* block parsing, which is
+// also how Tailwind's own Play/browser CDN script expects to be loaded: it installs a
+// MutationObserver, so blocking in <head> before <body> exists is the correct placement,
+// not a workaround.
+
 export const metadata: Metadata = {
   title: "Excise Revenue Recovery Portal | आबकारी विभाग, उत्तर प्रदेश",
   description: "State Excise Revenue Recovery (PAC/RC) Portal",
@@ -22,11 +29,9 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
-        {/* Tailwind CSS v4 (Play CDN, jsDelivr-mirrored) — utility classes only, no build step */}
-        <Script
-          src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"
-          strategy="beforeInteractive"
-        />
+        {/* Tailwind CSS v4 (Play CDN, jsDelivr-mirrored) — utility classes only, no build step.
+            Plain <script>, not next/script: must block parsing so no unstyled flash. */}
+        <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4" />
         {/* Tabler Icons (CDN) — strictly icons, no emojis anywhere in the UI */}
         <link
           rel="stylesheet"

@@ -6,6 +6,8 @@ import { apiFetch, ApiError } from "@/lib/api";
 import { sha256Hex } from "@/lib/crypto";
 import { saveClientSession } from "@/lib/session";
 import { alertError, alertSuccess } from "@/lib/alerts";
+import Button from "@/components/ui/Button";
+import TextField from "@/components/ui/TextField";
 
 type Tab = "cug" | "email";
 
@@ -54,65 +56,70 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex flex-1 items-center justify-center bg-zinc-50 px-4">
-      <div className="w-full max-w-sm rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
-        <h1 className="text-lg font-semibold text-zinc-900">Department of Excise, Uttar Pradesh</h1>
-        <p className="mb-6 text-sm text-zinc-500">Excise Revenue Recovery Portal</p>
-
-        <div className="mb-4 flex rounded-md bg-zinc-100 p-1 text-sm">
-          <button
-            className={`flex-1 rounded py-1.5 ${tab === "cug" ? "bg-white shadow-sm font-medium" : "text-zinc-500"}`}
-            onClick={() => setTab("cug")}
-            type="button"
-          >
-            CUG Mobile (DEO)
-          </button>
-          <button
-            className={`flex-1 rounded py-1.5 ${tab === "email" ? "bg-white shadow-sm font-medium" : "text-zinc-500"}`}
-            onClick={() => setTab("email")}
-            type="button"
-          >
-            Email (Admin)
-          </button>
+    <div className="flex flex-1 items-center justify-center bg-gradient-to-b from-slate-50 to-indigo-50 px-4 py-12">
+      <div className="w-full max-w-sm">
+        <div className="mb-6 flex flex-col items-center text-center">
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 text-2xl font-bold text-white shadow-lg shadow-indigo-200">
+            ₹
+          </div>
+          <h1 className="text-lg font-semibold text-slate-900">Department of Excise, Uttar Pradesh</h1>
+          <p className="mt-1 text-sm text-slate-500">Excise Revenue Recovery Portal</p>
         </div>
 
-        {tab === "cug" ? (
-          <form onSubmit={submitCug} className="space-y-3">
-            <input
-              type="tel"
-              inputMode="numeric"
-              maxLength={10}
-              placeholder="10-digit CUG mobile number"
-              value={mobile}
-              onChange={(e) => setMobile(e.target.value.replace(/\D/g, ""))}
-              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-            />
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/60">
+          <div className="mb-6 flex rounded-lg bg-slate-100 p-1 text-sm">
             <button
-              type="submit"
-              disabled={busy}
-              className="w-full rounded-md bg-zinc-900 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className={`flex-1 rounded-md py-2 font-medium transition-colors ${
+                tab === "cug" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+              onClick={() => setTab("cug")}
+              type="button"
             >
-              Login
+              CUG Mobile (DEO)
             </button>
-          </form>
-        ) : (
-          <form onSubmit={submitEmail} className="space-y-3">
-            <input
-              type="email"
-              placeholder="Email address"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-            />
             <button
-              type="submit"
-              disabled={busy}
-              className="w-full rounded-md bg-zinc-900 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className={`flex-1 rounded-md py-2 font-medium transition-colors ${
+                tab === "email" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+              onClick={() => setTab("email")}
+              type="button"
             >
-              Send Login Link
+              Email (Admin)
             </button>
-          </form>
-        )}
+          </div>
+
+          {tab === "cug" ? (
+            <form onSubmit={submitCug} className="space-y-4">
+              <TextField
+                label="CUG Mobile Number"
+                icon="ti-device-mobile"
+                type="tel"
+                inputMode="numeric"
+                maxLength={10}
+                placeholder="10-digit CUG mobile number"
+                value={mobile}
+                onChange={(e) => setMobile(e.target.value.replace(/\D/g, ""))}
+              />
+              <Button type="submit" disabled={busy} className="w-full">
+                {busy ? "Signing in..." : "Login"}
+              </Button>
+            </form>
+          ) : (
+            <form onSubmit={submitEmail} className="space-y-4">
+              <TextField
+                label="Email Address"
+                icon="ti-mail"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+              <Button type="submit" disabled={busy} className="w-full">
+                {busy ? "Sending..." : "Send Login Link"}
+              </Button>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   );
