@@ -1,0 +1,3 @@
+JWT_SECRET=replace-with-a-long-random-string
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+FRONTEND_URL=http://localhost:3000

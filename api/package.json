@@ -1,0 +1,38 @@
+{
+  "name": "api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf-typegen": "wrangler types",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply excise-revenue-recovery-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply excise-revenue-recovery-db --remote",
+    "db:seed:local": "wrangler d1 execute excise-revenue-recovery-db --local --file=./drizzle/seed.sql",
+    "db:seed:remote": "wrangler d1 execute excise-revenue-recovery-db --remote --file=./drizzle/seed.sql"
+  },
+  "dependencies": {
+    "@opennextjs/cloudflare": "^1.20.1",
+    "drizzle-orm": "^0.45.2",
+    "jose": "^6.2.3",
+    "next": "16.2.10",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "resend": "^6.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.10",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.10",
+    "typescript": "^5",
+    "wrangler": "^4.107.0"
+  }
+}

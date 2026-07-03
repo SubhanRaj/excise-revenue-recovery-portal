@@ -1,0 +1,22 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"main": ".open-next/worker.js",
+	"name": "excise-revenue-recovery-api",
+	"compatibility_date": "2026-06-01",
+	"compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+	"assets": {
+		"directory": ".open-next/assets",
+		"binding": "ASSETS"
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "excise-revenue-recovery-db",
+			// Replace with the ID printed by `wrangler d1 create excise-revenue-recovery-db`
+			"database_id": "<D1_DATABASE_ID>"
+		}
+	]
+	// ponytail: no R2 incremental cache / images binding — this API has no ISR pages or
+	// next/image usage. Add them back (see @opennextjs/cloudflare templates/wrangler.jsonc)
+	// if that changes.
+}
