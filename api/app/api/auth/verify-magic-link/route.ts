@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     .limit(1);
 
   if (!row || new Date(row.expiresAt) < new Date()) {
-    return NextResponse.json({ error: "लिंक अमान्य या समाप्त हो चुका है" }, { status: 401 });
+    return NextResponse.json({ error: "This link is invalid or has expired" }, { status: 401 });
   }
 
   const [user] = await db.select().from(users).where(eq(users.id, row.userId)).limit(1);

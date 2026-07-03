@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
   const [user] = await db.select().from(users).where(eq(users.cugHash, cugHash)).limit(1);
 
   if (!user) {
-    return NextResponse.json({ error: "अमान्य CUG नंबर" }, { status: 401 });
+    return NextResponse.json({ error: "Invalid CUG number" }, { status: 401 });
   }
 
   const token = await signSession({
