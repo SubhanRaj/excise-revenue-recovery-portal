@@ -346,7 +346,12 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   separate lines built from plain per-language field name constants
   (`RECOVERED_AMOUNT_EN`/`_HI`, `RC_AMOUNT_EN`/`_HI`) — don't go back to interpolating the
   combined bilingual `"English / हिन्दी"` label into one sentence, that mixes both languages
-  mid-line instead of one clean line per language.
+  mid-line instead of one clean line per language. The Previous Year / Save & Continue row is
+  `flex-col-reverse` below `sm` (each button `w-full`) and `sm:flex-row` above it — `Button`'s
+  base classes force `whitespace-nowrap`, so the longest label ("Save & View Summary") plus
+  "Previous Year" side by side overflowed a phone-width container before this; `-reverse` keeps
+  the primary action visually on top while `onBack`'s `<span />` placeholder only needs to exist
+  at `sm`+ to hold the `justify-between` gap.
 - **Tables must stay auto-layout (not `table-fixed`) wherever a cell can hold a large money
   value.** A district's Gross Arrears can be in the crores (`₹10,00,00,000.00` is a realistic
   value, not an edge case); a fixed-width column can't grow for it and the text

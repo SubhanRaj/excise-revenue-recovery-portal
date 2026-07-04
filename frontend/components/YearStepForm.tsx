@@ -123,16 +123,16 @@ export default function YearStepForm({ year, onFieldChange, onSaveAndContinue, o
         </span>
       </div>
 
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
         {onBack ? (
-          <Button type="button" variant="secondary" onClick={onBack}>
+          <Button type="button" variant="secondary" onClick={onBack} className="w-full sm:w-auto">
             <i className="ti ti-arrow-left text-base" />
             Previous Year
           </Button>
         ) : (
-          <span />
+          <span className="hidden sm:inline" />
         )}
-        <Button type="button" onClick={onSaveAndContinue} disabled={!parityOk}>
+        <Button type="button" onClick={onSaveAndContinue} disabled={!parityOk} className="w-full sm:w-auto">
           {isLastYear ? "Save & View Summary" : "Save & Continue"}
           <i className="ti ti-arrow-right text-base" />
         </Button>
