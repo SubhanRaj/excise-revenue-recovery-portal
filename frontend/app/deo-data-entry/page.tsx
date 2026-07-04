@@ -196,7 +196,6 @@ export default function EntryPage() {
                         : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
                   } disabled:opacity-40`}
                 >
-                  {done && step !== i && <i className="ti ti-check text-sm sm:text-base" />}
                   Year {i + 1}
                 </button>
               );
