@@ -423,7 +423,13 @@ visually cramped as features were added:
   `up-excise-spatial-revenue-optimizer` project's districts table, which does the same for its
   own row-click-to-detail behavior). Unlock asks for a reason first (`promptUnlockReason()` in
   `lib/alerts.ts`, a blocking SweetAlert2 textarea prompt) — see Data model below for where
-  that's stored.
+  that's stored. The Locked/Unlocked status badge in this table's Status column must carry the
+  same `dark:bg-red-950 dark:text-red-300` / `dark:bg-emerald-950 dark:text-emerald-300` pair as
+  the identical badge on `/admin/districts/detail` — it was missed once during the dark-mode
+  rebrand (the `bg-red-100`/`bg-emerald-100` light-mode classes don't change with the theme on
+  their own, so the badge just looked like a mismatched light patch sitting in an otherwise-dark
+  table, not literally invisible, but still wrong). If you add another status badge, copy the
+  color pair from one of these two rather than inventing a new light-only one.
 - **`/admin/districts/detail`** — one district's PAC figures across all 5 years as a small
   field × year table (with its own value/field search box, separate from the Districts table's
   by-name one), a lock-status badge, who locked it and when (`formatIST(lockedAt)`), and — if

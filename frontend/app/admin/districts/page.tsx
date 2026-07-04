@@ -153,7 +153,9 @@ export default function DistrictsPage() {
         cell: (info) => (
           <span
             className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-              info.getValue() === 1 ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"
+              info.getValue() === 1
+                ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
+                : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
             }`}
           >
             <i className={`ti ${info.getValue() === 1 ? "ti-lock" : "ti-lock-open"} text-sm`} />
