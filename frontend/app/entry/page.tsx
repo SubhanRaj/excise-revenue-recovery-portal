@@ -6,15 +6,17 @@ import { db, type DraftYear } from "@/lib/db";
 import { FINANCIAL_YEARS, PAC_FIELD_ORDER } from "@/lib/pac-fields";
 import { apiFetch, ApiError } from "@/lib/api";
 import { readClientSession, clearClientSession, consumeJustAuthed } from "@/lib/session";
-import { confirmFinalSubmit, notifyToast } from "@/lib/alerts";
+import { confirmFinalSubmit, promptDeoNameAndLock, notifyToast } from "@/lib/alerts";
 import YearStepForm from "@/components/YearStepForm";
 import MasterView from "@/components/MasterView";
 import AppHeader from "@/components/ui/AppHeader";
-import Banner from "@/components/ui/Banner";
+import HelpPanel from "@/components/ui/HelpPanel";
 import type { Profile } from "@/components/ui/ProfileMenu";
 
-const BLANK_FIELD_MESSAGE =
-  "Please do not leave any field blank. Enter 0 if there is no due amount or recovery.";
+const BLANK_FIELD_TITLE = "Field left blank / फ़ील्ड खाली है";
+const BLANK_FIELD_TEXT =
+  "Please do not leave any field blank. Enter 0 if there is no due amount or recovery. / " +
+  "कृपया कोई भी फ़ील्ड खाली न छोड़ें। यदि कोई धनराशि या वसूली नहीं है तो 0 दर्ज करें।";
 
 function blankYear(financialYear: (typeof FINANCIAL_YEARS)[number]): DraftYear {
   return {
@@ -34,9 +36,7 @@ export default function EntryPage() {
   const [ready, setReady] = useState(false);
   const [years, setYears] = useState<DraftYear[]>(FINANCIAL_YEARS.map(blankYear));
   const [step, setStep] = useState(0); // 0..4 = year steps, 5 = master view
-  const [submittedByName, setSubmittedByName] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [blankError, setBlankError] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -52,7 +52,7 @@ export default function EntryPage() {
         const p = await apiFetch<Profile>("/api/auth/me");
         setProfile(p);
         if (consumeJustAuthed()) {
-          notifyToast({ icon: "success", title: `Welcome, ${p.districtName ?? "DEO"}` });
+          notifyToast({ icon: "success", title: `Welcome, DEO ${p.districtName ?? ""}`.trim() });
         }
       } catch {
         clearClientSession();
@@ -72,7 +72,6 @@ export default function EntryPage() {
   }, [router]);
 
   function updateField(index: number, field: keyof DraftYear, value: string) {
-    setBlankError(false);
     setYears((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], [field]: value };
@@ -84,8 +83,7 @@ export default function EntryPage() {
   async function saveAndContinue(index: number) {
     const year = years[index];
     const blank = PAC_FIELD_ORDER.some((field) => year[field].trim() === "");
-    if (blank) return setBlankError(true);
-    setBlankError(false);
+    if (blank) return notifyToast({ icon: "error", title: BLANK_FIELD_TITLE, text: BLANK_FIELD_TEXT });
 
     const updated = { ...year, completed: true };
     setYears((prev) => {
@@ -102,11 +100,14 @@ export default function EntryPage() {
   }
 
   async function submitAll() {
-    if (submittedByName.trim().length === 0) return;
-    // The one remaining confirm dialog: locking a district's submission is irreversible
-    // without an Admin unlock, so this warrants a blocking confirmation, unlike routine messages.
+    // Two-step confirm, both blocking modals since locking is irreversible without an Admin
+    // unlock: first a plain "have you checked the data" confirm, then a name-entry prompt
+    // with its own liability disclaimer — modeled on the sibling excise-bakaya-record
+    // project's single Swal.fire({ input: "text" }) "Verify & Lock Record" prompt.
     const confirmed = await confirmFinalSubmit();
     if (!confirmed) return;
+    const submittedByName = await promptDeoNameAndLock();
+    if (!submittedByName) return;
 
     setSubmitError(null);
     setSubmitting(true);
@@ -156,7 +157,27 @@ export default function EntryPage() {
   return (
     <div className="flex min-h-full flex-1 flex-col bg-slate-50">
       <AppHeader title="DEO Data Entry" profile={profile} />
-      <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
+      <HelpPanel pageKey="deo-entry" title="Filling this form">
+        <p>
+          Enter all six PAC/RC fields for each year. None may be left blank — type 0 if there
+          is genuinely no amount, so a blank never gets silently treated as zero.
+        </p>
+        <p>
+          <strong>Recovered Amount</strong> must exactly match <strong>RC Amount</strong> — it
+          auto-fills from RC Amount until you edit it directly, and &quot;Save &amp;
+          Continue&quot; stays disabled until the two match.
+        </p>
+        <p>
+          <strong>Net Recoverable</strong> updates live as you type; it is calculated for
+          display only and is not stored separately.
+        </p>
+        <p>
+          Year <strong>N+1</strong> unlocks only once year <strong>N</strong> is saved.
+          &quot;Final Submit &amp; Lock&quot; on the Master View is irreversible without an
+          Admin unlock.
+        </p>
+      </HelpPanel>
+      <div className={`mx-auto w-full flex-1 px-4 py-8 ${step === 5 ? "max-w-6xl" : "max-w-4xl"}`}>
         <nav className="mb-6 flex flex-wrap items-center gap-2">
           {FINANCIAL_YEARS.map((fy, i) => {
             const done = years[i]?.completed;
@@ -199,25 +220,17 @@ export default function EntryPage() {
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           {step < 5 ? (
             <YearStepForm
+              key={years[step].financialYear}
               year={years[step]}
               onFieldChange={(field, value) => updateField(step, field, value)}
               onSaveAndContinue={() => saveAndContinue(step)}
-              onBack={
-                step > 0
-                  ? () => {
-                      setBlankError(false);
-                      setStep(step - 1);
-                    }
-                  : undefined
-              }
+              onBack={step > 0 ? () => setStep(step - 1) : undefined}
               isLastYear={step === 4}
-              blankErrorMessage={blankError ? BLANK_FIELD_MESSAGE : null}
             />
           ) : (
             <MasterView
               years={years}
-              submittedByName={submittedByName}
-              onSubmittedByNameChange={setSubmittedByName}
+              districtName={profile?.districtName}
               onSubmit={submitAll}
               busy={submitting}
               error={submitError}

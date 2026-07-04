@@ -60,28 +60,34 @@ what `npx tsc --noEmit` and manual review are for on routine UI changes.
 
 There's exactly one seeded account right now: `shubhanraj2002@gmail.com` (role `admin`,
 signs in via Magic Link — see DEPLOY.md). To demo the full DEO flow you need a second,
-DEO-role account, since none is seeded by default (DEO provisioning is a manual DB
-operation — see CLAUDE.md's "Known gaps"). To add a disposable one:
+DEO-role account, since none is seeded by default. As of the bulk-provisioning feature (see
+CLAUDE.md's "Bulk DEO provisioning" section) this is done through the Admin dashboard, not a
+manual DB insert:
 
-```bash
-MOBILE="<demo CUG — see the DEMO_CUG Worker secret, not written here>"
-HASH=$(printf '%s' "$MOBILE" | shasum -a 256 | cut -d' ' -f1)
-cd api
-npx wrangler d1 execute excise-revenue-recovery-db --remote --command \
-  "INSERT INTO users (role, cug_hash, district_id) VALUES ('deo', '$HASH', (SELECT id FROM districts WHERE district_name = 'Lucknow'));"
-```
+1. Sign in as Admin, click **Download DEO Template**, open the `.xlsx` — column A has all 75
+   district names pre-filled.
+2. Fill in the demo CUG (see the `DEMO_CUG` Worker secret, not written here) in the "DEO CUG
+   Mobile" column for `Lucknow`, save, and **Upload DEO Data** the same file back. A toast
+   confirms `1 added, 0 updated`.
+3. (Manual DB insert is still available as a fallback — same `INSERT INTO users (role,
+   cug_hash, district_id) VALUES ('deo', '<sha256 of the demo CUG>', (SELECT id FROM
+   districts WHERE district_name = 'Lucknow'));` as before — but the template round trip
+   above is now the intended path and exercises the feature.)
 
 Then:
 
 1. **Admin**: `/login` → Email tab → `shubhanraj2002@gmail.com` → check inbox for the
    styled login-link email (`api/lib/email.ts`) → Verify & Continue → `/admin` shows all
    75 districts. Try Sync, switching financial years, Export to Excel.
-2. **DEO**: `/login` → CUG tab → the demo CUG → lands on `/entry`. Walk Year 1 → 5: leave
-   a field blank and hit "Save & Continue" (inline anti-blank Banner, no popup), make
-   Recovered Amount ≠ RC Amount (inline parity Banner, button disabled), watch Net
-   Recoverable update live. On Year 5, reach Master View, type a name, hit "Final Submit &
-   Lock" — this is the one remaining SweetAlert2 confirm dialog (intentional: it's the only
-   irreversible action in the app). Confirms → locks the district, kills the DEO session,
+2. **DEO**: `/login` → CUG tab → the demo CUG → lands on `/entry`. Walk Year 1 → 5: leave a
+   field blank and hit "Save & Continue" (a corner toast, not a popup or banner — bilingual),
+   make Recovered Amount ≠ RC Amount and blur the field (bold inline bilingual message under
+   Recovered Amount, "Save & Continue" disabled), watch Net Recoverable update live, try
+   "Previous Year" to go back a step. On Year 5, reach Master View (title now shows the
+   district name, English + smaller Hindi line), hit the big "Submit & Lock" button — this
+   triggers two SweetAlert2 dialogs: first a "verify the data is correct" confirm, then a
+   name-entry prompt with a liability disclaimer (try typing digits or "DEO Lucknow" to see
+   the validator reject it). Confirming both locks the district, kills the DEO session,
    redirects to `/login`.
 3. **Back to Admin** → Sync → the district now shows "Locked" with real numbers → "Unlock"
    reverses it for retesting.

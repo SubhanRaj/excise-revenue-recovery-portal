@@ -47,3 +47,39 @@ export function exportDistrictsToXlsx(districts: CachedDistrict[], pacData: Cach
   window.XLSX.utils.book_append_sheet(wb, ws, "PAC Data");
   window.XLSX.writeFile(wb, `excise-revenue-recovery-${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
+
+// Template for bulk DEO provisioning (frontend/app/admin/page.tsx's Upload DEO Data). Column A
+// is pre-filled with all 75 seeded district names, alphabetical, exactly as stored in
+// api/drizzle/seed.sql (already Title Case) — the admin only needs to type into columns B/C
+// and re-upload. Column order here must match the array-of-arrays parsing in
+// parseDeoTemplateFile below.
+export function downloadDeoTemplate(districts: CachedDistrict[]) {
+  const header = ["District Name", "DEO CUG Mobile (10 digits)", "DEO Email (optional)"];
+  const sortedNames = [...districts].map((d) => d.districtName).sort((a, b) => a.localeCompare(b));
+  const rows = sortedNames.map((name) => [name, "", ""]);
+
+  const ws = window.XLSX.utils.aoa_to_sheet([header, ...rows]);
+  ws["!cols"] = [{ wch: 24 }, { wch: 26 }, { wch: 30 }];
+
+  const wb = window.XLSX.utils.book_new();
+  window.XLSX.utils.book_append_sheet(wb, ws, "DEO Provisioning");
+  window.XLSX.writeFile(wb, "deo-provisioning-template.xlsx");
+}
+
+export type DeoTemplateRow = { districtName: string; cugMobile: string; email: string };
+
+// Reads back whatever downloadDeoTemplate produced (or the admin's edited copy of it) —
+// deliberately positional (column A/B/C), not header-name matching, so it still works if the
+// admin retypes/retranslates the header row's wording.
+export function parseDeoTemplateFile(workbook: ReturnType<typeof window.XLSX.read>): DeoTemplateRow[] {
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const aoa = window.XLSX.utils.sheet_to_json<(string | number)[]>(sheet, { header: 1 });
+  return aoa
+    .slice(1) // skip header row
+    .map((row) => ({
+      districtName: String(row[0] ?? "").trim(),
+      cugMobile: String(row[1] ?? "").trim(),
+      email: String(row[2] ?? "").trim(),
+    }))
+    .filter((row) => row.districtName);
+}

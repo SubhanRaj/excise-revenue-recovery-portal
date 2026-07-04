@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   createColumnHelper,
@@ -16,10 +16,11 @@ import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRe
 import { apiFetch, ApiError } from "@/lib/api";
 import { readClientSession, clearClientSession, consumeJustAuthed } from "@/lib/session";
 import { notifyToast } from "@/lib/alerts";
-import { exportDistrictsToXlsx } from "@/lib/export";
+import { exportDistrictsToXlsx, downloadDeoTemplate, parseDeoTemplateFile } from "@/lib/export";
 import AppHeader from "@/components/ui/AppHeader";
 import Button from "@/components/ui/Button";
 import Banner from "@/components/ui/Banner";
+import HelpPanel from "@/components/ui/HelpPanel";
 import type { Profile } from "@/components/ui/ProfileMenu";
 
 type Row = CachedDistrict & Record<(typeof PAC_FIELD_ORDER)[number], number>;
@@ -41,8 +42,10 @@ export default function AdminPage() {
   const [globalFilter, setGlobalFilter] = useState("");
   const [sorting, setSorting] = useState<SortingState>([]);
   const [syncing, setSyncing] = useState(false);
+  const [provisioning, setProvisioning] = useState(false);
   const [banner, setBanner] = useState<{ variant: "error" | "success"; message: string } | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const deoFileInputRef = useRef<HTMLInputElement>(null);
 
   async function sync() {
     setSyncing(true);
@@ -120,6 +123,46 @@ export default function AdminPage() {
   async function exportExcel() {
     await sync();
     exportDistrictsToXlsx(districts, pacData);
+  }
+
+  async function handleDeoFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file name after a fix-and-reupload
+    if (!file) return;
+
+    setProvisioning(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = window.XLSX.read(buffer, { type: "array" });
+      const templateRows = parseDeoTemplateFile(workbook);
+      if (templateRows.length === 0) {
+        setBanner({ variant: "error", message: "No rows found in the uploaded file." });
+        return;
+      }
+
+      const { results } = await apiFetch<{
+        results: { districtName: string; status: "inserted" | "updated" | "skipped" | "error"; message?: string }[];
+      }>("/api/admin/provision-deos", { method: "POST", body: JSON.stringify({ rows: templateRows }) });
+
+      const inserted = results.filter((r) => r.status === "inserted").length;
+      const updated = results.filter((r) => r.status === "updated").length;
+      const errors = results.filter((r) => r.status === "error");
+
+      notifyToast({
+        icon: errors.length > 0 ? "error" : "success",
+        title: `${inserted} added, ${updated} updated${errors.length ? `, ${errors.length} failed` : ""}`,
+      });
+      if (errors.length > 0) {
+        setBanner({
+          variant: "error",
+          message: `Failed rows: ${errors.map((r) => `${r.districtName} (${r.message})`).join("; ")}`,
+        });
+      }
+    } catch (err) {
+      setBanner({ variant: "error", message: err instanceof ApiError ? err.message : "Upload failed." });
+    } finally {
+      setProvisioning(false);
+    }
   }
 
   const rows: Row[] = useMemo(
@@ -213,6 +256,31 @@ export default function AdminPage() {
   return (
     <div className="flex min-h-full flex-1 flex-col bg-slate-50">
       <AppHeader title="Admin Dashboard" profile={profile} />
+      <HelpPanel pageKey="admin-dashboard" title="Using this dashboard">
+        <p>
+          Pick a financial year, then <strong>Sync</strong> to pull the latest districts and
+          PAC data from the server into this browser&apos;s local cache.
+        </p>
+        <p>
+          Click a column header to sort; use the search box to filter by district name. The
+          District column stays pinned while you scroll horizontally.
+        </p>
+        <p>
+          The bottom row totals every numeric column for the selected year across all 75
+          districts.
+        </p>
+        <p>
+          <strong>Export to Excel</strong> re-syncs first, then builds the spreadsheet from the
+          freshly-synced data. <strong>Unlock</strong> lets a District Excise Officer re-edit a
+          submission they already locked.
+        </p>
+        <p>
+          <strong>Download DEO Template</strong> gives you all 75 districts pre-filled; type
+          each DEO&apos;s CUG mobile number and/or email into the blank columns and
+          <strong> Upload DEO Data</strong> the same file back to add or update their login.
+          Existing DEOs are updated, not duplicated, by matching district name.
+        </p>
+      </HelpPanel>
       <div className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-8">
         {banner && (
           <div className="mb-4">
@@ -246,13 +314,32 @@ export default function AdminPage() {
             <i className={`ti ti-refresh text-base ${syncing ? "animate-spin" : ""}`} />
             {syncing ? "Syncing..." : "Sync"}
           </Button>
+          <Button variant="secondary" onClick={() => downloadDeoTemplate(districts)}>
+            <i className="ti ti-download text-base" />
+            Download DEO Template
+          </Button>
+          <input
+            ref={deoFileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleDeoFileSelected}
+            className="hidden"
+          />
+          <Button
+            variant="secondary"
+            onClick={() => deoFileInputRef.current?.click()}
+            disabled={provisioning}
+          >
+            <i className={`ti ti-upload text-base ${provisioning ? "animate-pulse" : ""}`} />
+            {provisioning ? "Uploading..." : "Upload DEO Data"}
+          </Button>
           <Button onClick={exportExcel}>
             <i className="ti ti-file-spreadsheet text-base" />
             Export to Excel
           </Button>
         </div>
 
-        <div className="max-h-[70vh] overflow-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="max-h-[70vh] overflow-auto rounded-lg border border-slate-200 bg-white shadow-sm [scrollbar-width:thin] scroll-smooth">
           <table className="w-full border-collapse text-sm">
             <thead>
               {table.getHeaderGroups().map((hg) => (
@@ -275,7 +362,7 @@ export default function AdminPage() {
             </thead>
             <tbody>
               {table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50">
+                <tr key={row.id} className="border-t border-slate-100 bg-white hover:bg-slate-50">
                   {row.getVisibleCells().map((cell) => (
                     <td
                       key={cell.id}

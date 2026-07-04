@@ -30,6 +30,7 @@ export type CachedPacData = {
   recoveredAmount: number;
   stayCount: number;
   stayAmount: number;
+  submittedByName: string | null;
 };
 
 const db = new Dexie("excise-revenue-recovery-portal") as Dexie & {

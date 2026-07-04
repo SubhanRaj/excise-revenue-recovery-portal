@@ -42,6 +42,10 @@ export default function RootLayout({
           rel="stylesheet"
           href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css"
         />
+        {/* SweetAlert2's own backdrop is a flat dim overlay; this adds a blur on top of it so
+            every confirm/prompt (not just the lock flow) reads as a real modal, not a popup
+            floating over still-readable content. */}
+        <style>{`.swal2-container { backdrop-filter: blur(3px); }`}</style>
       </head>
       <body className="min-h-full flex flex-col" style={{ fontFamily: "'Noto Sans Devanagari', Inter, sans-serif" }}>
         {children}

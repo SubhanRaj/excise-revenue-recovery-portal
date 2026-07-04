@@ -44,6 +44,11 @@ export const pacData = sqliteTable("pac_data", {
   // 4. (ii) सक्षम न्यायालय द्वारा स्थगित धनराशि
   stayAmount: real("stay_amount").notNull(),
 
+  // Same name the DEO typed in the lock confirmation, duplicated from users.submitted_by_name
+  // onto the revenue row itself (keyed by district_id, same as everything else in this table)
+  // so Admin can see who submitted a given year's numbers without joining users.
+  submittedByName: text("submitted_by_name"),
+
   createdAt: text("created_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
 }, (table) => ({
   districtYearUnique: uniqueIndex("district_year_unique").on(table.districtId, table.financialYear),

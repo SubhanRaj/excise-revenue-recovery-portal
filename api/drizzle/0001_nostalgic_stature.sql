@@ -1,0 +1,1 @@
+ALTER TABLE `pac_data` ADD `submitted_by_name` text;

@@ -121,9 +121,45 @@
       <district/email>" on login and "Logged out" on logout — see CLAUDE.md's UI conventions
       for the `markJustAuthed`/`consumeJustAuthed` one-shot mechanism
 
+## Milestone 11 — Validation UX, help redesign, lock flow, bulk DEO provisioning (done)
+
+- [x] Blank-field validation moved from a bottom `Banner` to a bilingual `notifyToast()`
+      (not tied to one field); parity error stays inline under Recovered Amount but only
+      shows after blur, in full bilingual field names with no "(3)"/"(2.ii)" numbering
+- [x] Recovered Amount auto-fills from RC Amount as the DEO types, until they edit it
+      directly — never locked/read-only, just pre-filled
+- [x] `HelpPanel` redesigned from an inline text button into a `position: fixed` round
+      button pinned below the header (stays put on scroll); removed the full-screen
+      backdrop-blur; two independent dismiss actions (temporary `×` vs. persisted "Don't
+      show this again"); mounted once per page (`entry`, `admin`) with tailored content
+      for each, instead of per-form-step
+- [x] Fixed sticky/frozen table rows (admin table + Master View) bleeding scrolled content
+      through a transparent/alpha-striped row background; switched both tables back to
+      auto-layout (not `table-fixed`) so crore-scale money values don't clip
+- [x] Master View title centered, shows the district name, with a smaller bilingual Hindi
+      line underneath
+- [x] Lock flow reworked: `MasterView.tsx` has no inline DEO-name field anymore, just a big
+      `Submit & Lock` button; clicking it runs `confirmFinalSubmit()` (data-correctness +
+      irreversibility disclaimer) then `promptDeoNameAndLock()` (SweetAlert2 text-input
+      prompt with a liability disclaimer and a regex validator blocking blank/numeric/
+      designation-typed-as-name input) — modeled on the sibling `excise-bakaya-record`
+      project's small-scale `Swal.fire({ input: "text" })` pattern
+- [x] Global `.swal2-container { backdrop-filter: blur(3px) }` so every SweetAlert2 modal
+      blurs the page behind it
+- [x] `Button.tsx` gained a `size` prop (`md`/`lg`) instead of letting callers pass
+      conflicting padding/text-size via `className` (unreliable with the Tailwind CDN's
+      in-browser JIT — see CLAUDE.md)
+- [x] Bulk DEO provisioning: Admin can download an `.xlsx` template pre-filled with all 75
+      district names, fill in CUG mobile/email, and re-upload — `POST
+      /api/admin/provision-deos` hashes the CUG server-side (the one deliberate exception to
+      "server never sees a raw CUG," since there's no DEO browser in this flow to hash it
+      first) and upserts by district name, no duplicates
+- [x] `pac_data.submitted_by_name` (migration `0001_nostalgic_stature.sql`, applied to
+      remote D1) — the DEO's lock-time name is now stored on the revenue row itself, keyed
+      by `district_id`, not just on `users`
+
 ## Backlog / not started
 
-- [ ] Admin UI to provision DEO users (currently manual DB insert — see CLAUDE.md "Known gaps")
 - [ ] Real domain + DNS, and (optional) collapse `/frontend` + `/api` onto one zone via a
       Worker route so the cross-origin cookie dance in CLAUDE.md's Auth section can be dropped
 - [ ] Verify `mail.upexciseonline.co` (or chosen domain) in Resend and switch `FROM_EMAIL`

@@ -47,6 +47,10 @@ They communicate only over HTTP, cross-origin, with credentials (cookies) includ
 - **Net Recoverable is never persisted.** It's `max(0, grossArrears - recoveredAmount -
   stayAmount)`, computed client-side for display only (`netRecoverable()` in
   `frontend/lib/pac-fields.ts`).
+- `pac_data.submitted_by_name` duplicates `users.submitted_by_name` onto each revenue row
+  itself (migration `0001_nostalgic_stature.sql`) — same value, written at the same time in
+  the same submit-route batch, just keyed by `district_id` like the rest of `pac_data` so
+  Admin can see who submitted a given year's numbers without joining `users`.
 
 ## Validation rules — enforce on both client and server, always
 
@@ -118,6 +122,27 @@ only once year `N` is marked `completed`. Every keystroke persists to Dexie
 years in one atomic payload (`db.batch()` on the API side: 5 inserts + lock flip + user
 audit stamp, all-or-nothing).
 
+**The DEO's name is not a form field — it's collected in the lock confirmation itself.**
+`MasterView.tsx` has no name input; it's just the table plus a big `size="lg"` "Submit &
+Lock" button. Clicking it runs a two-step SweetAlert2 flow in `frontend/lib/alerts.ts`,
+modeled on the sibling `excise-bakaya-record` project's single `Swal.fire({ input: "text",
+inputValidator })` "Verify & Lock Record" prompt (same small-scale approach — a plain Swal
+text input, not a custom form):
+1. `confirmFinalSubmit()` — a plain yes/no: verify the data is correct, because locking is
+   irreversible without contacting the Admin/Excise HQ.
+2. `promptDeoNameAndLock()` — only if step 1 is confirmed. A second Swal with a text input
+   for the officer's name, a liability disclaimer (wrong data is the submitting DEO's
+   responsibility), and `inputValidator: validateDeoName()` which rejects: blank input,
+   digits (guards against pasting a CUG number — this has actually happened), and the
+   designation itself instead of a name (e.g. "DEO Shajapur" — also a real recurring
+   mistake, caught via a whole-word regex for "deo"/"officer"/etc., not substring match, so
+   it doesn't false-positive on real names). Returns `null` on cancel, name string on
+   confirm — `entry/page.tsx`'s `submitAll()` bails out on either step returning falsy.
+
+Both dialogs are bilingual (English + Hindi). `app/layout.tsx` adds a small global
+`.swal2-container { backdrop-filter: blur(3px) }` rule so every SweetAlert2 modal in the app
+(not just this one) blurs the page behind it rather than just dimming it.
+
 The Admin dashboard caches all districts + PAC rows in Dexie (`adminDistricts`,
 `adminPacData`) for instant load, with an explicit "Sync" button to refetch from D1.
 Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
@@ -129,27 +154,39 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   `frontend/lib/pac-fields.ts`) and the department name in a couple of headers/the page
   title — because those mirror the actual government form and department name, not because
   "Hindi UI" is a general goal. Don't add Hindi to new chrome text.
-- **Feedback is inline SPA state, not popups.** Each page keeps local `useState` for
-  error/success and renders `components/ui/Banner.tsx` next to the relevant control —
-  modeled on the `sent`/`error` state pattern in the sibling `up-excise-spatial-revenue-optimizer`
-  project's login form. Field-specific validation (e.g. the parity check) renders directly
-  under the offending field, bold, rather than in a page-bottom banner — see
-  `YearStepForm.tsx`'s Recovered Amount field. `window.Swal` (SweetAlert2, CDN) is reserved
-  for: blocking confirms before an irreversible or session-ending action
-  (`confirmFinalSubmit()`, `confirmLogout()` in `frontend/lib/alerts.ts`) and brief
-  auth-transition toasts (`notifyToast()` — `toast: true, position: "top-end"`, modeled on
-  the sibling `excise-bakaya-record` project's login/sync/unlock toasts) fired on
-  login/logout. Don't reach for a new SweetAlert popup for routine errors/success messages —
-  add a `Banner` instead.
+- **Feedback is inline SPA state or a toast, never a page-bottom banner for validation.**
+  Field-specific errors (the parity check knows exactly which two fields are wrong) render
+  directly under the offending field, bold, bilingual, and only after the field is blurred —
+  not on every keystroke — see `YearStepForm.tsx`'s Recovered Amount field. Generic errors
+  that aren't tied to one specific field (e.g. "some field is blank" — could be any of six)
+  use `notifyToast()` instead of a `Banner`, since there's no single field to anchor an inline
+  message under — see `saveAndContinue()` in `entry/page.tsx`. Page-level success/failure
+  (sync failed, submit failed) still uses `components/ui/Banner.tsx`, modeled on the
+  `sent`/`error` state pattern in the sibling `up-excise-spatial-revenue-optimizer` project's
+  login form. `window.Swal` (SweetAlert2, CDN) is reserved for: blocking confirms before an
+  irreversible or session-ending action (`confirmFinalSubmit()`, `confirmLogout()` in
+  `frontend/lib/alerts.ts`) and toasts (`notifyToast()` — `toast: true, position: "top-end"`,
+  modeled on the sibling `excise-bakaya-record` project's login/sync/unlock toasts) for
+  login/logout and generic validation. Don't reach for a new blocking SweetAlert popup for
+  routine errors/success — use `notifyToast()` or a `Banner` instead.
 - **"Welcome" toast fires once per sign-in, not per page load.** `frontend/lib/session.ts`'s
   `markJustAuthed()`/`consumeJustAuthed()` set/clear a `sessionStorage` flag right before the
   `/login` or `/verify` page redirects to `/entry`/`/admin`; the destination page's existing
   `/api/auth/me` guard call checks and clears it. If you add another place that lands a user
   on those pages after auth, call `markJustAuthed()` there too or the toast won't show.
-- **Help balloon** (`frontend/components/ui/HelpPanel.tsx`, used in `YearStepForm.tsx`) is
-  ported from the sibling `up-excise-spatial-revenue-optimizer` project's `HelpPanel`, which
-  uses DaisyUI — this repo has no DaisyUI (or shadcn) installed, so it's restyled onto plain
-  Tailwind/indigo classes. Keep that in mind if porting more components from that sibling.
+- **Help button** (`frontend/components/ui/HelpPanel.tsx`) is a `position: fixed` round
+  button pinned just below the header (`right-6 top-24`, stays put while the page scrolls) —
+  originally ported from the sibling `up-excise-spatial-revenue-optimizer` project's
+  `HelpPanel` (which uses DaisyUI — this repo has no DaisyUI or shadcn, so it's restyled onto
+  plain Tailwind/indigo classes), then redesigned off that project's inline-button pattern
+  into a floating one so it doesn't compete for space in a page header/nav. It never opens on
+  its own — only on click — and has two independent dismiss actions: the balloon's `×` just
+  closes it for that moment (button stays, reopenable anytime), while "Don't show this again"
+  additionally persists a per-`pageKey` `localStorage` flag that only clears the small unread
+  dot on the button — it never hides or disables the button itself. One `HelpPanel` is mounted
+  once per page (`entry/page.tsx`, `admin/page.tsx`), not per sub-view, since it's fixed
+  positioning anyway. If you add a new gated page, add one there too rather than leaving help
+  DEO/Admin-page-specific and inconsistent.
 - No emojis anywhere in the UI — Tabler Icons (CDN webfont, `<link>` in `layout.tsx`)
   instead. Don't put a Tabler `<i>` icon directly inside/overlapping live input text —
   the glyph renders via a CSS `::before` that loads async, so it can flash a fallback tofu
@@ -157,6 +194,13 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   icon slot as a result, and the admin district search input had the same bug — fixed by
   dropping the icon rather than fighting the async font load). Icons on buttons/badges
   next to static short label text are fine.
+- **Never pass two conflicting size utilities (e.g. `py-2.5` from a component's base classes
+  and `py-4` via a `className` override) into the same class list** — the Tailwind CDN's
+  in-browser JIT scans the whole document rather than respecting the order classes appear in
+  one element's `className` string, so which of two same-property utilities wins is not
+  reliably "the last one written." `components/ui/Button.tsx` has a `size?: "md" | "lg"` prop
+  specifically so padding/text-size never has two candidate utilities active at once — add a
+  new size there instead of overriding padding/text size through `className`.
 - **`disabled:cursor-not-allowed` doesn't work on `<button>` in this Tailwind version** —
   the CDN's preflight sets `button { cursor: pointer }` unconditionally, which beats the
   `disabled:` variant regardless of class order. If a disabled button needs to actually
@@ -178,7 +222,25 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   full-width with the parity error inline beneath it; stay count+amount paired the same way
   as RC) rather than looping `PAC_FIELD_ORDER` — matches the "(i)/(ii)" pairing on the actual
   government form. If the six-field schema ever changes, update this layout by hand, same as
-  every other place `PAC_FIELD_ORDER` is deliberately duplicated instead of derived.
+  every other place `PAC_FIELD_ORDER` is deliberately duplicated instead of derived. Recovered
+  Amount auto-fills from RC Amount as the DEO types it, until they edit Recovered Amount
+  directly — then it stops following (it's never locked/read-only, just pre-filled).
+- **Tables must stay auto-layout (not `table-fixed`) wherever a cell can hold a large money
+  value.** A district's Gross Arrears can be in the crores (`₹10,00,00,000.00` is a realistic
+  value, not an edge case); a fixed-width column can't grow for it and the text
+  overlaps/clips. `MasterView.tsx`'s summary table and the admin dashboard's table
+  (`admin/page.tsx`) both rely on natural auto-layout sizing plus `whitespace-nowrap` on money
+  cells so columns widen to fit, with `overflow-x-auto` on the wrapper as the fallback once
+  that exceeds a narrow viewport — don't switch either back to `table-fixed`.
+- **Sticky/pinned table rows and columns need an *opaque* background, not `bg-inherit` off a
+  transparent or alpha (`/50`) parent.** Both tables' body rows previously had no explicit
+  background (or a semi-transparent stripe), so their `sticky left-0` first column — which
+  uses `bg-inherit` to match whatever row it's in — inherited transparency too, letting
+  content scrolled underneath show/bleed through the frozen header row and frozen first
+  column. Fixed by giving every `tbody tr` a solid background (`bg-white`, with a solid
+  `bg-slate-50` — not `bg-slate-50/50` — for the alternating stripe); `bg-inherit` on the
+  pinned cell then correctly resolves to something opaque. If you add another sticky
+  header/column, give its scrolling ancestor rows an opaque background from the start.
 - SheetJS exports use the free/Community CDN build, which **cannot write frozen panes**
   (that's a SheetJS Pro feature) — see the `ponytail:` comment in `frontend/lib/export.ts`
   if you're asked to make the exported header row actually freeze.
@@ -199,10 +261,30 @@ deploys, causing a real production incident — see TESTING.md's Incidents secti
 disconnected. If a Cloudflare dashboard nudges you to "connect to Git" for this Pages
 project, don't.
 
+## Bulk DEO provisioning (Admin dashboard)
+
+Admin can now add/update DEO logins for all 75 districts via an Excel round trip instead of
+a manual DB operation:
+
+- **Download DEO Template** (`downloadDeoTemplate()` in `frontend/lib/export.ts`) builds an
+  `.xlsx` with column A pre-filled with all 75 district names (alphabetical, straight from
+  the synced `districts` cache — already Title Case from `api/drizzle/seed.sql`), columns B/C
+  blank for CUG mobile and email.
+- **Upload DEO Data** reads that file back (`parseDeoTemplateFile()` — positional
+  column A/B/C parsing, not header-name matching, so it survives the admin re-wording the
+  header row) and `POST`s the rows to `POST /api/admin/provision-deos`
+  (`api/app/api/admin/provision-deos/route.ts`).
+- That endpoint is the **one deliberate exception** to "the server never sees a raw CUG
+  number": there's no DEO browser in this flow to hash it client-side like the login flow
+  does, so the *admin's* browser sends the plaintext 10-digit number the admin typed, and the
+  server hashes it on ingest (`api/lib/hash.ts`'s `sha256Hex`, a server-side port of
+  `frontend/lib/crypto.ts`'s). Each row is upserted by matching `district_name`: an existing
+  `role: "deo"` user for that district gets `cug_hash`/`email` updated, no existing one gets a
+  new row inserted — never duplicated. Blank rows (admin hasn't filled in that district yet)
+  are silently skipped, not errors.
+
 ## Known gaps / intentionally out of scope
 
-- No admin UI to provision new DEO users (add `cug_hash`/`email` rows) — currently a
-  manual DB operation. Add an endpoint if that becomes a real workflow, not speculatively.
 - No password/OTP fallback if Resend or a DEO's CUG number changes — re-seed manually.
 - The seeded demo DEO account (see TESTING.md) is a manual `wrangler d1 execute --remote`
   insert, same as any other DEO — it does **not** exist in remote D1 just because it's

@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
         recoveredAmount: row.recoveredAmount,
         stayCount: row.stayCount,
         stayAmount: row.stayAmount,
+        submittedByName: submittedByName.trim(),
       })
     ),
     db.update(districts).set({ lockStatus: 1 }).where(eq(districts.id, session.districtId!)),
