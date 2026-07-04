@@ -261,6 +261,23 @@
       to the last 30 days on read. Modeled on the sibling
       `up-excise-spatial-revenue-optimizer` project's audit log.
 
+## Milestone 15 — DEO entry mobile pass + parity error readability (done)
+
+- [x] `Submit & Lock` button's `dark` variant switched from a solid near-black fill
+      (`bg-slate-800`) to the same light-toned pattern every other `Button` variant already
+      uses (soft `bg-slate-100` + border) — it read as unreadable/too heavy next to the rest
+      of the light-mode-first UI
+- [x] `YearStepForm.tsx`'s RC count/amount and stay count/amount pairs now stack one field per
+      row below the `sm` breakpoint (`grid-cols-1 sm:grid-cols-[11rem_1fr]`) instead of staying
+      two-up on phone-width screens
+- [x] DEO entry Year 1–5 / Master View nav pills: removed the `flex-1` divider `<span>` that
+      forced an ugly full-width empty line when the pills wrapped on mobile; year pills now
+      wrap together in their own group, Master View right-aligns via `sm:ml-auto`
+- [x] Added `pb-24 sm:pb-8` to the DEO entry page container so the fixed `HelpPanel` button no
+      longer overlaps the full-width Master View submit button on mobile
+- [x] Parity error under Recovered Amount no longer interleaves English/Hindi mid-sentence —
+      split into separate per-language name constants so each line is single-language
+
 ## Backlog / not started
 
 - [ ] Real domain + DNS, and (optional) collapse `/frontend` + `/api` onto one zone via a

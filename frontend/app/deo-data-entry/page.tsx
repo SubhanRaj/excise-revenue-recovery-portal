@@ -175,38 +175,39 @@ export default function EntryPage() {
           Admin unlock.
         </p>
       </HelpPanel>
-      <div className={`mx-auto w-full flex-1 px-4 py-8 ${step === 5 ? "max-w-6xl" : "max-w-4xl"}`}>
+      <div className={`mx-auto w-full flex-1 px-4 pt-8 pb-24 sm:pb-8 ${step === 5 ? "max-w-6xl" : "max-w-4xl"}`}>
         <nav className="sticky top-16 z-10 mb-6 flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50/95 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
-          {FINANCIAL_YEARS.map((fy, i) => {
-            const done = years[i]?.completed;
-            const locked = i !== 0 && !years[i - 1]?.completed;
-            return (
-              <button
-                key={fy}
-                type="button"
-                onClick={() => goToStep(i)}
-                disabled={locked}
-                style={locked ? { cursor: "not-allowed" } : undefined}
-                className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
-                  step === i
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : done
-                      ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
-                      : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
-                } disabled:opacity-40`}
-              >
-                {done && step !== i && <i className="ti ti-check text-base" />}
-                Year {i + 1}
-              </button>
-            );
-          })}
-          <span className="mx-1 h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+          <div className="flex flex-wrap items-center gap-2">
+            {FINANCIAL_YEARS.map((fy, i) => {
+              const done = years[i]?.completed;
+              const locked = i !== 0 && !years[i - 1]?.completed;
+              return (
+                <button
+                  key={fy}
+                  type="button"
+                  onClick={() => goToStep(i)}
+                  disabled={locked}
+                  style={locked ? { cursor: "not-allowed" } : undefined}
+                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                    step === i
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : done
+                        ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                        : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                  } disabled:opacity-40`}
+                >
+                  {done && step !== i && <i className="ti ti-check text-base" />}
+                  Year {i + 1}
+                </button>
+              );
+            })}
+          </div>
           <button
             type="button"
             onClick={() => goToStep(5)}
             disabled={!years.every((y) => y.completed)}
             style={!years.every((y) => y.completed) ? { cursor: "not-allowed" } : undefined}
-            className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+            className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors sm:ml-auto ${
               step === 5
                 ? "bg-blue-600 text-white shadow-sm"
                 : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"

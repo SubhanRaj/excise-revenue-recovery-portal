@@ -9,8 +9,10 @@ import Button from "./ui/Button";
 // Full field names without the leading "3."/"2. (ii)" form-numbering — the numbers make
 // sense next to the input itself, but read as cryptic column references in a standalone
 // error message.
-const RECOVERED_AMOUNT_NAME = "Recovered Amount / वसूल की गयी धनराशि";
-const RC_AMOUNT_NAME = "RC Amount / आर.सी. में निहित धनराशि";
+const RECOVERED_AMOUNT_EN = "Recovered Amount";
+const RECOVERED_AMOUNT_HI = "वसूल की गयी धनराशि";
+const RC_AMOUNT_EN = "RC Amount";
+const RC_AMOUNT_HI = "आर.सी. में निहित धनराशि";
 
 type Props = {
   year: DraftYear;
@@ -61,7 +63,7 @@ export default function YearStepForm({ year, onFieldChange, onSaveAndContinue, o
           onChange={(raw) => onFieldChange("grossArrears", raw)}
         />
 
-        <div className="grid grid-cols-[11rem_1fr] gap-4 items-end">
+        <div className="grid grid-cols-1 sm:grid-cols-[11rem_1fr] gap-4 sm:items-end">
           <PacFieldInput
             label={PAC_FIELD_LABELS.rcCount}
             value={year.rcCount}
@@ -87,16 +89,16 @@ export default function YearStepForm({ year, onFieldChange, onSaveAndContinue, o
           />
           {parityTouched && !parityOk && (
             <p className="mt-1.5 text-sm font-bold text-red-600">
-              {RECOVERED_AMOUNT_NAME} must exactly match {RC_AMOUNT_NAME} — please correct one
-              of the two amounts before continuing.
+              {RECOVERED_AMOUNT_EN} must exactly match {RC_AMOUNT_EN} — please correct one of
+              the two amounts before continuing.
               <br />
-              {RECOVERED_AMOUNT_NAME.split(" / ")[1]} और {RC_AMOUNT_NAME.split(" / ")[1]} बिल्कुल
-              समान होनी चाहिए — आगे बढ़ने से पहले किसी एक राशि को ठीक करें।
+              {RECOVERED_AMOUNT_HI} और {RC_AMOUNT_HI} बिल्कुल समान होनी चाहिए — आगे बढ़ने से पहले
+              किसी एक राशि को ठीक करें।
             </p>
           )}
         </div>
 
-        <div className="grid grid-cols-[11rem_1fr] gap-4 items-end">
+        <div className="grid grid-cols-1 sm:grid-cols-[11rem_1fr] gap-4 sm:items-end">
           <PacFieldInput
             label={PAC_FIELD_LABELS.stayCount}
             value={year.stayCount}

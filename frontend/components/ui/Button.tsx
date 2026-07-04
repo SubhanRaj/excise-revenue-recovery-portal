@@ -12,7 +12,7 @@ const VARIANTS: Record<NonNullable<Props["variant"]>, string> = {
     "dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-800",
   // For serious-but-not-alarming actions (e.g. the final lock) — conveys gravity without the
   // "something is wrong" connotation a red button carries.
-  dark: "bg-slate-800 text-white hover:bg-slate-900 focus-visible:ring-slate-400 dark:bg-slate-700 dark:hover:bg-slate-600",
+  dark: "bg-slate-100 text-slate-800 border border-slate-300 hover:bg-slate-200 focus-visible:ring-slate-400 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-slate-700",
   danger: "bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-300",
   // Soft-tinted variants for secondary toolbar actions that still deserve some color (e.g. the
   // DEO template download/upload buttons) — less flat than `secondary`'s plain gray outline,

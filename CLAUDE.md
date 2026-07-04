@@ -204,7 +204,13 @@ The Admin dashboard caches all districts + PAC rows in Dexie (`adminDistricts`,
 
 The Year 1–5 / Master View nav pills in `deo-data-entry/page.tsx` are `sticky top-16` (just below the
 also-`sticky` `AppHeader`) so they stay reachable while scrolling down a long year form,
-matching the `AdminDashboard`'s always-visible toolbar.
+matching the `AdminDashboard`'s always-visible toolbar. The Year pills are grouped in their own
+wrapping `<div>` separate from the Master View pill (`sm:ml-auto` right-aligns it on wider
+screens) — they used to be split by a `flex-1` divider `<span>` in the same flex-wrap row, which
+forced an ugly full-width empty line whenever the pills wrapped on a narrow/mobile viewport.
+Don't reintroduce a flex-growing spacer between the two groups. The page container also carries
+`pb-24 sm:pb-8` (not equal top/bottom padding) so the fixed `HelpPanel` button doesn't sit on top
+of the full-width Master View "Submit & Lock" button on mobile.
 Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
 
 ## Visual language: sober blue, not indigo/purple, and dark mode
@@ -300,9 +306,11 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   reliably "the last one written." `components/ui/Button.tsx` has a `size?: "sm" | "md" | "lg"`
   prop specifically so padding/text-size never has two candidate utilities active at once —
   add a new size there instead of overriding padding/text size through `className`. It also
-  has a `dark` variant (`bg-slate-800`) for serious-but-not-alarming actions like the final
-  lock — used instead of `danger` (red) because a red button reads as "something is wrong",
-  not "this is a big deal, be sure." Icon + label are pinned onto one line via explicit
+  has a `dark` variant (soft `bg-slate-100`/border, same light-toned pattern as `blue`/`amber`
+  — not a solid near-black fill, which read as unreadable/alarming on the final lock button)
+  for serious-but-not-alarming actions like the final lock — used instead of `danger` (red)
+  because a red button reads as "something is wrong," not "this is a big deal, be sure."
+  Icon + label are pinned onto one line via explicit
   `flex-row flex-nowrap whitespace-nowrap` (not left to `inline-flex`'s default) so they can
   never visually stack even on a very wide (`size="lg" className="w-full"`) button.
 - **`disabled:cursor-not-allowed` doesn't work on `<button>` in this Tailwind version** —
@@ -325,10 +333,17 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   full-width; RC count+amount paired two-up with a narrow count column; recovered amount
   full-width with the parity error inline beneath it; stay count+amount paired the same way
   as RC) rather than looping `PAC_FIELD_ORDER` — matches the "(i)/(ii)" pairing on the actual
-  government form. If the six-field schema ever changes, update this layout by hand, same as
-  every other place `PAC_FIELD_ORDER` is deliberately duplicated instead of derived. Recovered
-  Amount auto-fills from RC Amount as the DEO types it, until they edit Recovered Amount
-  directly — then it stops following (it's never locked/read-only, just pre-filled).
+  government form. The two-up pairing only applies from the `sm` breakpoint up
+  (`grid-cols-1 sm:grid-cols-[11rem_1fr]`) — below that, each field gets its own row, since the
+  narrow count column has no room to breathe on a phone-width form. If the six-field schema
+  ever changes, update this layout by hand, same as every other place `PAC_FIELD_ORDER` is
+  deliberately duplicated instead of derived. Recovered Amount auto-fills from RC Amount as the
+  DEO types it, until they edit Recovered Amount directly — then it stops following (it's never
+  locked/read-only, just pre-filled). The parity error message keeps English and Hindi on
+  separate lines built from plain per-language field name constants
+  (`RECOVERED_AMOUNT_EN`/`_HI`, `RC_AMOUNT_EN`/`_HI`) — don't go back to interpolating the
+  combined bilingual `"English / हिन्दी"` label into one sentence, that mixes both languages
+  mid-line instead of one clean line per language.
 - **Tables must stay auto-layout (not `table-fixed`) wherever a cell can hold a large money
   value.** A district's Gross Arrears can be in the crores (`₹10,00,00,000.00` is a realistic
   value, not an edge case); a fixed-width column can't grow for it and the text
