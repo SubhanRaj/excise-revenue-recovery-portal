@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { clearClientSession } from "@/lib/session";
 import { confirmLogout, notifyToast } from "@/lib/alerts";
+import { setNavDistrictId } from "@/lib/adminNav";
 import ProfileMenu, { type Profile } from "./ProfileMenu";
 import ThemeToggle from "./ThemeToggle";
 
@@ -39,15 +40,19 @@ function DistrictSearch({ districts }: { districts: SearchableDistrict[] }) {
   function goTo(id: number) {
     setQuery("");
     setOpen(false);
-    router.push(`/admin/districts/detail?id=${id}`);
+    setNavDistrictId(id);
+    router.push("/admin/districts/detail");
   }
 
+  // No leading search icon here — a Tabler <i> icon overlapping live input text renders via an
+  // async-loading CSS ::before glyph, which can flash a fallback tofu box on top of the text
+  // before the font loads (see the identical fix on TextField.tsx and the earlier admin
+  // district search input, both of which dropped their icon for the same reason).
   return (
-    <div className="relative hidden w-full max-w-xs md:block">
-      <i className="ti ti-search pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+    <div className="relative hidden w-44 shrink-0 lg:block">
       <input
         type="text"
-        placeholder="Search district..."
+        placeholder="Jump to district..."
         value={query}
         onChange={(e) => {
           setQuery(e.target.value);
@@ -58,7 +63,7 @@ function DistrictSearch({ districts }: { districts: SearchableDistrict[] }) {
         onKeyDown={(e) => {
           if (e.key === "Enter" && matches[0]) goTo(matches[0].id);
         }}
-        className="w-full rounded-md border border-slate-300 bg-white py-1.5 pl-8 pr-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+        className="w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
       />
       {open && matches.length > 0 && (
         <ul className="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
@@ -94,32 +99,36 @@ export default function AppHeader({ title, role, profile, navLinks, onSync, sync
   return (
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-700 text-base font-bold text-white">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-700 text-base font-bold text-white">
           ₹
         </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</p>
           <p className="truncate text-xs text-slate-500 dark:text-slate-400">Excise Revenue Recovery Portal</p>
         </div>
-        {navLinks && (
-          <nav className="ml-4 hidden items-center gap-1 sm:flex">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  pathname === link.href
-                    ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
-                    : "text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                }`}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-        )}
-        {districts && <DistrictSearch districts={districts} />}
-        <div className="ml-auto flex items-center gap-1">
+
+        {/* Everything else lives in one right-aligned group — deliberately not spread across
+            the full header width, which read as cluttered once nav links, search, Sync, the
+            theme toggle, and the profile menu all needed a place to live. */}
+        <div className="ml-auto flex items-center gap-2">
+          {navLinks && (
+            <nav className="hidden items-center gap-1 sm:flex">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                    pathname === link.href
+                      ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                      : "text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </nav>
+          )}
+          {districts && <DistrictSearch districts={districts} />}
           {onSync && (
             <button
               onClick={onSync}
@@ -132,14 +141,7 @@ export default function AppHeader({ title, role, profile, navLinks, onSync, sync
             </button>
           )}
           <ThemeToggle />
-          <ProfileMenu profile={profile ?? null} />
-          <button
-            onClick={logout}
-            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-          >
-            <i className="ti ti-logout text-base" />
-            Logout
-          </button>
+          <ProfileMenu profile={profile ?? null} onLogout={logout} />
         </div>
       </div>
     </header>

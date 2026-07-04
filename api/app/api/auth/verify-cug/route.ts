@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { users } from "@/db/schema";
 import { signSession, sessionCookie } from "@/lib/session";
+import { auditLogInsert } from "@/lib/audit";
 
 // Frontend hashes the 10-digit CUG mobile number via Web Crypto SHA-256 before sending it here.
 // The server never sees or stores the raw mobile number.
@@ -25,6 +26,8 @@ export async function POST(req: NextRequest) {
     role: user.role as "deo" | "admin",
     districtId: user.districtId,
   });
+
+  await auditLogInsert(db, { eventType: "login_cug", actorRole: user.role as "deo" | "admin" });
 
   const res = NextResponse.json({ ok: true, role: user.role, districtId: user.districtId });
   res.headers.set("Set-Cookie", sessionCookie(token, user.role as "deo" | "admin"));

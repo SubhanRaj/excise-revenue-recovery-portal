@@ -1,16 +1,17 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable } from "@/lib/pac-fields";
 import { formatIST } from "@/lib/format";
+import { getNavDistrictId } from "@/lib/adminNav";
 import { useAdminData } from "@/lib/useAdminData";
 import AppHeader, { type NavLink } from "@/components/ui/AppHeader";
 
 const NAV_LINKS: NavLink[] = [
   { label: "Dashboard", href: "/admin" },
   { label: "Districts", href: "/admin/districts" },
+  { label: "Audit Log", href: "/admin/audit" },
 ];
 
 function formatValue(field: (typeof PAC_FIELD_ORDER)[number], value: number) {
@@ -19,15 +20,20 @@ function formatValue(field: (typeof PAC_FIELD_ORDER)[number], value: number) {
     : value.toLocaleString("en-IN");
 }
 
-// A query-string id (?id=123) rather than a /districts/[id] dynamic segment — this app is a
-// fully static export (next.config.ts: output: "export") with no server to resolve arbitrary
-// paths at request time, so a dynamic route would need every district id enumerated via
-// generateStaticParams at build time. A single static detail.html reading `?id=` from the
-// client avoids that entirely, consistent with the rest of this SPA's client-only routing.
-function DistrictDetail() {
-  const districtId = Number(useSearchParams().get("id"));
+// Which district to show comes from sessionStorage (lib/adminNav.ts), set by whatever link
+// sent the admin here (a table row, the header's district search, the dashboard's top-5 list)
+// — not a ?id= URL query string. This app is a fully static export (next.config.ts:
+// output: "export") with no server to resolve arbitrary paths at request time, so a
+// /districts/[id] dynamic segment would need every id enumerated via generateStaticParams;
+// sessionStorage avoids that without putting the id in the URL either.
+export default function DistrictDetailPage() {
+  const [districtId, setDistrictId] = useState<number | null>(null);
   const { ready, profile, districts, pacData, sync, syncing } = useAdminData();
   const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    setDistrictId(getNavDistrictId());
+  }, []);
 
   const district = districts.find((d) => d.id === districtId);
   const yearRows = useMemo(
@@ -50,7 +56,7 @@ function DistrictDetail() {
       )
     : PAC_FIELD_ORDER;
 
-  if (!ready) return null;
+  if (!ready || districtId === null) return null;
 
   return (
     <div className="flex min-h-full flex-1 flex-col bg-slate-50 dark:bg-slate-950">
@@ -94,15 +100,29 @@ function DistrictDetail() {
                   </p>
                 </div>
               )}
+              {district.lockStatus === 0 && district.unlockedAt && (
+                <div className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm dark:border-slate-800 dark:bg-slate-900">
+                  <p className="text-slate-500 dark:text-slate-400">
+                    Last unlocked by{" "}
+                    <span className="font-medium text-slate-800 dark:text-slate-200">{district.unlockedBy ?? "—"}</span> on{" "}
+                    <span className="font-medium text-slate-800 dark:text-slate-200">{formatIST(district.unlockedAt)}</span> IST
+                  </p>
+                  {district.unlockReason && (
+                    <p className="mt-1 text-slate-500 dark:text-slate-400">
+                      Reason: <span className="font-medium text-slate-800 dark:text-slate-200">{district.unlockReason}</span>
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="mb-3">
               <input
                 type="text"
-                placeholder="Search across years or values (e.g. a field label or an amount)..."
+                placeholder="Search field or amount..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                className="w-full max-w-sm rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                className="w-full max-w-sm rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               />
             </div>
 
@@ -166,13 +186,5 @@ function DistrictDetail() {
         )}
       </div>
     </div>
-  );
-}
-
-export default function DistrictDetailPage() {
-  return (
-    <Suspense>
-      <DistrictDetail />
-    </Suspense>
   );
 }

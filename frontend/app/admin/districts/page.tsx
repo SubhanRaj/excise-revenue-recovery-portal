@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   createColumnHelper,
@@ -15,9 +15,10 @@ import {
 } from "@tanstack/react-table";
 import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable } from "@/lib/pac-fields";
 import { ApiError } from "@/lib/api";
-import { notifyToast } from "@/lib/alerts";
+import { notifyToast, promptUnlockReason } from "@/lib/alerts";
 import { exportDistrictsToXlsx, downloadDeoTemplate, parseDeoTemplateFile } from "@/lib/export";
 import { useAdminData } from "@/lib/useAdminData";
+import { setNavDistrictId, consumeNavStatusFilter } from "@/lib/adminNav";
 import { apiFetch } from "@/lib/api";
 import AppHeader, { type NavLink } from "@/components/ui/AppHeader";
 import Button from "@/components/ui/Button";
@@ -28,6 +29,7 @@ import type { CachedDistrict } from "@/lib/db";
 const NAV_LINKS: NavLink[] = [
   { label: "Dashboard", href: "/admin" },
   { label: "Districts", href: "/admin/districts" },
+  { label: "Audit Log", href: "/admin/audit" },
 ];
 
 const PAGE_SIZE_OPTIONS = [25, 50, 75, 100] as const;
@@ -46,15 +48,25 @@ export default function DistrictsPage() {
   const router = useRouter();
   const { ready, profile, districts, pacData, sync, syncing, unlock, error, setError } = useAdminData();
   const [selectedYear, setSelectedYear] = useState<(typeof FINANCIAL_YEARS)[number]>(FINANCIAL_YEARS[0]);
+  const [statusFilter, setStatusFilter] = useState<"all" | "locked" | "unlocked">("all");
   const [globalFilter, setGlobalFilter] = useState("");
+
+  // Deep-linked from the Admin Dashboard's Locked/Unlocked KPI cards, via sessionStorage
+  // (lib/adminNav.ts) rather than a ?status= URL query string.
+  useEffect(() => {
+    const status = consumeNavStatusFilter();
+    if (status) setStatusFilter(status);
+  }, []);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 25 });
   const [provisioning, setProvisioning] = useState(false);
   const deoFileInputRef = useRef<HTMLInputElement>(null);
 
-  async function handleUnlock(districtId: number) {
+  async function handleUnlock(districtId: number, districtName: string) {
+    const reason = await promptUnlockReason(districtName);
+    if (!reason) return;
     try {
-      await unlock(districtId);
+      await unlock(districtId, reason);
       notifyToast({ icon: "success", title: "District unlocked." });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Unlock failed.");
@@ -105,14 +117,18 @@ export default function DistrictsPage() {
 
   const rows: Row[] = useMemo(
     () =>
-      districts.map((d) => {
-        const match = pacData.find((p) => p.districtId === d.id && p.financialYear === selectedYear);
-        const values = Object.fromEntries(
-          PAC_FIELD_ORDER.map((field) => [field, match?.[field] ?? 0])
-        ) as Record<(typeof PAC_FIELD_ORDER)[number], number>;
-        return { ...d, ...values };
-      }),
-    [districts, pacData, selectedYear]
+      districts
+        .filter((d) =>
+          statusFilter === "all" ? true : statusFilter === "locked" ? d.lockStatus === 1 : d.lockStatus === 0
+        )
+        .map((d) => {
+          const match = pacData.find((p) => p.districtId === d.id && p.financialYear === selectedYear);
+          const values = Object.fromEntries(
+            PAC_FIELD_ORDER.map((field) => [field, match?.[field] ?? 0])
+          ) as Record<(typeof PAC_FIELD_ORDER)[number], number>;
+          return { ...d, ...values };
+        }),
+    [districts, pacData, selectedYear, statusFilter]
   );
 
   const totals = useMemo(() => {
@@ -147,7 +163,10 @@ export default function DistrictsPage() {
       }),
       ...PAC_FIELD_ORDER.map((field) =>
         columnHelper.accessor(field, {
-          header: PAC_FIELD_LABELS[field],
+          // Full bilingual label only as a tooltip — using it as the header text directly
+          // forced every column to auto-size to its longest label rather than its (much
+          // shorter) numeric values, which is what was bloating the table width.
+          header: () => <span title={PAC_FIELD_LABELS[field]}>{PAC_FIELD_LABELS[field].split(" / ")[0]}</span>,
           cell: (info) => formatValue(field, info.getValue()),
         })
       ),
@@ -168,7 +187,7 @@ export default function DistrictsPage() {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                handleUnlock(row.original.id);
+                handleUnlock(row.original.id, row.original.districtName);
               }}
               className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
             >
@@ -221,7 +240,7 @@ export default function DistrictsPage() {
           Existing DEOs are updated, not duplicated, by matching district name.
         </p>
       </HelpPanel>
-      <div className="mx-auto w-full max-w-[1400px] flex-1 px-6 py-6 lg:px-10">
+      <div className="w-full flex-1 px-4 py-6 sm:px-6 lg:px-[15%]">
         {error && (
           <div className="mb-4">
             <Banner variant="error">{error}</Banner>
@@ -239,6 +258,15 @@ export default function DistrictsPage() {
 
           <div className="flex flex-wrap items-center gap-2">
             <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as "all" | "locked" | "unlocked")}
+              className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+            >
+              <option value="all">All statuses</option>
+              <option value="locked">Locked</option>
+              <option value="unlocked">Unlocked</option>
+            </select>
+            <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(e.target.value as (typeof FINANCIAL_YEARS)[number])}
               className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
@@ -249,7 +277,7 @@ export default function DistrictsPage() {
                 </option>
               ))}
             </select>
-            <Button variant="secondary" size="sm" onClick={() => downloadDeoTemplate(districts)}>
+            <Button variant="blue" size="sm" onClick={() => downloadDeoTemplate(districts)}>
               <i className="ti ti-download text-sm" />
               DEO Template
             </Button>
@@ -260,7 +288,7 @@ export default function DistrictsPage() {
               onChange={handleDeoFileSelected}
               className="hidden"
             />
-            <Button variant="secondary" size="sm" onClick={() => deoFileInputRef.current?.click()} disabled={provisioning}>
+            <Button variant="amber" size="sm" onClick={() => deoFileInputRef.current?.click()} disabled={provisioning}>
               <i className={`ti ti-upload text-sm ${provisioning ? "animate-pulse" : ""}`} />
               {provisioning ? "Uploading..." : "Upload DEO Data"}
             </Button>
@@ -298,7 +326,10 @@ export default function DistrictsPage() {
               {table.getRowModel().rows.map((row) => (
                 <tr
                   key={row.id}
-                  onClick={() => router.push(`/admin/districts/detail?id=${row.original.id}`)}
+                  onClick={() => {
+                    setNavDistrictId(row.original.id);
+                    router.push("/admin/districts/detail");
+                  }}
                   className="cursor-pointer border-t border-slate-100 bg-white hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
                 >
                   {row.getVisibleCells().map((cell) => (

@@ -26,7 +26,12 @@ They communicate only over HTTP, cross-origin, with credentials (cookies) includ
 ## Data model (`api/db/schema.ts`)
 
 - `districts` — one row per district (75 total, seeded from `api/drizzle/seed.sql`).
-  `lock_status` (0/1) gates whether a DEO can still submit.
+  `lock_status` (0/1) gates whether a DEO can still submit. `unlocked_at`/`unlock_reason`/
+  `unlocked_by` (migration `0003_overjoyed_malcolm_colcord.sql`) are stamped on every admin
+  unlock (`POST /api/admin/unlock`, which now requires a non-blank reason) — the district-level
+  mirror of the lock-side audit trail below, since unlocking is a whole-district action rather
+  than tied to one financial year's row. Only ever holds the *most recent* unlock event, not a
+  full history — for that, see `audit_log` below.
 - `users` — both DEOs and Admins. DEOs authenticate via `cug_hash` (SHA-256 of a 10-digit
   CUG mobile number — the server never sees the raw number). Admins authenticate via
   magic link (`email`). `locked_at` / `submitted_by_name` are stamped when a DEO locks.
@@ -68,6 +73,19 @@ They communicate only over HTTP, cross-origin, with credentials (cookies) includ
   locale conventions (comma grouping etc.), not the timezone — omitting `timeZone` renders in
   whatever zone the browser happens to be in, not IST, which is why `formatIST()` always
   passes it explicitly.
+- `audit_log` (migration `0004_white_songbird.sql`) — one row per login/logout, district
+  lock/unlock, or DEO-provisioning batch (`event_type`, `actor_role`, `actor_email`,
+  `district_name`, `metadata` as a JSON string, `created_at`). Written via
+  `api/lib/audit.ts`'s `auditLogInsert()`, which returns an insert statement rather than
+  awaiting it itself, so callers that already have a `db.batch()` (lock, unlock) can fold the
+  audit row into the same atomic write instead of a separate round trip. `created_at` is always
+  `new Date().toISOString()` from JS, **never** a SQL `CURRENT_TIMESTAMP` default — this table's
+  timestamps are shown directly to admins (`/admin/audit`), so it can't afford the
+  timezone-less-string bug described above for `locked_at`. Rows older than 30 days are pruned
+  opportunistically inside `GET /api/admin/audit-log` (the only reader of this table) rather
+  than via a separate Cloudflare Cron Trigger — simplest option for a table with exactly one
+  consumer. Modeled on the sibling `up-excise-spatial-revenue-optimizer` project's `audit_log`
+  table and `/admin/audit` page.
 
 ## Validation rules — enforce on both client and server, always
 
@@ -347,61 +365,89 @@ deploys, causing a real production incident — see TESTING.md's Incidents secti
 disconnected. If a Cloudflare dashboard nudges you to "connect to Git" for this Pages
 project, don't.
 
-## Admin pages: Dashboard / Districts / district detail
+## Admin pages: Dashboard / Districts / district detail / Audit Log
 
-Admin is now **three separate routes**, not one page with an in-page toggle — split apart
-because the single-page toolbar (Sync, DEO Template, Upload, Export, year select, all in one
-row) got visually cramped as features were added:
+Admin is **four separate routes**, not one page with an in-page toggle — split apart because
+the single-page toolbar (Sync, DEO Template, Upload, Export, year select, all in one row) got
+visually cramped as features were added:
 
-- **`/admin`** (`components/AdminDashboard.tsx`) — KPI cards (districts/locked/unlocked/
-  gross-arrears/net-recoverable), a top-5-districts bar list, and a lock-status card. Most of
-  that card is still plain CSS divs/percentages (ladder rung 4/5 — no dependency for a bar
-  list), but the locked-vs-unlocked ratio is now an actual **Chart.js donut**
-  (`LockStatusDonut` inside `AdminDashboard.tsx`) loaded from a CDN `<script lazyOnload>` in
-  `layout.tsx` — the one chart the user actually asked to see, added alongside the existing
-  bars rather than replacing them. Chart.js is a `devDependency` purely for its TS types
-  (`window.Chart` in `lib/globals.d.ts`), same pattern as `xlsx`/`sweetalert2` — the real
-  runtime script is CDN-only. Since the script loads lazily, `LockStatusDonut` polls for
-  `window.Chart` every 150ms until it appears rather than assuming it's ready on mount.
+- **`/admin`** (`components/AdminDashboard.tsx`) — colorful, clickable KPI cards (Districts/
+  Locked/Unlocked/Gross Arrears/Net Recoverable — each its own accent color: blue/red/emerald/
+  amber/violet, via `KpiCard`'s `color` prop, not five identical white cards), a top-5-districts
+  bar list, and a lock-status card. Every card links somewhere useful: Districts/Gross
+  Arrears/Net Recoverable go to `/admin/districts`; Locked/Unlocked go there too but pre-filter
+  by status (see sessionStorage nav below); each top-5 list row links straight to that
+  district's detail page. Most of the lock-status card is still plain CSS divs/percentages
+  (ladder rung 4/5 — no dependency for a bar list), but the locked-vs-unlocked ratio also gets
+  an actual **Chart.js donut** (`LockStatusDonut` inside `AdminDashboard.tsx`) loaded from a CDN
+  `<script lazyOnload>` in `layout.tsx` — the one chart the user actually asked to see, added
+  alongside the existing bars rather than replacing them. Chart.js is a `devDependency` purely
+  for its TS types (`window.Chart` in `lib/globals.d.ts`), same pattern as `xlsx`/`sweetalert2`
+  — the real runtime script is CDN-only. Since the script loads lazily, `LockStatusDonut` polls
+  for `window.Chart` every 150ms until it appears rather than assuming it's ready on mount.
 - **`/admin/districts`** — the sortable/searchable/pinned-column table with pagination
-  (`getPaginationRowModel`, Rows-per-page 25/50/75/100, Prev/Next), plus Lock/Unlock, Download
-  DEO Template, Upload DEO Data, and Export to Excel — all the *actions* live here now, not on
-  the Dashboard. Clicking anywhere on a district row navigates to that district's detail page;
-  the Unlock button inside the row calls `e.stopPropagation()` so it doesn't also trigger that
-  navigation (pattern borrowed from the sibling `up-excise-spatial-revenue-optimizer`
-  project's districts table, which does the same for its own row-click-to-detail behavior).
-- **`/admin/districts/detail?id=<districtId>`** — one district's PAC figures across all 5
-  years as a small field × year table, a lock-status badge, and (if locked) who locked it and
-  when, via `formatIST(lockedAt)` (see Data model above). Deliberately a **query-string route,
-  not a `/districts/[id]` dynamic segment** — `next.config.ts` has `output: "export"` (fully
-  static, no server to resolve arbitrary paths at request time), so a dynamic segment would
-  need every district id enumerated via `generateStaticParams`. A single static
-  `detail/index.html` reading `?id=` client-side (`useSearchParams`, wrapped in `<Suspense>`
-  same as `/verify`) avoids that. Has its own search box that filters the *field* rows by
-  matching the query against either the raw number or the formatted (₹, comma-grouped) value
-  across any year — separate from the Districts table's own by-name search box.
+  (`getPaginationRowModel`, Rows-per-page 25/50/75/100, Prev/Next), a Locked/Unlocked/All
+  status filter, plus Lock/Unlock, Download DEO Template (`variant="blue"`), Upload DEO Data
+  (`variant="amber"`), and Export to Excel — all the *actions* live here now, not on the
+  Dashboard. Numeric column headers show the short English label only, with the full bilingual
+  label as a `title` tooltip (`header: () => <span title={...}>`) — using the full bilingual
+  string as the header text was forcing every column to auto-size to its longest label rather
+  than its much-shorter numeric values, which is what was bloating the table width. Container
+  uses `lg:px-[15%]` instead of a fixed `max-w-*`, so the table gets most of the viewport on
+  large monitors without stretching edge-to-edge. Clicking anywhere on a district row navigates
+  to that district's detail page; the Unlock button inside the row calls `e.stopPropagation()`
+  so it doesn't also trigger that navigation (pattern borrowed from the sibling
+  `up-excise-spatial-revenue-optimizer` project's districts table, which does the same for its
+  own row-click-to-detail behavior). Unlock asks for a reason first (`promptUnlockReason()` in
+  `lib/alerts.ts`, a blocking SweetAlert2 textarea prompt) — see Data model below for where
+  that's stored.
+- **`/admin/districts/detail`** — one district's PAC figures across all 5 years as a small
+  field × year table (with its own value/field search box, separate from the Districts table's
+  by-name one), a lock-status badge, who locked it and when (`formatIST(lockedAt)`), and — if
+  it's currently unlocked — who last unlocked it, when, and why.
+- **`/admin/audit`** — a paginated (100/page), newest-first table of every login/logout,
+  district lock/unlock, and DEO provisioning batch, auto-pruned to the last 30 days on read
+  (see Data model below). Modeled on the sibling `up-excise-spatial-revenue-optimizer`
+  project's `/admin/audit` page and its `audit_log` table.
 
-All three pages share `frontend/lib/useAdminData.ts` — the admin-only session guard, the
+**Which district/status to show is passed via `sessionStorage`, never a `?id=`/`?status=` URL
+query string** (`frontend/lib/adminNav.ts`) — this app is a fully static export
+(`next.config.ts`: `output: "export"`) with no server to resolve arbitrary paths at request
+time, so a `/districts/[id]` dynamic segment would need every district id enumerated via
+`generateStaticParams`; sessionStorage sidesteps that without putting anything in the URL
+either. `setNavDistrictId()`/`getNavDistrictId()` are **not** consume-on-read (a reload of the
+detail page should keep showing the same district, like a URL param would); `setNavStatusFilter()`
+/`consumeNavStatusFilter()` **are** consume-on-read, same shape as `markJustAuthed()`/
+`consumeJustAuthed()` in `session.ts` — landing on `/admin/districts` via the regular nav link
+after a KPI card set a filter on an earlier visit should default back to "all", not surprise
+the admin with a still-filtered table.
+
+All four pages share `frontend/lib/useAdminData.ts` — the admin-only session guard, the
 Dexie-backed `districts`/`pacData` cache, `sync()`, and `unlock()` — so none of them
-re-implements the same fetch/cache dance; before this it was all one page and didn't need
-sharing, but three routes copy-pasting the same effect would have been a real duplication
-smell. `AppHeader` grew two new optional props to go with the split: `navLinks` (the
-Dashboard/Districts pill nav, now in the header instead of an in-page toggle) and
-`onSync`/`syncing` (the Sync button, also moved to the header so it's reachable from every
-admin page, not just wherever the toolbar happened to be) — see `components/ui/AppHeader.tsx`.
-`AppHeader` also takes an optional `districts` prop that, when passed, renders a global
-"jump to a district" search box (`DistrictSearch` inside `AppHeader.tsx`) that autocompletes
-district names and navigates straight to that district's detail page — separate from, and in
-addition to, the Districts table's own row-filtering search box.
+re-implements the same fetch/cache dance (the Audit Log page is the one exception: it doesn't
+need districts/pacData at all, so it does its own lightweight `/api/auth/me?role=admin` guard
+instead of pulling in a full district sync it would never use). `AppHeader` takes `navLinks`
+(the Dashboard/Districts/Audit Log pill nav, in the header rather than an in-page toggle) and
+`onSync`/`syncing` (the Sync button, also in the header so it's reachable from every admin
+page). Everything on the right side of the header — nav links, the district search, Sync, the
+theme toggle, and the profile menu — lives in one `ml-auto` group, deliberately not spread
+across the header's full width (that read as cluttered once several of these needed a home).
+Logout lives **inside the profile dropdown** (`ProfileMenu`'s `onLogout` prop), not as its own
+top-level header button, for the same decluttering reason — same for both Admin and DEO
+headers. `AppHeader` also takes an optional `districts` prop that, when passed, renders a
+global "jump to a district" search box (`DistrictSearch` inside `AppHeader.tsx`, no leading
+icon — see the icon/live-text overlap note in UI conventions below) that autocompletes district
+names and navigates straight to that district's detail page — separate from, and in addition
+to, the Districts table's own row-filtering search box.
 
 Admins are IAS/senior officers already comfortable navigating dashboards, so these pages favor
 a compact toolbar (`Button size="sm"`, no big page-title heading) — deliberately different
 from the DEO side, which stays verbose/hand-holding on purpose (see the Help button and inline
 validation throughout `deo-data-entry/page.tsx`). The districts `<table>` itself has no
-`w-full` — letting it auto-size to its content (not stretch to fill the `max-w-[1400px]`
-container) is what fixed it looking oddly stretched-out after the auto-layout fix in "Tables
-must stay auto-layout" below; `overflow-x-auto` on the wrapper is still the fallback for
-narrow viewports.
+`w-full` — letting it auto-size to its content (not stretch to fill the container) is what
+fixed it looking oddly stretched-out after the auto-layout fix in "Tables must stay
+auto-layout" below; `overflow-x-auto` on the wrapper is still the fallback for narrow
+viewports.
 
 Excel export (`exportDistrictsToXlsx()` in `frontend/lib/export.ts`) is **one workbook, five
 sheets** — one per financial year, each sheet districts × the 6 PAC fields for just that year

@@ -83,9 +83,37 @@ export async function confirmLogout(): Promise<boolean> {
     showCancelButton: true,
     confirmButtonText: "Yes, Logout",
     cancelButtonText: "Cancel",
-    confirmButtonColor: "#4f46e5",
+    confirmButtonColor: "#1d4ed8",
   });
   return result.isConfirmed;
+}
+
+// Admin unlocking a district: a confirm + reason prompt, same shape as the DEO's lock flow
+// above (blocking, since this reopens a submission the DEO already finalized) — the reason is
+// stored server-side (districts.unlock_reason) as an audit trail for why a locked submission
+// was reopened. Returns the trimmed reason, or null if the admin cancelled.
+export async function promptUnlockReason(districtName: string): Promise<string | null> {
+  const result = await window.Swal.fire({
+    icon: "warning",
+    title: `Unlock ${districtName}?`,
+    html:
+      "This lets the District Excise Officer re-edit data they already submitted and locked. " +
+      "Please record why this district is being unlocked." +
+      '<br><br><span lang="hi">इससे जिला आबकारी अधिकारी अपने द्वारा पहले से जमा और लॉक किए गए ' +
+      "डेटा को फिर से संपादित कर सकेंगे। कृपया दर्ज करें कि इस जिले को अनलॉक क्यों किया जा रहा है।</span>",
+    input: "textarea",
+    inputPlaceholder: "Reason for unlocking (required)",
+    showCancelButton: true,
+    confirmButtonText: "Unlock",
+    cancelButtonText: "Cancel",
+    confirmButtonColor: "#dc2626",
+    allowOutsideClick: false,
+    inputValidator: (value: string) =>
+      value && value.trim()
+        ? undefined
+        : "Please enter a reason for unlocking. / कृपया अनलॉक करने का कारण दर्ज करें।",
+  });
+  return result.isConfirmed ? (result.value as string).trim() : null;
 }
 
 // Fire-and-forget corner toast for auth transitions (login/logout) and generic validation

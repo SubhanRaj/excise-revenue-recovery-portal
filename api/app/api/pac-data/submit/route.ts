@@ -4,6 +4,7 @@ import { getDb } from "@/lib/db";
 import { pacData, districts, users, FINANCIAL_YEARS } from "@/db/schema";
 import { requireSession } from "@/lib/auth-guard";
 import { destroySessionCookie } from "@/lib/session";
+import { auditLogInsert } from "@/lib/audit";
 
 type YearRow = {
   financialYear: string;
@@ -105,6 +106,12 @@ export async function POST(req: NextRequest) {
       .update(users)
       .set({ lockedAt: now, submittedByName: submittedByName.trim() })
       .where(eq(users.id, session.userId)),
+    auditLogInsert(db, {
+      eventType: "district_locked",
+      actorRole: "deo",
+      districtName: district.districtName,
+      metadata: { submittedByName: submittedByName.trim() },
+    }),
   ] as unknown as Parameters<typeof db.batch>[0]);
 
   const res = NextResponse.json({ ok: true });

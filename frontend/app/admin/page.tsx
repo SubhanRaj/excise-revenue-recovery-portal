@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { FINANCIAL_YEARS, PAC_FIELD_ORDER } from "@/lib/pac-fields";
 import { useAdminData } from "@/lib/useAdminData";
+import type { CachedDistrict } from "@/lib/db";
 import AppHeader, { type NavLink } from "@/components/ui/AppHeader";
 import Banner from "@/components/ui/Banner";
 import HelpPanel from "@/components/ui/HelpPanel";
@@ -11,9 +12,10 @@ import AdminDashboard from "@/components/AdminDashboard";
 const NAV_LINKS: NavLink[] = [
   { label: "Dashboard", href: "/admin" },
   { label: "Districts", href: "/admin/districts" },
+  { label: "Audit Log", href: "/admin/audit" },
 ];
 
-type Row = Record<(typeof PAC_FIELD_ORDER)[number], number> & { districtName: string; lockStatus: number; id: number };
+type Row = CachedDistrict & Record<(typeof PAC_FIELD_ORDER)[number], number>;
 
 export default function AdminDashboardPage() {
   const { ready, profile, districts, pacData, sync, syncing, error } = useAdminData();

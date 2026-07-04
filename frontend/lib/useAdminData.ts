@@ -75,10 +75,11 @@ export function useAdminData() {
     })();
   }, [router]);
 
-  async function unlock(districtId: number) {
-    await apiFetch("/api/admin/unlock", { method: "POST", body: JSON.stringify({ districtId }) });
-    setDistricts((prev) => prev.map((d) => (d.id === districtId ? { ...d, lockStatus: 0 } : d)));
-    await db.adminDistricts.update(districtId, { lockStatus: 0 });
+  async function unlock(districtId: number, reason: string) {
+    await apiFetch("/api/admin/unlock", { method: "POST", body: JSON.stringify({ districtId, reason }) });
+    const patch = { lockStatus: 0, unlockedAt: new Date().toISOString(), unlockReason: reason, unlockedBy: profile?.email ?? null };
+    setDistricts((prev) => prev.map((d) => (d.id === districtId ? { ...d, ...patch } : d)));
+    await db.adminDistricts.update(districtId, patch);
   }
 
   return { ready, profile, districts, pacData, setDistricts, setPacData, sync, syncing, unlock, error, setError };

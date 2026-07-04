@@ -18,6 +18,9 @@ export type CachedDistrict = {
   id: number;
   districtName: string;
   lockStatus: number;
+  unlockedAt: string | null;
+  unlockReason: string | null;
+  unlockedBy: string | null;
 };
 
 export type CachedPacData = {

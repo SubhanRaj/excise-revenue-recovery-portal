@@ -233,6 +233,34 @@
       `/api/auth/me`, so it went stale whenever the *other* role logged in anywhere in the
       same browser. Pages now call the server directly and trust its answer.
 
+## Milestone 14 — Colorful clickable KPI cards, header decluttering, unlock reasons, audit log (done)
+
+- [x] Admin Dashboard KPI cards recolored (blue/red/emerald/amber/violet per card, not five
+      identical white cards) and made clickable — Districts/Gross Arrears/Net Recoverable go
+      to `/admin/districts`, Locked/Unlocked go there pre-filtered by status, top-5-dues list
+      rows link straight to that district's detail page
+- [x] `/admin/districts` gained a Locked/Unlocked/All status filter, shortened its numeric
+      column headers to just the English label (full bilingual label moved to a `title`
+      tooltip) since the long bilingual headers were forcing every column to auto-size to the
+      header text instead of the much-shorter numeric values, widened its container to
+      `lg:px-[15%]` instead of a fixed max-width, and gave the DEO Template/Upload DEO Data
+      buttons actual color (`Button` variants `blue`/`amber`) instead of a plain gray outline
+- [x] Replaced every `?id=`/`?status=` URL query string with `sessionStorage` state
+      (`frontend/lib/adminNav.ts`) — district id and status filter now travel between admin
+      pages without ever touching the URL
+- [x] `AppHeader` decluttered: nav links, district search, Sync, theme toggle, and the profile
+      menu now live in one right-aligned group instead of spreading across the header;
+      Logout moved out of its own top-level button into the profile dropdown (`ProfileMenu`'s
+      `onLogout`) for both Admin and DEO; the header's district-search input dropped its
+      leading icon (same live-text/async-glyph overlap bug as `TextField`)
+- [x] Admin can now unlock a district only after entering a reason (`promptUnlockReason()`,
+      SweetAlert2 textarea) — stored on `districts.unlock_reason`/`unlocked_at`/`unlocked_by`
+      (migration `0003_overjoyed_malcolm_colcord.sql`) and shown on that district's detail page
+- [x] New `audit_log` table (migration `0004_white_songbird.sql`) and `/admin/audit` page —
+      every login/logout, lock/unlock, and DEO-provisioning batch, newest first, auto-pruned
+      to the last 30 days on read. Modeled on the sibling
+      `up-excise-spatial-revenue-optimizer` project's audit log.
+
 ## Backlog / not started
 
 - [ ] Real domain + DNS, and (optional) collapse `/frontend` + `/api` onto one zone via a

@@ -9,7 +9,7 @@ export type Profile = {
   email: string | null;
 };
 
-export default function ProfileMenu({ profile }: { profile: Profile | null }) {
+export default function ProfileMenu({ profile, onLogout }: { profile: Profile | null; onLogout?: () => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -59,6 +59,19 @@ export default function ProfileMenu({ profile }: { profile: Profile | null }) {
               <i className="ti ti-mail text-base text-slate-400" />
               <span className="truncate">{profile.email}</span>
             </div>
+          )}
+          {onLogout && (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onLogout();
+              }}
+              className="flex w-full items-center gap-1.5 rounded-md border-t border-slate-100 px-0 pt-2 text-red-600 hover:text-red-700 dark:border-slate-800 dark:text-red-400 dark:hover:text-red-300"
+            >
+              <i className="ti ti-logout text-base" />
+              Logout
+            </button>
           )}
         </div>
       )}

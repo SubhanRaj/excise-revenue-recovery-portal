@@ -3,6 +3,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { magicLinkTokens, users } from "@/db/schema";
 import { signSession, sessionCookie } from "@/lib/session";
+import { auditLogInsert } from "@/lib/audit";
 
 // POST-only by design: the frontend /verify page requires a button click ("Verify & Continue"),
 // so link-prefetching email clients/crawlers (which only issue GET) can never consume the token.
@@ -38,6 +39,12 @@ export async function POST(req: NextRequest) {
     userId: user.id,
     role: user.role as "deo" | "admin",
     districtId: user.districtId,
+  });
+
+  await auditLogInsert(db, {
+    eventType: "login_magic_link",
+    actorRole: user.role as "deo" | "admin",
+    actorEmail: user.email,
   });
 
   const res = NextResponse.json({ ok: true, role: user.role, districtId: user.districtId });

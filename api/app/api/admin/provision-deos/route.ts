@@ -4,6 +4,7 @@ import { getDb } from "@/lib/db";
 import { districts, users } from "@/db/schema";
 import { requireSession } from "@/lib/auth-guard";
 import { sha256Hex } from "@/lib/hash";
+import { auditLogInsert } from "@/lib/audit";
 
 type InputRow = { districtName?: unknown; cugMobile?: unknown; email?: unknown };
 type RowResult = { districtName: string; status: "inserted" | "updated" | "skipped" | "error"; message?: string };
@@ -84,6 +85,17 @@ export async function POST(req: NextRequest) {
       results.push({ districtName, status: "error", message: "Save failed — CUG or email may already be in use" });
     }
   }
+
+  const [admin] = await db.select({ email: users.email }).from(users).where(eq(users.id, session.userId)).limit(1);
+  const inserted = results.filter((r) => r.status === "inserted").length;
+  const updated = results.filter((r) => r.status === "updated").length;
+  const errors = results.filter((r) => r.status === "error").length;
+  await auditLogInsert(db, {
+    eventType: "deo_provisioned",
+    actorRole: "admin",
+    actorEmail: admin?.email,
+    metadata: { inserted, updated, errors, totalRows: rows.length },
+  });
 
   return NextResponse.json({ results });
 }

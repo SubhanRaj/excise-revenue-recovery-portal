@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import Link from "next/link";
 import type { Chart } from "chart.js";
 import { PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable } from "@/lib/pac-fields";
 import type { CachedDistrict } from "@/lib/db";
@@ -61,16 +62,64 @@ function LockStatusDonut({ locked, unlocked }: { locked: number; unlocked: numbe
   );
 }
 
-function KpiCard({ label, value, icon }: { label: string; value: string; icon: string }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
-        <i className={`ti ${icon} text-base`} />
-        <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
+const KPI_COLORS = {
+  blue: {
+    card: "border-blue-100 bg-blue-50/60 dark:border-blue-900 dark:bg-blue-950/30",
+    badge: "bg-blue-600 text-white",
+  },
+  red: {
+    card: "border-red-100 bg-red-50/60 dark:border-red-900 dark:bg-red-950/30",
+    badge: "bg-red-600 text-white",
+  },
+  emerald: {
+    card: "border-emerald-100 bg-emerald-50/60 dark:border-emerald-900 dark:bg-emerald-950/30",
+    badge: "bg-emerald-600 text-white",
+  },
+  amber: {
+    card: "border-amber-100 bg-amber-50/60 dark:border-amber-900 dark:bg-amber-950/30",
+    badge: "bg-amber-500 text-white",
+  },
+  violet: {
+    card: "border-violet-100 bg-violet-50/60 dark:border-violet-900 dark:bg-violet-950/30",
+    badge: "bg-violet-600 text-white",
+  },
+} as const;
+
+function KpiCard({
+  label,
+  value,
+  icon,
+  color,
+  href,
+}: {
+  label: string;
+  value: string;
+  icon: string;
+  color: keyof typeof KPI_COLORS;
+  href?: string;
+}) {
+  const c = KPI_COLORS[color];
+  const content = (
+    <div
+      className={`group rounded-lg border p-4 transition-all ${c.card} ${
+        href ? "cursor-pointer hover:-translate-y-0.5 hover:shadow-md" : ""
+      }`}
+    >
+      <div className="flex items-center gap-2.5">
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${c.badge}`}>
+          <i className={`ti ${icon} text-base`} />
+        </span>
+        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          {label}
+        </span>
+        {href && (
+          <i className="ti ti-chevron-right ml-auto text-slate-300 transition-transform group-hover:translate-x-0.5 dark:text-slate-600" />
+        )}
       </div>
-      <p className="mt-1.5 text-xl font-semibold text-slate-900 dark:text-slate-100">{value}</p>
+      <p className="mt-2 text-xl font-semibold tabular-nums text-slate-900 dark:text-slate-100">{value}</p>
     </div>
   );
+  return href ? <Link href={href}>{content}</Link> : content;
 }
 
 // ponytail: top-5 list and lock-ratio bar stay plain CSS divs — only the one chart the user
@@ -89,7 +138,11 @@ export default function AdminDashboard({ rows, selectedYear }: { rows: Row[]; se
   );
 
   const topDues = [...rows]
-    .map((r) => ({ name: r.districtName, dues: netRecoverable(r.grossArrears, r.recoveredAmount, r.stayAmount) }))
+    .map((r) => ({
+      id: r.id,
+      name: r.districtName,
+      dues: netRecoverable(r.grossArrears, r.recoveredAmount, r.stayAmount),
+    }))
     .sort((a, b) => b.dues - a.dues)
     .slice(0, 5);
   const maxDues = Math.max(1, ...topDues.map((d) => d.dues));
@@ -97,11 +150,17 @@ export default function AdminDashboard({ rows, selectedYear }: { rows: Row[]; se
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <KpiCard label="Districts" value={String(totalDistricts)} icon="ti-map-pin" />
-        <KpiCard label="Locked" value={String(locked)} icon="ti-lock" />
-        <KpiCard label="Unlocked" value={String(unlocked)} icon="ti-lock-open" />
-        <KpiCard label="Gross Arrears" value={formatMoney(sums.grossArrears)} icon="ti-report-money" />
-        <KpiCard label="Net Recoverable" value={formatMoney(netRecoverableTotal)} icon="ti-cash" />
+        <KpiCard label="Districts" value={String(totalDistricts)} icon="ti-map-pin" color="blue" href="/admin/districts" />
+        <KpiCard label="Locked" value={String(locked)} icon="ti-lock" color="red" href="/admin/districts?status=locked" />
+        <KpiCard
+          label="Unlocked"
+          value={String(unlocked)}
+          icon="ti-lock-open"
+          color="emerald"
+          href="/admin/districts?status=unlocked"
+        />
+        <KpiCard label="Gross Arrears" value={formatMoney(sums.grossArrears)} icon="ti-report-money" color="amber" href="/admin/districts" />
+        <KpiCard label="Net Recoverable" value={formatMoney(netRecoverableTotal)} icon="ti-cash" color="violet" href="/admin/districts" />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -111,7 +170,11 @@ export default function AdminDashboard({ rows, selectedYear }: { rows: Row[]; se
           </h3>
           <div className="space-y-2.5">
             {topDues.map((d) => (
-              <div key={d.name}>
+              <Link
+                key={d.id}
+                href={`/admin/districts/detail?id=${d.id}`}
+                className="-mx-2 block rounded-md px-2 py-1 transition-colors hover:bg-blue-50 dark:hover:bg-blue-950/40"
+              >
                 <div className="mb-1 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
                   <span>{d.name}</span>
                   <span className="tabular-nums">{formatMoney(d.dues)}</span>
@@ -122,7 +185,7 @@ export default function AdminDashboard({ rows, selectedYear }: { rows: Row[]; se
                     style={{ width: `${Math.max(2, (d.dues / maxDues) * 100)}%` }}
                   />
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </div>

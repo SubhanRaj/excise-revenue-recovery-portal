@@ -5,6 +5,13 @@ export const districts = sqliteTable("districts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   districtName: text("district_name").notNull().unique(),
   lockStatus: integer("lock_status").notNull().default(0),
+  // Stamped on every admin unlock (POST /api/admin/unlock) — mirrors the lock-side audit trail
+  // (users.locked_at / pac_data.submitted_by_name) but on the district itself, since unlocking
+  // is a district-wide action rather than something tied to one financial year's row. Only
+  // ever holds the most recent unlock event, not a full history.
+  unlockedAt: text("unlocked_at"),
+  unlockReason: text("unlock_reason"),
+  unlockedBy: text("unlocked_by"), // the admin's email
 });
 
 export const users = sqliteTable("users", {
@@ -57,6 +64,23 @@ export const pacData = sqliteTable("pac_data", {
 }, (table) => ({
   districtYearUnique: uniqueIndex("district_year_unique").on(table.districtId, table.financialYear),
 }));
+
+// General-purpose activity trail (logins/logouts, locks/unlocks, bulk DEO provisioning) —
+// modeled on the sibling up-excise-spatial-revenue-optimizer project's audit_log table.
+// createdAt is always written from JS (`new Date().toISOString()`), never a SQL
+// CURRENT_TIMESTAMP default — see the note on pac_data.locked_at above for why: this table's
+// timestamps are shown directly to admins, so it can't afford the timezone-less-string bug.
+// Rows older than 30 days are pruned opportunistically whenever the audit log is read
+// (api/app/api/admin/audit-log/route.ts) rather than via a separate cron trigger.
+export const auditLog = sqliteTable("audit_log", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  eventType: text("event_type").notNull(),
+  actorRole: text("actor_role"), // "admin" | "deo" | null (system-level events)
+  actorEmail: text("actor_email"), // admin's email; null for DEO events (no PII to log)
+  districtName: text("district_name"),
+  metadata: text("metadata"), // JSON string, event-specific extra detail (e.g. unlock reason)
+  createdAt: text("created_at").notNull(),
+});
 
 export const FINANCIAL_YEARS = [
   "2021-22",

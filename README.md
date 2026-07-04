@@ -17,10 +17,12 @@ They talk over plain `fetch`, credentialed cross-origin (see [CLAUDE.md](./CLAUD
 CORS/cookie setup). There is no shared package — types that overlap (financial years, PAC
 field order) are intentionally duplicated in each app.
 
-Client-side libraries (SweetAlert2, SheetJS, Tabler Icons, Google Fonts, Tailwind CSS v4) load
-from the jsDelivr CDN in `frontend/app/layout.tsx` rather than being bundled — see that file.
-Cleave.js and TanStack Table are npm dependencies instead, since they need to hook into React
-render/event cycles rather than run as passive globals.
+Client-side libraries (SweetAlert2, SheetJS, Tabler Icons, Google Fonts, Tailwind CSS v4,
+Chart.js) load from the jsDelivr CDN in `frontend/app/layout.tsx` rather than being bundled —
+see that file. SweetAlert2/SheetJS/Chart.js are still listed as npm `devDependencies` purely
+for their TypeScript types (`frontend/lib/globals.d.ts`'s `window.Swal`/`XLSX`/`Chart`), not
+because they're actually bundled. Cleave.js and TanStack Table are real npm dependencies,
+since they need to hook into React render/event cycles rather than run as passive globals.
 
 ## Getting started
 

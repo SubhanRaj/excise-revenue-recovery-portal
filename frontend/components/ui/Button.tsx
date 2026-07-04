@@ -1,7 +1,7 @@
 "use client";
 
 type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "secondary" | "dark" | "danger";
+  variant?: "primary" | "secondary" | "dark" | "danger" | "blue" | "amber";
   size?: "sm" | "md" | "lg";
 };
 
@@ -14,6 +14,12 @@ const VARIANTS: Record<NonNullable<Props["variant"]>, string> = {
   // "something is wrong" connotation a red button carries.
   dark: "bg-slate-800 text-white hover:bg-slate-900 focus-visible:ring-slate-400 dark:bg-slate-700 dark:hover:bg-slate-600",
   danger: "bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-300",
+  // Soft-tinted variants for secondary toolbar actions that still deserve some color (e.g. the
+  // DEO template download/upload buttons) — less flat than `secondary`'s plain gray outline,
+  // without competing with `primary` for visual weight.
+  blue: "bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 focus-visible:ring-blue-300 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-900 dark:hover:bg-blue-900",
+  amber:
+    "bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 focus-visible:ring-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-900 dark:hover:bg-amber-900",
 };
 
 // Kept out of the base class string and off the `className` override path deliberately —

@@ -77,20 +77,29 @@ manual DB insert:
 Then:
 
 1. **Admin**: `/login` → Email tab → `shubhanraj2002@gmail.com` → check inbox for the
-   styled login-link email (`api/lib/email.ts`) → Verify & Continue → `/admin` shows all
-   75 districts. Try Sync, switching financial years, Export to Excel.
-2. **DEO**: `/login` → CUG tab → the demo CUG → lands on `/deo-data-entry`. Walk Year 1 → 5: leave a
-   field blank and hit "Save & Continue" (a corner toast, not a popup or banner — bilingual),
-   make Recovered Amount ≠ RC Amount and blur the field (bold inline bilingual message under
-   Recovered Amount, "Save & Continue" disabled), watch Net Recoverable update live, try
-   "Previous Year" to go back a step. On Year 5, reach Master View (title now shows the
-   district name, English + smaller Hindi line), hit the big "Submit & Lock" button — this
-   triggers two SweetAlert2 dialogs: first a "verify the data is correct" confirm, then a
-   name-entry prompt with a liability disclaimer (try typing digits or "DEO Lucknow" to see
-   the validator reject it). Confirming both locks the district, kills the DEO session,
-   redirects to `/login`.
-3. **Back to Admin** → Sync → the district now shows "Locked" with real numbers → "Unlock"
-   reverses it for retesting.
+   styled login-link email (`api/lib/email.ts`) → Verify & Continue → `/admin` shows the
+   Dashboard — colored, clickable KPI cards (click Districts/Locked/Unlocked/Gross
+   Arrears/Net Recoverable, and a top-5-dues row, to confirm each link goes somewhere useful),
+   the locked/unlocked Chart.js donut, switching financial years. Then **Districts** (top nav)
+   for the sortable/searchable table, the Locked/Unlocked/All status filter, Sync, Export to
+   Excel.
+2. **DEO**: `/login` → CUG tab → the demo CUG → lands on `/deo-data-entry`. Since this is a
+   *separate* session cookie from the admin one above (see CLAUDE.md's Auth section), the
+   admin tab/session stays logged in the whole time — no need to re-request a magic link just
+   to switch back and forth. Walk Year 1 → 5: leave a field blank and hit "Save & Continue"
+   (a corner toast, not a popup or banner — bilingual), make Recovered Amount ≠ RC Amount and
+   blur the field (bold inline bilingual message under Recovered Amount, "Save & Continue"
+   disabled), watch Net Recoverable update live, try "Previous Year" to go back a step. On
+   Year 5, reach Master View (title now shows the district name, English + smaller Hindi
+   line), hit the big "Submit & Lock" button — this triggers two SweetAlert2 dialogs: first a
+   "verify the data is correct" confirm, then a name-entry prompt with a liability disclaimer
+   (try typing digits or "DEO Lucknow" to see the validator reject it). Confirming both locks
+   the district, kills the DEO session, redirects to `/login`.
+3. **Back to Admin → Districts** → Sync → the district now shows "Locked" with real numbers.
+   Click the row to open its detail page (who locked it, when, in IST) → **Back to Districts**
+   → **Unlock** now prompts for a reason (blank is rejected) before reversing it — check the
+   detail page again to see "Last unlocked by / on / Reason", and check **Audit Log** (top
+   nav) to see the lock and unlock events recorded, newest first.
 
 Reset for another pass:
 
