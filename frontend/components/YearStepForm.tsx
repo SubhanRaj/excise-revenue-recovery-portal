@@ -5,6 +5,7 @@ import { PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable } from 
 import type { DraftYear } from "@/lib/db";
 import Button from "./ui/Button";
 import Banner from "./ui/Banner";
+import HelpPanel from "./ui/HelpPanel";
 
 type Props = {
   year: DraftYear;
@@ -24,25 +25,37 @@ export default function YearStepForm({ year, onFieldChange, onSaveAndContinue, i
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-2 border-b border-slate-100 pb-4">
-        <i className="ti ti-calendar-stats text-xl text-indigo-600" />
-        <h2 className="text-base font-semibold text-slate-900">Financial Year {year.financialYear}</h2>
+      <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-4">
+        <div className="flex items-center gap-2">
+          <i className="ti ti-calendar-stats text-xl text-indigo-600" />
+          <h2 className="text-base font-semibold text-slate-900">Financial Year {year.financialYear}</h2>
+        </div>
+        <HelpPanel pageKey="deo-year-entry" title="Filling this form">
+          <p>Enter all six PAC/RC fields for this year. None may be left blank — type 0 if there is genuinely no amount, so a blank never gets silently treated as zero.</p>
+          <p><strong>Recovered Amount (3)</strong> must exactly equal <strong>RC Amount (2.ii)</strong> — the &quot;Save &amp; Continue&quot; button stays disabled until they match.</p>
+          <p><strong>Net Recoverable</strong> updates live as you type; it is calculated for display only and is not stored separately.</p>
+        </HelpPanel>
       </div>
 
       <div className="grid grid-cols-1 gap-4">
         {PAC_FIELD_ORDER.map((field) => (
-          <PacFieldInput
-            key={field}
-            label={PAC_FIELD_LABELS[field]}
-            value={year[field]}
-            money={isMoneyField(field)}
-            onChange={(raw) => onFieldChange(field, raw)}
-          />
+          <div key={field}>
+            <PacFieldInput
+              label={PAC_FIELD_LABELS[field]}
+              value={year[field]}
+              money={isMoneyField(field)}
+              onChange={(raw) => onFieldChange(field, raw)}
+            />
+            {field === "recoveredAmount" && !parityOk && (
+              <p className="mt-1.5 text-sm font-bold text-red-600">
+                Recovered Amount (3) must equal RC Amount (2.ii).
+              </p>
+            )}
+          </div>
         ))}
       </div>
 
       {blankErrorMessage && <Banner variant="error">{blankErrorMessage}</Banner>}
-      {!parityOk && <Banner variant="error">Recovered Amount (3) must equal RC Amount (2.ii).</Banner>}
 
       <div className="flex items-center justify-between rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm">
         <span className="font-medium text-indigo-900">Net Recoverable / शुद्ध वसूली योग्य धनराशि</span>
