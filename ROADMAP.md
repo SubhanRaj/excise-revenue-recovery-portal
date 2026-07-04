@@ -88,6 +88,24 @@
 - [x] Docs updated (DEPLOY.md, TESTING.md) to make GitHub Actions the documented primary
       deploy path, manual `wrangler` commands kept as local-dev/fallback reference
 
+## Milestone 9 — CUG hardening + UI bug pass (done)
+
+- [x] Anglicized the two remaining Hindi API error messages (`verify-cug`, `verify-magic-link`)
+- [x] Client-side CUG prefix validation (`94544`, real Excise Dept. numbers) — gated before
+      hashing/sending, error message never names the rule (generic "Invalid user")
+- [x] Demo/test CUG moved out of source and docs entirely: raw number lives only in the
+      `DEMO_CUG` Cloudflare Worker secret; frontend bypass compares against a precomputed
+      hash constant instead of the raw digits
+- [x] Fixed disabled DEO-nav buttons showing a pointer cursor instead of not-allowed
+      (Tailwind preflight `button { cursor: pointer }` conflict — see CLAUDE.md)
+- [x] Admin table: fixed the sticky header (wasn't actually sticking), added a sticky
+      totals row, removed the search-icon/input-text overlap, widened the page container
+- [x] DEO year form: one field per row instead of two-per-row at the `sm` breakpoint
+- [x] Diagnosed (not a regression, no code fix needed): demo CUG login failing was a
+      missing DB row, not a bug; admin magic-link redirect-to-login was the pre-documented
+      Safari cross-site-cookie risk, confirmed still working correctly in Chrome — see
+      TESTING.md's Incidents section
+
 ## Backlog / not started
 
 - [ ] Admin UI to provision DEO users (currently manual DB insert — see CLAUDE.md "Known gaps")

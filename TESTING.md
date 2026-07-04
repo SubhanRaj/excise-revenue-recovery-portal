@@ -130,3 +130,26 @@ a competing deploy path before re-diagnosing the app. `GET .../pages/projects/<n
 `.../workers/scripts/<name>/settings` `annotations["workers/triggered_by"]` (should say
 `version_upload` for a CLI/Action deploy, not something implying a separate build service)
 for Workers Builds.
+
+**2026-07-04 — demo CUG login returned "Invalid user"; admin magic-link login redirected
+back to `/login` after clicking Verify & Continue.**
+
+Two unrelated causes surfaced together:
+
+- The demo CUG: the manual demo script below had only ever been *documentation* — nobody
+  had actually run the `INSERT INTO users` command against remote D1 in this environment,
+  so the row genuinely didn't exist. Confirmed via `SELECT * FROM users` remotely (only the
+  superadmin row was present), fixed by running the insert. Not a code bug — see CLAUDE.md's
+  "Known gaps" for the standing reminder to check this before assuming a regression.
+- The magic-link redirect: reproduced the exact API sequence with `curl` and a cookie jar
+  (`request-magic-link` → `verify-magic-link` → `/api/auth/me`) and it worked end to end,
+  then ran `frontend/e2e/login.spec.ts` against production in real Chrome and it passed
+  cleanly too. So this wasn't a regression — it was the "Open risk, not yet hit" cross-site
+  cookie issue CLAUDE.md's Auth section already documents, hit for the first time on Safari.
+  No code change; the real fix is still the same one already on file (collapse both apps
+  onto one zone once a custom domain exists).
+
+Also fixed while investigating (unrelated to the above, found by visual review): disabled
+DEO nav buttons showed a normal pointer cursor instead of "not-allowed" — Tailwind's
+preflight in this version sets `button { cursor: pointer }` unconditionally, beating the
+`disabled:cursor-not-allowed` utility (see CLAUDE.md's UI conventions for the fix pattern).

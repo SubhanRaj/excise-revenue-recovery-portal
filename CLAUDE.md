@@ -66,7 +66,16 @@ Unified 7-day HttpOnly JWT cookie (`__session`, via `jose`), issued by either fl
 
 - **CUG flow**: `POST /api/auth/verify-cug` — frontend hashes the mobile number with
   Web Crypto (`frontend/lib/crypto.ts`) before sending; server matches against
-  `users.cug_hash`.
+  `users.cug_hash`. Real Excise Dept. CUG numbers all start with `94544`; the frontend
+  (`app/login/page.tsx`) gates on this prefix *before* hashing/sending, and the error is
+  the same generic "Invalid user" a real auth failure would show — the prefix rule itself
+  is never named in the message, so a wrong-prefix guess isn't distinguishable from an
+  unregistered number. The one seeded demo/test account is exempt from the prefix gate;
+  it's matched by comparing the computed hash against a precomputed constant
+  (`DEMO_CUG_HASH`) rather than checking the raw digits, so the actual demo number never
+  appears in shipped source. The number itself lives only in the `DEMO_CUG` Cloudflare
+  Worker secret (`wrangler secret put`, not retrievable after set) — don't add it back to
+  any doc or source file.
 - **Magic link flow**: `POST /api/auth/request-magic-link` issues a 15-minute token,
   emailed via Resend (`api/lib/email.ts` for the HTML); `frontend/app/verify/page.tsx`
   requires an explicit button click (POST, not GET) so email-client link-prefetchers can't
@@ -128,7 +137,16 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   instead. Don't put a Tabler `<i>` icon directly inside/overlapping live input text —
   the glyph renders via a CSS `::before` that loads async, so it can flash a fallback tofu
   box on top of the text before the font loads (this happened once; `TextField` has no
-  icon slot as a result). Icons on buttons/badges next to static short label text are fine.
+  icon slot as a result, and the admin district search input had the same bug — fixed by
+  dropping the icon rather than fighting the async font load). Icons on buttons/badges
+  next to static short label text are fine.
+- **`disabled:cursor-not-allowed` doesn't work on `<button>` in this Tailwind version** —
+  the CDN's preflight sets `button { cursor: pointer }` unconditionally, which beats the
+  `disabled:` variant regardless of class order. If a disabled button needs to actually
+  show a blocked cursor (e.g. `Button.tsx`, the DEO year-step nav pills), set
+  `style={{ cursor: "not-allowed" }}` directly from the JS disabled condition instead of
+  relying on the Tailwind utility — `disabled:opacity-*` still works fine, it's only
+  `cursor` that's affected.
 - **Tailwind is a CDN script (`@tailwindcss/browser@4`), not a build step** — see
   `frontend/app/layout.tsx`. It must be a plain `<script src=...>` tag, not `next/script`.
   `next/script`'s `beforeInteractive` strategy injects the tag via a JS runtime hook rather
@@ -163,3 +181,8 @@ project, don't.
 - No admin UI to provision new DEO users (add `cug_hash`/`email` rows) — currently a
   manual DB operation. Add an endpoint if that becomes a real workflow, not speculatively.
 - No password/OTP fallback if Resend or a DEO's CUG number changes — re-seed manually.
+- The seeded demo DEO account (see TESTING.md) is a manual `wrangler d1 execute --remote`
+  insert, same as any other DEO — it does **not** exist in remote D1 just because it's
+  documented. If demo login ever starts failing with "Invalid user", check the `users`
+  table remotely before assuming a code regression; the row may simply never have been
+  (re-)inserted after a database reset/reseed.
