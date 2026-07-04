@@ -2,7 +2,6 @@
    CDN script finishes generating utility classes (it's a runtime JIT, not a build step). */
 :root {
   --background: #f8fafc;
-  --foreground: #0f172a;
   color-scheme: light;
 }
 
@@ -12,16 +11,22 @@
 
 body {
   background: var(--background);
-  color: var(--foreground);
   font-family: "Noto Sans Devanagari", Inter, system-ui, sans-serif;
   margin: 0;
 }
 
+/* No `color` here or on body above — this stylesheet isn't wrapped in a Tailwind @layer, so
+   per CSS Cascade Layers an unlayered rule always outranks Tailwind's own @layer-wrapped
+   utilities, specificity and the .dark toggle notwithstanding. A `color` declaration here
+   would permanently pin every button/input/select's text to this file's static value —
+   which happened to match Tailwind's light-mode text-slate-900 by coincidence (so it went
+   unnoticed), but silently defeated every dark:text-* class app-wide, rendering dark-on-dark
+   invisible text on every button/input once dark mode was on. Tailwind is a blocking script
+   that loads near-instantly, so leave color entirely to its utility classes. */
 input,
 select,
 button {
   font: inherit;
-  color: inherit;
 }
 
 input,

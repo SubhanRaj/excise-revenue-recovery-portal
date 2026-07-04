@@ -247,14 +247,25 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   since a manual per-page toggle there isn't needed before the user is even signed in. When
   adding a new component, mirror the existing `dark:bg-slate-900` / `dark:text-slate-100` /
   `dark:border-slate-800` pattern already used throughout rather than inventing new dark-mode
-  shades. `<head>` also declares `<meta name="color-scheme" content="light dark" />` — without
-  it, Chrome's Android "force dark" feature doesn't know the site already handles its own
-  theming and layers its own auto-darken/invert heuristic on top of our `.dark` class, which
-  showed up as input borders rendering with a wrong greenish tint and, on some elements, text
-  forced to a near-black that was unreadable against our own dark background. This isn't a
-  Tailwind/CSS bug on our side — it only reproduces on Chrome for Android with that OS-level
-  setting on — so don't try to chase it by re-tuning our own `dark:` colors; the meta tag is
-  the actual fix and must stay in `<head>`.
+  shades. `<head>` also declares `<meta name="color-scheme" content="light dark" />`, mainly to
+  stop Chrome for Android's own "force dark" heuristic from also auto-darkening/inverting colors
+  on top of our `.dark` class — real, but a secondary issue; see below for the actual cause of
+  invisible dark-mode text.
+- **`frontend/app/globals.css` must never set `color` on `body`, `button`, `input`, or
+  `select`.** This file is a plain external stylesheet (a pre-Tailwind FOUC fallback, per its own
+  comment) — it is **not** wrapped in a Tailwind `@layer`, and CSS Cascade Layers make any
+  unlayered rule outrank *every* `@layer`-wrapped Tailwind utility for the same property on the
+  same element, regardless of specificity or whether `.dark` is present. This file used to set
+  `body { color: var(--foreground) }` plus `input, select, button { color: inherit }`, which
+  permanently pinned every button/input/select's text to that one static, never-dark-aware value
+  — it happened to equal Tailwind's own light-mode `text-slate-900`, so it went unnoticed for
+  months, but in dark mode it silently defeated every `dark:text-*` class on every button/input
+  app-wide (Login, the year-nav pills, Submit & Lock, Sync, Unlock, pagination, dropdown
+  `<select>`s — all of it), rendering dark-on-dark, functionally invisible text. Confirmed with a
+  headless Playwright render of the deployed site (`page.goto(..., { colorScheme: 'dark' })` +
+  `getComputedStyle`) before and after removing those two `color` declarations. If you need a
+  pre-Tailwind fallback color again, wrap it in `@layer base { ... }` instead of a bare rule —
+  don't add a plain unlayered `color` rule back.
 
 ## UI conventions
 
