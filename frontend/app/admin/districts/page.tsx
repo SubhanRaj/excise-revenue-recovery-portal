@@ -247,20 +247,20 @@ export default function DistrictsPage() {
           </div>
         )}
 
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-4 flex flex-nowrap items-center justify-between gap-3">
           <input
             type="text"
             placeholder="Search district..."
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
-            className="w-full max-w-xs rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            className="w-full max-w-xs shrink-0 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           />
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as "all" | "locked" | "unlocked")}
-              className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+              className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
             >
               <option value="all">All statuses</option>
               <option value="locked">Locked</option>
@@ -269,7 +269,7 @@ export default function DistrictsPage() {
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(e.target.value as (typeof FINANCIAL_YEARS)[number])}
-              className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+              className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
             >
               {FINANCIAL_YEARS.map((fy) => (
                 <option key={fy} value={fy}>
@@ -277,8 +277,8 @@ export default function DistrictsPage() {
                 </option>
               ))}
             </select>
-            <Button variant="blue" size="sm" onClick={() => downloadDeoTemplate(districts)}>
-              <i className="ti ti-download text-sm" />
+            <Button variant="blue" size="xs" onClick={() => downloadDeoTemplate(districts)}>
+              <i className="ti ti-download text-xs" />
               DEO Template
             </Button>
             <input
@@ -288,19 +288,19 @@ export default function DistrictsPage() {
               onChange={handleDeoFileSelected}
               className="hidden"
             />
-            <Button variant="amber" size="sm" onClick={() => deoFileInputRef.current?.click()} disabled={provisioning}>
-              <i className={`ti ti-upload text-sm ${provisioning ? "animate-pulse" : ""}`} />
+            <Button variant="amber" size="xs" onClick={() => deoFileInputRef.current?.click()} disabled={provisioning}>
+              <i className={`ti ti-upload text-xs ${provisioning ? "animate-pulse" : ""}`} />
               {provisioning ? "Uploading..." : "Upload DEO Data"}
             </Button>
-            <Button size="sm" onClick={exportExcel}>
-              <i className="ti ti-file-spreadsheet text-sm" />
-              Export to Excel
+            <Button size="xs" onClick={exportExcel}>
+              <i className="ti ti-file-spreadsheet text-xs" />
+              Export
             </Button>
           </div>
         </div>
 
         <div className="max-h-[65vh] overflow-auto rounded-lg border border-slate-200 bg-white shadow-sm [scrollbar-width:thin] scroll-smooth dark:border-slate-800 dark:bg-slate-900">
-          <table className="border-collapse text-sm">
+          <table className="w-full border-collapse text-sm">
             <thead>
               {table.getHeaderGroups().map((hg) => (
                 <tr key={hg.id} className="bg-slate-50 dark:bg-slate-800">

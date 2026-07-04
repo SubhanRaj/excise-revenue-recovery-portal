@@ -2,7 +2,7 @@
 
 type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: "primary" | "secondary" | "dark" | "danger" | "blue" | "amber";
-  size?: "sm" | "md" | "lg";
+  size?: "xs" | "sm" | "md" | "lg";
 };
 
 const VARIANTS: Record<NonNullable<Props["variant"]>, string> = {
@@ -28,9 +28,10 @@ const VARIANTS: Record<NonNullable<Props["variant"]>, string> = {
 // since the Tailwind CDN's JIT scans the whole document rather than respecting className
 // prop order. A `size` variant avoids ever having two padding/text-size utilities in play.
 const SIZES: Record<NonNullable<Props["size"]>, string> = {
-  sm: "px-2.5 py-1.5 text-xs",
-  md: "px-4 py-2.5 text-sm",
-  lg: "px-6 py-4 text-base",
+  xs: "px-2 py-1 text-xs gap-1",
+  sm: "px-2.5 py-1.5 text-xs gap-1.5",
+  md: "px-4 py-2.5 text-sm gap-2",
+  lg: "px-6 py-4 text-base gap-2",
 };
 
 export default function Button({ variant = "primary", size = "md", className = "", disabled, ...props }: Props) {
@@ -44,7 +45,7 @@ export default function Button({ variant = "primary", size = "md", className = "
       style={disabled ? { cursor: "not-allowed" } : undefined}
       // flex-row + whitespace-nowrap spelled out explicitly (not left to inline-flex's
       // default) so icon+label can never wrap onto separate lines regardless of button width.
-      className={`inline-flex flex-row flex-nowrap items-center justify-center gap-2 whitespace-nowrap rounded-md font-semibold shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 ${SIZES[size]} ${VARIANTS[variant]} ${className}`}
+      className={`inline-flex flex-row flex-nowrap items-center justify-center whitespace-nowrap rounded-md font-semibold shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 ${SIZES[size]} ${VARIANTS[variant]} ${className}`}
     />
   );
 }
