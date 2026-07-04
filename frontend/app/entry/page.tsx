@@ -161,13 +161,14 @@ export default function EntryPage() {
                 type="button"
                 onClick={() => goToStep(i)}
                 disabled={locked}
+                style={locked ? { cursor: "not-allowed" } : undefined}
                 className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
                   step === i
                     ? "bg-indigo-600 text-white shadow-sm"
                     : done
                       ? "bg-indigo-50 text-indigo-700"
                       : "bg-slate-100 text-slate-500"
-                } disabled:cursor-not-allowed disabled:opacity-40`}
+                } disabled:opacity-40`}
               >
                 {done && step !== i && <i className="ti ti-check text-base" />}
                 Year {i + 1}
@@ -179,9 +180,10 @@ export default function EntryPage() {
             type="button"
             onClick={() => goToStep(5)}
             disabled={!years.every((y) => y.completed)}
+            style={!years.every((y) => y.completed) ? { cursor: "not-allowed" } : undefined}
             className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
               step === 5 ? "bg-indigo-600 text-white shadow-sm" : "bg-slate-100 text-slate-500"
-            } disabled:cursor-not-allowed disabled:opacity-40`}
+            } disabled:opacity-40`}
           >
             <i className="ti ti-clipboard-list text-base" />
             Master View

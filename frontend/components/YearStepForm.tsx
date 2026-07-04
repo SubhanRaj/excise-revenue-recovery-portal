@@ -29,7 +29,7 @@ export default function YearStepForm({ year, onFieldChange, onSaveAndContinue, i
         <h2 className="text-base font-semibold text-slate-900">Financial Year {year.financialYear}</h2>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4">
         {PAC_FIELD_ORDER.map((field) => (
           <PacFieldInput
             key={field}

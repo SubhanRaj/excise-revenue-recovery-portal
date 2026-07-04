@@ -127,6 +127,17 @@ export default function AdminPage() {
     [districts, pacData, selectedYear]
   );
 
+  const totals = useMemo(() => {
+    const sums = Object.fromEntries(
+      PAC_FIELD_ORDER.map((field) => [field, rows.reduce((sum, r) => sum + r[field], 0)])
+    ) as Record<(typeof PAC_FIELD_ORDER)[number], number>;
+    const netRecoverableTotal = rows.reduce(
+      (sum, r) => sum + netRecoverable(r.grossArrears, r.recoveredAmount, r.stayAmount),
+      0
+    );
+    return { sums, netRecoverableTotal };
+  }, [rows]);
+
   const columns = useMemo(
     () => [
       columnHelper.accessor("districtName", {
@@ -195,7 +206,7 @@ export default function AdminPage() {
   return (
     <div className="flex min-h-full flex-1 flex-col bg-slate-50">
       <AppHeader title="Admin Dashboard" />
-      <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
+      <div className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-8">
         {banner && (
           <div className="mb-4">
             <Banner variant={banner.variant}>{banner.message}</Banner>
@@ -217,16 +228,13 @@ export default function AdminPage() {
               </option>
             ))}
           </select>
-          <span className="relative flex items-center">
-            <i className="ti ti-search pointer-events-none absolute left-3 text-base text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search district..."
-              value={globalFilter}
-              onChange={(e) => setGlobalFilter(e.target.value)}
-              className="rounded-md border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-            />
-          </span>
+          <input
+            type="text"
+            placeholder="Search district..."
+            value={globalFilter}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+          />
           <Button variant="secondary" onClick={sync} disabled={syncing}>
             <i className={`ti ti-refresh text-base ${syncing ? "animate-spin" : ""}`} />
             {syncing ? "Syncing..." : "Sync"}
@@ -237,8 +245,8 @@ export default function AdminPage() {
           </Button>
         </div>
 
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
-          <table className="w-full min-w-[1100px] border-collapse text-sm">
+        <div className="max-h-[70vh] overflow-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+          <table className="w-full border-collapse text-sm">
             <thead>
               {table.getHeaderGroups().map((hg) => (
                 <tr key={hg.id} className="bg-slate-50">
@@ -246,12 +254,13 @@ export default function AdminPage() {
                     <th
                       key={header.id}
                       onClick={header.column.getToggleSortingHandler()}
-                      className={`sticky top-0 whitespace-nowrap px-3 py-2.5 text-left font-medium text-slate-600 ${
+                      className={`sticky top-0 z-20 whitespace-nowrap bg-slate-50 px-3 py-2.5 text-left font-medium text-slate-600 ${
                         header.column.getCanSort() ? "cursor-pointer select-none hover:text-slate-900" : ""
-                      } ${header.column.getIsPinned() ? "left-0 z-10 bg-slate-50" : ""}`}
+                      } ${header.column.getIsPinned() ? "left-0 z-30" : ""}`}
                     >
                       {flexRender(header.column.columnDef.header, header.getContext())}
-                      {{ asc: " ▲", desc: " ▼" }[header.column.getIsSorted() as string] ?? ""}
+                      {{ asc: " ▲", desc: " ▼" }[header.column.getIsSorted() as string] ??
+                        (header.column.getCanSort() ? " ⇅" : "")}
                     </th>
                   ))}
                 </tr>
@@ -273,6 +282,21 @@ export default function AdminPage() {
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr className="sticky bottom-0 z-20 border-t-2 border-slate-300 bg-slate-100 font-semibold text-slate-900">
+                <td className="sticky left-0 z-30 whitespace-nowrap bg-slate-100 px-3 py-2.5">Total</td>
+                <td className="whitespace-nowrap px-3 py-2.5" />
+                {PAC_FIELD_ORDER.map((field) => (
+                  <td key={field} className="whitespace-nowrap px-3 py-2.5">
+                    {formatValue(field, totals.sums[field])}
+                  </td>
+                ))}
+                <td className="whitespace-nowrap px-3 py-2.5">
+                  ₹{totals.netRecoverableTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </td>
+                <td className="whitespace-nowrap px-3 py-2.5" />
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>
