@@ -46,9 +46,11 @@ export default function YearStepForm({ year, onFieldChange, onSaveAndContinue, o
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-2 border-b border-slate-100 pb-4">
-        <i className="ti ti-calendar-stats text-xl text-indigo-600" />
-        <h2 className="text-base font-semibold text-slate-900">Financial Year {year.financialYear}</h2>
+      <div className="flex items-center gap-2 border-b border-slate-100 pb-4 dark:border-slate-800">
+        <i className="ti ti-calendar-stats text-xl text-blue-600 dark:text-blue-400" />
+        <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+          Financial Year {year.financialYear}
+        </h2>
       </div>
 
       <div className="grid grid-cols-1 gap-4">
@@ -110,9 +112,11 @@ export default function YearStepForm({ year, onFieldChange, onSaveAndContinue, o
         </div>
       </div>
 
-      <div className="flex items-center justify-between rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm">
-        <span className="font-medium text-indigo-900">Net Recoverable / शुद्ध वसूली योग्य धनराशि</span>
-        <span className="text-base font-semibold text-indigo-700">
+      <div className="flex items-center justify-between rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm dark:border-blue-900 dark:bg-blue-950/40">
+        <span className="font-medium text-blue-900 dark:text-blue-200">
+          Net Recoverable / शुद्ध वसूली योग्य धनराशि
+        </span>
+        <span className="text-base font-semibold text-blue-700 dark:text-blue-300">
           ₹{netRecoverable(gross, recovered, stay).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
         </span>
       </div>

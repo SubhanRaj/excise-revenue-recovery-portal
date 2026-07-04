@@ -7,8 +7,10 @@ import {
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
+  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
+  type PaginationState,
   type SortingState,
 } from "@tanstack/react-table";
 import { db, type CachedDistrict, type CachedPacData } from "@/lib/db";
@@ -21,7 +23,10 @@ import AppHeader from "@/components/ui/AppHeader";
 import Button from "@/components/ui/Button";
 import Banner from "@/components/ui/Banner";
 import HelpPanel from "@/components/ui/HelpPanel";
+import AdminDashboard from "@/components/AdminDashboard";
 import type { Profile } from "@/components/ui/ProfileMenu";
+
+const PAGE_SIZE_OPTIONS = [25, 50, 75, 100] as const;
 
 type Row = CachedDistrict & Record<(typeof PAC_FIELD_ORDER)[number], number>;
 
@@ -39,8 +44,10 @@ export default function AdminPage() {
   const [districts, setDistricts] = useState<CachedDistrict[]>([]);
   const [pacData, setPacData] = useState<CachedPacData[]>([]);
   const [selectedYear, setSelectedYear] = useState<(typeof FINANCIAL_YEARS)[number]>(FINANCIAL_YEARS[0]);
+  const [view, setView] = useState<"dashboard" | "table">("dashboard");
   const [globalFilter, setGlobalFilter] = useState("");
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 25 });
   const [syncing, setSyncing] = useState(false);
   const [provisioning, setProvisioning] = useState(false);
   const [banner, setBanner] = useState<{ variant: "error" | "success"; message: string } | null>(null);
@@ -243,18 +250,20 @@ export default function AdminPage() {
   const table = useReactTable({
     data: rows,
     columns,
-    state: { globalFilter, sorting, columnPinning: { left: ["districtName"] } },
+    state: { globalFilter, sorting, pagination, columnPinning: { left: ["districtName"] } },
     onGlobalFilterChange: setGlobalFilter,
     onSortingChange: setSorting,
+    onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
   });
 
   if (!ready) return null;
 
   return (
-    <div className="flex min-h-full flex-1 flex-col bg-slate-50">
+    <div className="flex min-h-full flex-1 flex-col bg-slate-50 dark:bg-slate-950">
       <AppHeader title="Admin Dashboard" profile={profile} />
       <HelpPanel pageKey="admin-dashboard" title="Using this dashboard">
         <p>
@@ -281,118 +290,192 @@ export default function AdminPage() {
           Existing DEOs are updated, not duplicated, by matching district name.
         </p>
       </HelpPanel>
-      <div className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-8">
+      <div className="mx-auto w-full max-w-[1400px] flex-1 px-6 py-6 lg:px-10">
         {banner && (
           <div className="mb-4">
             <Banner variant={banner.variant}>{banner.message}</Banner>
           </div>
         )}
-        <div className="mb-5 flex flex-wrap items-center gap-3">
-          <div className="mr-auto">
-            <h1 className="text-lg font-semibold text-slate-900">75 Districts</h1>
-            <p className="text-sm text-slate-500">Review, sync, and export PAC recovery data.</p>
+
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex rounded-lg bg-slate-100 p-1 text-sm dark:bg-slate-800">
+            <button
+              type="button"
+              onClick={() => setView("dashboard")}
+              className={`rounded-md px-3 py-1.5 font-medium transition-colors ${
+                view === "dashboard"
+                  ? "bg-white text-blue-700 shadow-sm dark:bg-slate-950 dark:text-blue-400"
+                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              }`}
+            >
+              Dashboard
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("table")}
+              className={`rounded-md px-3 py-1.5 font-medium transition-colors ${
+                view === "table"
+                  ? "bg-white text-blue-700 shadow-sm dark:bg-slate-950 dark:text-blue-400"
+                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              }`}
+            >
+              Districts Table
+            </button>
           </div>
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(e.target.value as (typeof FINANCIAL_YEARS)[number])}
-            className="rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-          >
-            {FINANCIAL_YEARS.map((fy) => (
-              <option key={fy} value={fy}>
-                {fy}
-              </option>
-            ))}
-          </select>
-          <input
-            type="text"
-            placeholder="Search district..."
-            value={globalFilter}
-            onChange={(e) => setGlobalFilter(e.target.value)}
-            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-          />
-          <Button variant="secondary" onClick={sync} disabled={syncing}>
-            <i className={`ti ti-refresh text-base ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? "Syncing..." : "Sync"}
-          </Button>
-          <Button variant="secondary" onClick={() => downloadDeoTemplate(districts)}>
-            <i className="ti ti-download text-base" />
-            Download DEO Template
-          </Button>
-          <input
-            ref={deoFileInputRef}
-            type="file"
-            accept=".xlsx,.xls"
-            onChange={handleDeoFileSelected}
-            className="hidden"
-          />
-          <Button
-            variant="secondary"
-            onClick={() => deoFileInputRef.current?.click()}
-            disabled={provisioning}
-          >
-            <i className={`ti ti-upload text-base ${provisioning ? "animate-pulse" : ""}`} />
-            {provisioning ? "Uploading..." : "Upload DEO Data"}
-          </Button>
-          <Button onClick={exportExcel}>
-            <i className="ti ti-file-spreadsheet text-base" />
-            Export to Excel
-          </Button>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value as (typeof FINANCIAL_YEARS)[number])}
+              className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+            >
+              {FINANCIAL_YEARS.map((fy) => (
+                <option key={fy} value={fy}>
+                  {fy}
+                </option>
+              ))}
+            </select>
+            <Button variant="secondary" size="sm" onClick={sync} disabled={syncing}>
+              <i className={`ti ti-refresh text-sm ${syncing ? "animate-spin" : ""}`} />
+              {syncing ? "Syncing..." : "Sync"}
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => downloadDeoTemplate(districts)}>
+              <i className="ti ti-download text-sm" />
+              DEO Template
+            </Button>
+            <input
+              ref={deoFileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleDeoFileSelected}
+              className="hidden"
+            />
+            <Button variant="secondary" size="sm" onClick={() => deoFileInputRef.current?.click()} disabled={provisioning}>
+              <i className={`ti ti-upload text-sm ${provisioning ? "animate-pulse" : ""}`} />
+              {provisioning ? "Uploading..." : "Upload DEO Data"}
+            </Button>
+            <Button size="sm" onClick={exportExcel}>
+              <i className="ti ti-file-spreadsheet text-sm" />
+              Export to Excel
+            </Button>
+          </div>
         </div>
 
-        <div className="max-h-[70vh] overflow-auto rounded-lg border border-slate-200 bg-white shadow-sm [scrollbar-width:thin] scroll-smooth">
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              {table.getHeaderGroups().map((hg) => (
-                <tr key={hg.id} className="bg-slate-50">
-                  {hg.headers.map((header) => (
-                    <th
-                      key={header.id}
-                      onClick={header.column.getToggleSortingHandler()}
-                      className={`sticky top-0 z-20 whitespace-nowrap bg-slate-50 px-3 py-2.5 text-left font-medium text-slate-600 ${
-                        header.column.getCanSort() ? "cursor-pointer select-none hover:text-slate-900" : ""
-                      } ${header.column.getIsPinned() ? "left-0 z-30" : ""}`}
-                    >
-                      {flexRender(header.column.columnDef.header, header.getContext())}
-                      {{ asc: " ▲", desc: " ▼" }[header.column.getIsSorted() as string] ??
-                        (header.column.getCanSort() ? " ⇅" : "")}
-                    </th>
+        {view === "dashboard" ? (
+          <AdminDashboard rows={rows} selectedYear={selectedYear} />
+        ) : (
+          <>
+            <div className="mb-3">
+              <input
+                type="text"
+                placeholder="Search district..."
+                value={globalFilter}
+                onChange={(e) => setGlobalFilter(e.target.value)}
+                className="w-full max-w-xs rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              />
+            </div>
+
+            <div className="max-h-[65vh] overflow-auto rounded-lg border border-slate-200 bg-white shadow-sm [scrollbar-width:thin] scroll-smooth dark:border-slate-800 dark:bg-slate-900">
+              <table className="border-collapse text-sm">
+                <thead>
+                  {table.getHeaderGroups().map((hg) => (
+                    <tr key={hg.id} className="bg-slate-50 dark:bg-slate-800">
+                      {hg.headers.map((header) => (
+                        <th
+                          key={header.id}
+                          onClick={header.column.getToggleSortingHandler()}
+                          className={`sticky top-0 z-20 whitespace-nowrap bg-slate-50 px-3 py-2.5 text-left font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400 ${
+                            header.column.getCanSort()
+                              ? "cursor-pointer select-none hover:text-slate-900 dark:hover:text-slate-100"
+                              : ""
+                          } ${header.column.getIsPinned() ? "left-0 z-30" : ""}`}
+                        >
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                          {{ asc: " ▲", desc: " ▼" }[header.column.getIsSorted() as string] ??
+                            (header.column.getCanSort() ? " ⇅" : "")}
+                        </th>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="border-t border-slate-100 bg-white hover:bg-slate-50">
-                  {row.getVisibleCells().map((cell) => (
-                    <td
-                      key={cell.id}
-                      className={`whitespace-nowrap px-3 py-2.5 text-slate-800 ${
-                        cell.column.getIsPinned() ? "sticky left-0 z-10 bg-inherit font-medium" : ""
-                      }`}
-                    >
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </thead>
+                <tbody>
+                  {table.getRowModel().rows.map((row) => (
+                    <tr key={row.id} className="border-t border-slate-100 bg-white hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800">
+                      {row.getVisibleCells().map((cell) => (
+                        <td
+                          key={cell.id}
+                          className={`whitespace-nowrap px-3 py-2.5 text-slate-800 dark:text-slate-200 ${
+                            cell.column.getIsPinned() ? "sticky left-0 z-10 bg-inherit font-medium" : ""
+                          }`}
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="sticky bottom-0 z-20 border-t-2 border-slate-300 bg-slate-100 font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                    <td className="sticky left-0 z-30 whitespace-nowrap bg-slate-100 px-3 py-2.5 dark:bg-slate-800">Total</td>
+                    <td className="whitespace-nowrap px-3 py-2.5" />
+                    {PAC_FIELD_ORDER.map((field) => (
+                      <td key={field} className="whitespace-nowrap px-3 py-2.5">
+                        {formatValue(field, totals.sums[field])}
+                      </td>
+                    ))}
+                    <td className="whitespace-nowrap px-3 py-2.5">
+                      ₹{totals.netRecoverableTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </td>
+                    <td className="whitespace-nowrap px-3 py-2.5" />
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600 dark:text-slate-400">
+              <div className="flex items-center gap-2">
+                <span>Rows per page</span>
+                <select
+                  value={pagination.pageSize}
+                  onChange={(e) => setPagination((p) => ({ ...p, pageIndex: 0, pageSize: Number(e.target.value) }))}
+                  className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                >
+                  {PAGE_SIZE_OPTIONS.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
                   ))}
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="sticky bottom-0 z-20 border-t-2 border-slate-300 bg-slate-100 font-semibold text-slate-900">
-                <td className="sticky left-0 z-30 whitespace-nowrap bg-slate-100 px-3 py-2.5">Total</td>
-                <td className="whitespace-nowrap px-3 py-2.5" />
-                {PAC_FIELD_ORDER.map((field) => (
-                  <td key={field} className="whitespace-nowrap px-3 py-2.5">
-                    {formatValue(field, totals.sums[field])}
-                  </td>
-                ))}
-                <td className="whitespace-nowrap px-3 py-2.5">
-                  ₹{totals.netRecoverableTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                </td>
-                <td className="whitespace-nowrap px-3 py-2.5" />
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+                </select>
+                <span>
+                  of {table.getFilteredRowModel().rows.length} district{table.getFilteredRowModel().rows.length === 1 ? "" : "s"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => table.previousPage()}
+                  disabled={!table.getCanPreviousPage()}
+                  style={!table.getCanPreviousPage() ? { cursor: "not-allowed" } : undefined}
+                  className="rounded-md border border-slate-300 bg-white px-2.5 py-1 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                >
+                  <i className="ti ti-chevron-left text-sm" />
+                </button>
+                <span>
+                  Page {table.getState().pagination.pageIndex + 1} of {Math.max(1, table.getPageCount())}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => table.nextPage()}
+                  disabled={!table.getCanNextPage()}
+                  style={!table.getCanNextPage() ? { cursor: "not-allowed" } : undefined}
+                  className="rounded-md border border-slate-300 bg-white px-2.5 py-1 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                >
+                  <i className="ti ti-chevron-right text-sm" />
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

@@ -145,7 +145,35 @@ Both dialogs are bilingual (English + Hindi). `app/layout.tsx` adds a small glob
 
 The Admin dashboard caches all districts + PAC rows in Dexie (`adminDistricts`,
 `adminPacData`) for instant load, with an explicit "Sync" button to refetch from D1.
+
+The Year 1–5 / Master View nav pills in `entry/page.tsx` are `sticky top-16` (just below the
+also-`sticky` `AppHeader`) so they stay reachable while scrolling down a long year form,
+matching the `AdminDashboard`'s always-visible toolbar.
 Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
+
+## Visual language: sober blue, not indigo/purple, and dark mode
+
+- **Brand color is `blue` (Tailwind's default blue-600/700/800), not `indigo`.** The app
+  originally used `indigo-*` throughout (buttons, header, tabs, focus rings, the magic-link
+  email); it read as too purple/playful for a government portal and was rebranded to `blue`
+  in one pass across every component, plus the magic-link email's inline hex colors
+  (`api/lib/email.ts`: `#1d4ed8`/`#2563eb`, the hex equivalents of `blue-700`/`blue-600`).
+  If you add new UI, use `blue-*` for primary/accent, never reach for `indigo-*` again —
+  `frontend/e2e/login.spec.ts` asserts `text-blue-700` on the active login tab as a
+  regression guard.
+- **Dark mode** (`frontend/lib/theme.ts`, `components/ui/ThemeToggle.tsx`): persisted in
+  `localStorage` (`excise-portal:theme`), defaults to the OS's `prefers-color-scheme` when
+  nothing is stored yet. `app/layout.tsx` has a plain blocking inline `<script>` (same
+  reasoning as the Tailwind CDN script — must run before first paint) that reads
+  `localStorage` and adds the `.dark` class to `<html>` synchronously, so there's no
+  flash-of-wrong-theme on reload. A second `<style type="text/tailwindcss">` block sets
+  `@custom-variant dark (&:where(.dark, .dark *));` so `dark:` utilities key off that class
+  instead of Tailwind v4's default `prefers-color-scheme` media query — this is what lets the
+  toggle override the OS setting rather than just mirroring it. `ThemeToggle` lives in
+  `AppHeader` (every gated page) and is also placed directly on `/login` and `/verify`, which
+  have no `AppHeader`. When adding a new component, mirror the existing `dark:bg-slate-900`
+  / `dark:text-slate-100` / `dark:border-slate-800` pattern already used throughout rather
+  than inventing new dark-mode shades.
 
 ## UI conventions
 
@@ -175,18 +203,24 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   `/api/auth/me` guard call checks and clears it. If you add another place that lands a user
   on those pages after auth, call `markJustAuthed()` there too or the toast won't show.
 - **Help button** (`frontend/components/ui/HelpPanel.tsx`) is a `position: fixed` round
-  button pinned just below the header (`right-6 top-24`, stays put while the page scrolls) —
-  originally ported from the sibling `up-excise-spatial-revenue-optimizer` project's
-  `HelpPanel` (which uses DaisyUI — this repo has no DaisyUI or shadcn, so it's restyled onto
-  plain Tailwind/indigo classes), then redesigned off that project's inline-button pattern
-  into a floating one so it doesn't compete for space in a page header/nav. It never opens on
-  its own — only on click — and has two independent dismiss actions: the balloon's `×` just
-  closes it for that moment (button stays, reopenable anytime), while "Don't show this again"
-  additionally persists a per-`pageKey` `localStorage` flag that only clears the small unread
-  dot on the button — it never hides or disables the button itself. One `HelpPanel` is mounted
-  once per page (`entry/page.tsx`, `admin/page.tsx`), not per sub-view, since it's fixed
-  positioning anyway. If you add a new gated page, add one there too rather than leaving help
-  DEO/Admin-page-specific and inconsistent.
+  button pinned bottom-right (`bottom-6 right-6`, stays put while the page scrolls) on every
+  gated page — originally ported from the sibling `up-excise-spatial-revenue-optimizer`
+  project's `HelpPanel` (which uses DaisyUI — this repo has no DaisyUI or shadcn, so it's
+  restyled onto plain Tailwind/blue classes), then redesigned off that project's inline-button
+  pattern into a floating one so it doesn't compete for space in a page header/nav. Colored
+  light (`bg-blue-50`/`border-blue-200`) rather than solid, darkening on hover/active
+  (`hover:bg-blue-100 active:bg-blue-200`) — deliberately not the same visual weight as a
+  primary action button. It never opens on its own — only on click — and always opens
+  upward-left of the button since it sits at the bottom of the viewport; its width/height are
+  measured against actual available space (`useLayoutEffect` in `HelpPanel.tsx`) before paint,
+  so it only scrolls internally if the display genuinely doesn't have room, not by default. Two
+  independent dismiss actions: the balloon's `×` just closes it for that moment (button stays,
+  reopenable anytime), while "Don't show this again" additionally persists a per-`pageKey`
+  `localStorage` flag that only clears the small unread dot on the button — it never hides or
+  disables the button itself. One `HelpPanel` is mounted once per page (`entry/page.tsx`,
+  `admin/page.tsx`), not per sub-view, since it's fixed positioning anyway. If you add a new
+  gated page, add one there too rather than leaving help DEO/Admin-page-specific and
+  inconsistent.
 - No emojis anywhere in the UI — Tabler Icons (CDN webfont, `<link>` in `layout.tsx`)
   instead. Don't put a Tabler `<i>` icon directly inside/overlapping live input text —
   the glyph renders via a CSS `::before` that loads async, so it can flash a fallback tofu
@@ -198,9 +232,14 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   and `py-4` via a `className` override) into the same class list** — the Tailwind CDN's
   in-browser JIT scans the whole document rather than respecting the order classes appear in
   one element's `className` string, so which of two same-property utilities wins is not
-  reliably "the last one written." `components/ui/Button.tsx` has a `size?: "md" | "lg"` prop
-  specifically so padding/text-size never has two candidate utilities active at once — add a
-  new size there instead of overriding padding/text size through `className`.
+  reliably "the last one written." `components/ui/Button.tsx` has a `size?: "sm" | "md" | "lg"`
+  prop specifically so padding/text-size never has two candidate utilities active at once —
+  add a new size there instead of overriding padding/text size through `className`. It also
+  has a `dark` variant (`bg-slate-800`) for serious-but-not-alarming actions like the final
+  lock — used instead of `danger` (red) because a red button reads as "something is wrong",
+  not "this is a big deal, be sure." Icon + label are pinned onto one line via explicit
+  `flex-row flex-nowrap whitespace-nowrap` (not left to `inline-flex`'s default) so they can
+  never visually stack even on a very wide (`size="lg" className="w-full"`) button.
 - **`disabled:cursor-not-allowed` doesn't work on `<button>` in this Tailwind version** —
   the CDN's preflight sets `button { cursor: pointer }` unconditionally, which beats the
   `disabled:` variant regardless of class order. If a disabled button needs to actually
@@ -261,9 +300,33 @@ deploys, causing a real production incident — see TESTING.md's Incidents secti
 disconnected. If a Cloudflare dashboard nudges you to "connect to Git" for this Pages
 project, don't.
 
+## Admin Dashboard layout
+
+`admin/page.tsx` defaults to a **Dashboard** view (`components/AdminDashboard.tsx`) — KPI
+cards (districts/locked/unlocked/gross-arrears/net-recoverable) plus a top-5-districts bar
+list and a locked/unlocked ratio bar, all plain divs with percentage-based widths rather than
+a charting library (ladder rung 4/5 — no new dependency for "some stats at a glance"; add
+Chart.js or similar later if the cards stop being enough). A pill toggle switches to
+**Districts Table**, which is the pre-existing sortable/searchable/pinned-column table, now
+with pagination (`getPaginationRowModel`, a Rows-per-page `<select>` with 25/50/75/100, and
+Prev/Next). The financial-year `<select>` above both views is unchanged — it already filtered
+the table to one year at a time before this pass; that logic wasn't touched, only the
+container it sits above was reorganized into the dashboard/table toggle. Admins are IAS/senior
+officers already comfortable navigating dashboards, so this page favors a compact toolbar
+(`Button size="sm"`, no big page-title heading) — deliberately different from the DEO side,
+which stays verbose/hand-holding on purpose (see the Help button and inline validation
+throughout `entry/page.tsx`). The districts `<table>` itself has no `w-full` — letting it
+auto-size to its content (not stretch to fill the `max-w-[1400px]` container) is what fixed it
+looking oddly stretched-out after the auto-layout fix in "Tables must stay auto-layout" below;
+`overflow-x-auto` on the wrapper is still the fallback for narrow viewports.
+
+Excel export (`exportDistrictsToXlsx()` in `frontend/lib/export.ts`) is **one workbook, five
+sheets** — one per financial year, each sheet districts × the 6 PAC fields for just that year
+— not one sheet with all 5 years' columns side by side like the original version.
+
 ## Bulk DEO provisioning (Admin dashboard)
 
-Admin can now add/update DEO logins for all 75 districts via an Excel round trip instead of
+Admin can add/update DEO logins for all 75 districts via an Excel round trip instead of
 a manual DB operation:
 
 - **Download DEO Template** (`downloadDeoTemplate()` in `frontend/lib/export.ts`) builds an

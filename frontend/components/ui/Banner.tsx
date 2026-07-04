@@ -6,8 +6,14 @@ type Props = {
 };
 
 const VARIANTS = {
-  error: { wrap: "bg-red-50 text-red-700 border-red-100", icon: "ti-alert-circle" },
-  success: { wrap: "bg-emerald-50 text-emerald-700 border-emerald-100", icon: "ti-circle-check" },
+  error: {
+    wrap: "bg-red-50 text-red-700 border-red-100 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900",
+    icon: "ti-alert-circle",
+  },
+  success: {
+    wrap: "bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
+    icon: "ti-circle-check",
+  },
 };
 
 // Inline SPA-state feedback instead of a SweetAlert popup for every message — reserve the

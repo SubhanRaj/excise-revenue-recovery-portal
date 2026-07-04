@@ -8,17 +8,18 @@ type Props = {
   children: React.ReactNode;
 };
 
-// A fixed round help button pinned just below the header (stays in place while the page
-// scrolls) — never opens on its own, only when the DEO clicks it. Two separate dismiss
-// actions: the X just closes the balloon for now (the button stays, reopenable any time);
-// "Don't show this again" additionally persists a per-page localStorage flag that clears the
-// unread dot — it never hides or disables the button itself, so help stays reachable.
+// A fixed round help button pinned bottom-right on every gated page (stays in place while
+// the page scrolls) — never opens on its own, only when clicked. Opens upward-left since
+// it sits at the bottom of the viewport. Two separate dismiss actions: the X just closes the
+// balloon for now (the button stays, reopenable any time); "Don't show this again"
+// additionally persists a per-page localStorage flag that clears the unread dot — it never
+// hides or disables the button itself, so help stays reachable.
 export default function HelpPanel({ pageKey, title, children }: Props) {
   const storageKey = `help_done_${pageKey}`;
   const [open, setOpen] = useState(false);
   const [done, setDone] = useState(false);
-  const [openUpward, setOpenUpward] = useState(false);
   const [panelWidth, setPanelWidth] = useState(384);
+  const [panelMaxHeight, setPanelMaxHeight] = useState(320);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -27,14 +28,14 @@ export default function HelpPanel({ pageKey, title, children }: Props) {
     } catch {}
   }, [storageKey]);
 
-  // Runs before paint: pick whichever side (above/below the button) actually has room for a
-  // roughly 300px-tall balloon, and cap its width to the viewport so it's never clipped.
+  // Runs before paint: the button lives bottom-right, so the balloon always opens upward from
+  // it — cap its width/height to whatever room is actually above the button so it only
+  // scrolls internally if the display genuinely doesn't have room, not by default.
   useLayoutEffect(() => {
     if (!open || !wrapperRef.current) return;
     const rect = wrapperRef.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    setOpenUpward(spaceBelow < 300 && rect.top > spaceBelow);
     setPanelWidth(Math.min(384, window.innerWidth - 32));
+    setPanelMaxHeight(Math.max(160, rect.top - 24));
   }, [open]);
 
   useEffect(() => {
@@ -64,7 +65,7 @@ export default function HelpPanel({ pageKey, title, children }: Props) {
   }
 
   return (
-    <div ref={wrapperRef} className="group fixed right-6 top-24 z-40">
+    <div ref={wrapperRef} className="group fixed bottom-6 right-6 z-40">
       {!open && (
         <span className="pointer-events-none absolute right-full top-1/2 mr-3 -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
           Help / Instructions
@@ -76,40 +77,41 @@ export default function HelpPanel({ pageKey, title, children }: Props) {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label={open ? "Close help" : "Open help and instructions"}
-        className="relative flex h-12 w-12 items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 transition-colors hover:bg-indigo-700"
+        className="relative flex h-12 w-12 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-blue-700 shadow-lg transition-colors hover:bg-blue-100 active:bg-blue-200 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900 dark:active:bg-blue-800"
       >
         <i className="ti ti-help-circle text-2xl" />
         {!done && <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />}
       </button>
 
+      {/* Anchored bottom-right, so it always opens upward and to the left of the button. */}
       {open && (
         <div
           role="region"
           aria-label={`Help: ${title}`}
-          style={{ width: panelWidth }}
-          className={`absolute right-0 space-y-3 rounded-lg border border-indigo-100 bg-white p-4 shadow-2xl ${
-            openUpward ? "bottom-full mb-3" : "top-full mt-3"
-          }`}
+          style={{ width: panelWidth, maxHeight: panelMaxHeight }}
+          className="absolute bottom-full right-0 mb-3 flex flex-col space-y-3 rounded-lg border border-blue-100 bg-white p-4 shadow-2xl dark:border-blue-900 dark:bg-slate-900"
         >
           <div className="flex items-start justify-between gap-2">
-            <h3 className="text-sm font-semibold text-indigo-700">{title}</h3>
+            <h3 className="text-sm font-semibold text-blue-700 dark:text-blue-300">{title}</h3>
             <button
               type="button"
               onClick={() => setOpen(false)}
               aria-label="Close help panel"
-              className="shrink-0 rounded-md p-0.5 text-slate-400 hover:text-slate-600"
+              className="shrink-0 rounded-md p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
             >
               <i className="ti ti-x text-base" />
             </button>
           </div>
 
-          <div className="max-h-64 space-y-2 overflow-y-auto pr-1 text-sm text-slate-700">{children}</div>
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 text-sm text-slate-700 dark:text-slate-300">
+            {children}
+          </div>
 
           {!done && (
             <button
               type="button"
               onClick={dismissForever}
-              className="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-700"
+              className="shrink-0 self-start rounded-md bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600"
             >
               Don&apos;t show this again
             </button>

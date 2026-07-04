@@ -158,6 +158,32 @@
       remote D1) — the DEO's lock-time name is now stored on the revenue row itself, keyed
       by `district_id`, not just on `users`
 
+## Milestone 12 — Sober rebrand, dark mode, admin dashboard, help repositioning (done)
+
+- [x] Rebranded the whole app (every component + the magic-link email) from `indigo-*` to
+      `blue-*` — a professional-reading palette for a government portal, not purple
+- [x] Dark mode: `frontend/lib/theme.ts` + `ThemeToggle.tsx`, persisted in `localStorage`,
+      defaults to OS `prefers-color-scheme`, no flash on reload (blocking inline script in
+      `layout.tsx` sets `.dark` before paint), toggle in `AppHeader` plus standalone on
+      `/login`/`/verify`. Applied `dark:` variants across every component.
+- [x] Help button redesigned: light `bg-blue-50` (darkens on hover/active, not solid),
+      repositioned to `bottom-6 right-6` on every page (opens upward-left), dynamic
+      width/height measured against actual available space so it only scrolls internally if
+      the display genuinely can't fit it
+- [x] Fixed `Submit & Lock`'s icon/label risk of stacking (`Button.tsx` now spells out
+      `flex-row flex-nowrap whitespace-nowrap`); switched it from `variant="danger"` (red) to
+      a new `dark` variant (serious without reading as an error)
+- [x] Sticky Year 1–5 / Master View nav on the DEO entry page (was scrollable-away before)
+- [x] Admin Dashboard default view (KPI cards + top-5-districts bar + lock-ratio bar, plain
+      CSS, no charting dependency) with a toggle to the existing Districts Table; table
+      pagination (25/50/75/100 page size); compact `size="sm"` toolbar buttons, no oversized
+      page heading; removed the table's `w-full` (auto-sizes to content instead of stretching
+      to fill the container) and added more container padding
+- [x] Excel export rewritten to one workbook with 5 sheets (one per financial year), replacing
+      the old single-sheet-many-columns layout
+- [x] Fixed a real e2e regression caught while rebranding: `login.spec.ts` asserted
+      `text-indigo-700`, updated to `text-blue-700`
+
 ## Backlog / not started
 
 - [ ] Real domain + DNS, and (optional) collapse `/frontend` + `/api` onto one zone via a

@@ -6,6 +6,7 @@ import { apiFetch, ApiError } from "@/lib/api";
 import { saveClientSession, markJustAuthed } from "@/lib/session";
 import Button from "@/components/ui/Button";
 import Banner from "@/components/ui/Banner";
+import ThemeToggle from "@/components/ui/ThemeToggle";
 
 function VerifyForm() {
   const router = useRouter();
@@ -33,13 +34,16 @@ function VerifyForm() {
   }
 
   return (
-    <div className="flex flex-1 items-center justify-center bg-gradient-to-b from-slate-50 to-indigo-50 px-4">
-      <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 text-center shadow-xl shadow-slate-200/60">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
+    <div className="relative flex flex-1 items-center justify-center bg-gradient-to-b from-slate-50 to-blue-50 px-4 dark:from-slate-950 dark:to-slate-900">
+      <div className="absolute right-4 top-4">
+        <ThemeToggle />
+      </div>
+      <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 text-center shadow-xl shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-300">
           <i className="ti ti-shield-check text-2xl" />
         </div>
-        <h1 className="mb-1 text-lg font-semibold text-slate-900">Verify Login</h1>
-        <p className="mb-6 text-sm text-slate-500">Confirm below to complete signing in.</p>
+        <h1 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-100">Verify Login</h1>
+        <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">Confirm below to complete signing in.</p>
         {error && (
           <div className="mb-4 text-left">
             <Banner variant="error">{error}</Banner>

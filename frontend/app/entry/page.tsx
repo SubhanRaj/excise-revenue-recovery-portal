@@ -142,20 +142,20 @@ export default function EntryPage() {
 
   if (submitted) {
     return (
-      <div className="flex flex-1 items-center justify-center bg-gradient-to-b from-slate-50 to-indigo-50 px-4">
-        <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 text-center shadow-xl shadow-slate-200/60">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+      <div className="flex flex-1 items-center justify-center bg-gradient-to-b from-slate-50 to-blue-50 px-4 dark:from-slate-950 dark:to-slate-900">
+        <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 text-center shadow-xl shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900 dark:text-emerald-300">
             <i className="ti ti-circle-check text-2xl" />
           </div>
-          <h1 className="mb-1 text-lg font-semibold text-slate-900">Submitted &amp; Locked</h1>
-          <p className="text-sm text-slate-500">Redirecting to login...</p>
+          <h1 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-100">Submitted &amp; Locked</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Redirecting to login...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-full flex-1 flex-col bg-slate-50">
+    <div className="flex min-h-full flex-1 flex-col bg-slate-50 dark:bg-slate-950">
       <AppHeader title="DEO Data Entry" profile={profile} />
       <HelpPanel pageKey="deo-entry" title="Filling this form">
         <p>
@@ -178,7 +178,7 @@ export default function EntryPage() {
         </p>
       </HelpPanel>
       <div className={`mx-auto w-full flex-1 px-4 py-8 ${step === 5 ? "max-w-6xl" : "max-w-4xl"}`}>
-        <nav className="mb-6 flex flex-wrap items-center gap-2">
+        <nav className="sticky top-16 z-10 mb-6 flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50/95 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
           {FINANCIAL_YEARS.map((fy, i) => {
             const done = years[i]?.completed;
             const locked = i !== 0 && !years[i - 1]?.completed;
@@ -191,10 +191,10 @@ export default function EntryPage() {
                 style={locked ? { cursor: "not-allowed" } : undefined}
                 className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
                   step === i
-                    ? "bg-indigo-600 text-white shadow-sm"
+                    ? "bg-blue-600 text-white shadow-sm"
                     : done
-                      ? "bg-indigo-50 text-indigo-700"
-                      : "bg-slate-100 text-slate-500"
+                      ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                      : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
                 } disabled:opacity-40`}
               >
                 {done && step !== i && <i className="ti ti-check text-base" />}
@@ -202,14 +202,16 @@ export default function EntryPage() {
               </button>
             );
           })}
-          <span className="mx-1 h-px flex-1 bg-slate-200" />
+          <span className="mx-1 h-px flex-1 bg-slate-200 dark:bg-slate-800" />
           <button
             type="button"
             onClick={() => goToStep(5)}
             disabled={!years.every((y) => y.completed)}
             style={!years.every((y) => y.completed) ? { cursor: "not-allowed" } : undefined}
             className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
-              step === 5 ? "bg-indigo-600 text-white shadow-sm" : "bg-slate-100 text-slate-500"
+              step === 5
+                ? "bg-blue-600 text-white shadow-sm"
+                : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
             } disabled:opacity-40`}
           >
             <i className="ti ti-clipboard-list text-base" />
@@ -217,7 +219,7 @@ export default function EntryPage() {
           </button>
         </nav>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           {step < 5 ? (
             <YearStepForm
               key={years[step].financialYear}

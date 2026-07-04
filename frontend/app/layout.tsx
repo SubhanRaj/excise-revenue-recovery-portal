@@ -22,6 +22,18 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased">
       <head>
+        {/* Dark/light theme: must run before any paint, as a plain blocking inline script (same
+            reasoning as the Tailwind CDN script below) — reads the persisted choice from
+            localStorage, falling back to the OS's prefers-color-scheme, and sets the `dark`
+            class on <html> synchronously so there's no flash of the wrong theme on reload. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){try{var t=localStorage.getItem('excise-portal:theme');" +
+              "var d=t?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;" +
+              "if(d)document.documentElement.classList.add('dark');}catch(e){}})();",
+          }}
+        />
         {/* Google Fonts (CDN) — Noto Sans Devanagari for Hindi labels, Inter for Latin/numerals */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -32,6 +44,10 @@ export default function RootLayout({
         {/* Tailwind CSS v4 (Play CDN, jsDelivr-mirrored) — utility classes only, no build step.
             Plain <script>, not next/script: must block parsing so no unstyled flash. */}
         <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4" />
+        {/* Tailwind v4 defaults `dark:` to a prefers-color-scheme media query; this switches it
+            to a `.dark` class-based variant so the toggle (ThemeToggle.tsx) can control it
+            independently of the OS setting once the DEO/Admin picks one explicitly. */}
+        <style type="text/tailwindcss">{`@custom-variant dark (&:where(.dark, .dark *));`}</style>
         {/* Tabler Icons (CDN) — strictly icons, no emojis anywhere in the UI */}
         <link
           rel="stylesheet"
@@ -47,7 +63,10 @@ export default function RootLayout({
             floating over still-readable content. */}
         <style>{`.swal2-container { backdrop-filter: blur(3px); }`}</style>
       </head>
-      <body className="min-h-full flex flex-col" style={{ fontFamily: "'Noto Sans Devanagari', Inter, sans-serif" }}>
+      <body
+        className="flex min-h-full flex-col bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100"
+        style={{ fontFamily: "'Noto Sans Devanagari', Inter, sans-serif" }}
+      >
         {children}
 
         {/* SweetAlert2 (CDN) */}

@@ -32,7 +32,7 @@ function latestUnusedToken(): string {
 test.describe("login page", () => {
   test("CUG tab is the default and the mobile field is visible", async ({ page }) => {
     await page.goto("/login");
-    await expect(page.getByRole("button", { name: "CUG Mobile (DEO)" })).toHaveClass(/text-indigo-700/);
+    await expect(page.getByRole("button", { name: "CUG Mobile (DEO)" })).toHaveClass(/text-blue-700/);
     await expect(page.getByLabel("CUG Mobile Number")).toBeVisible();
     await expect(page.getByLabel("CUG Mobile Number")).toBeEditable();
   });

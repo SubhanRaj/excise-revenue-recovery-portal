@@ -31,9 +31,9 @@ export default function ProfileMenu({ profile }: { profile: Profile | null }) {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label="Account details"
-        className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
+        className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
       >
-        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700 dark:bg-blue-900 dark:text-blue-300">
           {profile.role === "admin" ? "A" : "D"}
         </span>
         <i className={`ti ti-chevron-down text-sm transition-transform ${open ? "rotate-180" : ""}`} />
@@ -42,20 +42,20 @@ export default function ProfileMenu({ profile }: { profile: Profile | null }) {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full z-30 mt-1 w-64 space-y-2 rounded-lg border border-slate-200 bg-white p-3 text-sm shadow-xl"
+          className="absolute right-0 top-full z-30 mt-1 w-64 space-y-2 rounded-lg border border-slate-200 bg-white p-3 text-sm shadow-xl dark:border-slate-700 dark:bg-slate-900"
         >
-          <div className="flex items-center gap-1.5 text-slate-500">
+          <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
             <i className="ti ti-shield-check text-base" />
             <span className="font-medium">{profile.role === "admin" ? "Admin" : "District Excise Officer"}</span>
           </div>
           {profile.districtName && (
-            <div className="flex items-center gap-1.5 text-slate-700">
+            <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
               <i className="ti ti-map-pin text-base text-slate-400" />
               {profile.districtName}
             </div>
           )}
           {profile.email && (
-            <div className="flex items-center gap-1.5 truncate text-slate-700">
+            <div className="flex items-center gap-1.5 truncate text-slate-700 dark:text-slate-300">
               <i className="ti ti-mail text-base text-slate-400" />
               <span className="truncate">{profile.email}</span>
             </div>

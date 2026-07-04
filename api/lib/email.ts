@@ -11,8 +11,8 @@ export function magicLinkHtml(verifyUrl: string, ttlMinutes: number): string {
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;max-width:560px;width:100%;overflow:hidden;">
         <tr>
-          <td style="background:#4338ca;padding:24px 32px;">
-            <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:#c7d2fe;">Government of Uttar Pradesh</p>
+          <td style="background:#1d4ed8;padding:24px 32px;">
+            <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:#bfdbfe;">Government of Uttar Pradesh</p>
             <p style="margin:4px 0 0;font-size:18px;font-weight:600;color:#fff;">Department of Excise — Revenue Recovery Portal</p>
           </td>
         </tr>
@@ -23,7 +23,7 @@ export function magicLinkHtml(verifyUrl: string, ttlMinutes: number): string {
             </p>
             <table cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
               <tr>
-                <td style="background:#4f46e5;border-radius:6px;">
+                <td style="background:#2563eb;border-radius:6px;">
                   <a href="${esc(verifyUrl)}" style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#fff;text-decoration:none;border-radius:6px;">
                     Verify &amp; Continue
                   </a>

@@ -8,6 +8,7 @@ import { saveClientSession, markJustAuthed } from "@/lib/session";
 import Button from "@/components/ui/Button";
 import TextField from "@/components/ui/TextField";
 import Banner from "@/components/ui/Banner";
+import ThemeToggle from "@/components/ui/ThemeToggle";
 
 type Tab = "cug" | "email";
 
@@ -76,21 +77,28 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex flex-1 items-center justify-center bg-gradient-to-b from-slate-50 to-indigo-50 px-4 py-12">
+    <div className="relative flex flex-1 items-center justify-center bg-gradient-to-b from-slate-50 to-blue-50 px-4 py-12 dark:from-slate-950 dark:to-slate-900">
+      <div className="absolute right-4 top-4">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center text-center">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 text-2xl font-bold text-white shadow-lg shadow-indigo-200">
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-700 text-2xl font-bold text-white shadow-lg shadow-blue-200 dark:shadow-none">
             ₹
           </div>
-          <h1 className="text-lg font-semibold text-slate-900">Department of Excise, Uttar Pradesh</h1>
-          <p className="mt-1 text-sm text-slate-500">Excise Revenue Recovery Portal</p>
+          <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            Department of Excise, Uttar Pradesh
+          </h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Excise Revenue Recovery Portal</p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/60">
-          <div className="mb-6 flex rounded-lg bg-slate-100 p-1 text-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
+          <div className="mb-6 flex rounded-lg bg-slate-100 p-1 text-sm dark:bg-slate-800">
             <button
               className={`flex-1 rounded-md py-2 font-medium transition-colors ${
-                tab === "cug" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                tab === "cug"
+                  ? "bg-white text-blue-700 shadow-sm dark:bg-slate-950 dark:text-blue-400"
+                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
               }`}
               onClick={() => switchTab("cug")}
               type="button"
@@ -99,7 +107,9 @@ export default function LoginPage() {
             </button>
             <button
               className={`flex-1 rounded-md py-2 font-medium transition-colors ${
-                tab === "email" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                tab === "email"
+                  ? "bg-white text-blue-700 shadow-sm dark:bg-slate-950 dark:text-blue-400"
+                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
               }`}
               onClick={() => switchTab("email")}
               type="button"
@@ -127,7 +137,7 @@ export default function LoginPage() {
           ) : sent ? (
             <Banner variant="success">
               <p className="font-medium">Check your email</p>
-              <p className="mt-0.5 font-normal text-emerald-600">
+              <p className="mt-0.5 font-normal text-emerald-600 dark:text-emerald-400">
                 If <strong>{email}</strong> is registered, a sign-in link has been sent. It expires in 15 minutes.
               </p>
             </Banner>
