@@ -22,6 +22,12 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased">
       <head>
+        {/* Tells the browser this site manages its own light/dark styling, so Chrome's Android
+            "force dark" heuristic doesn't also try to auto-darken/invert colors on top of our
+            own .dark class — that double-darkening is what was turning input borders greenish
+            and, in some elements, forcing text to a near-black that's unreadable against our
+            own dark background. */}
+        <meta name="color-scheme" content="light dark" />
         {/* Dark/light theme: must run before any paint, as a plain blocking inline script (same
             reasoning as the Tailwind CDN script below) — reads the persisted choice from
             localStorage, falling back to the OS's prefers-color-scheme, and sets the `dark`

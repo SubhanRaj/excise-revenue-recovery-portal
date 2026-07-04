@@ -247,7 +247,14 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   since a manual per-page toggle there isn't needed before the user is even signed in. When
   adding a new component, mirror the existing `dark:bg-slate-900` / `dark:text-slate-100` /
   `dark:border-slate-800` pattern already used throughout rather than inventing new dark-mode
-  shades.
+  shades. `<head>` also declares `<meta name="color-scheme" content="light dark" />` — without
+  it, Chrome's Android "force dark" feature doesn't know the site already handles its own
+  theming and layers its own auto-darken/invert heuristic on top of our `.dark` class, which
+  showed up as input borders rendering with a wrong greenish tint and, on some elements, text
+  forced to a near-black that was unreadable against our own dark background. This isn't a
+  Tailwind/CSS bug on our side — it only reproduces on Chrome for Android with that OS-level
+  setting on — so don't try to chase it by re-tuning our own `dark:` colors; the meta tag is
+  the actual fix and must stay in `<head>`.
 
 ## UI conventions
 
