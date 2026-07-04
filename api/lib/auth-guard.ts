@@ -1,8 +1,12 @@
 import { NextRequest } from "next/server";
-import { COOKIE_NAME, verifySession, SessionPayload } from "@/lib/session";
+import { cookieName, verifySession, SessionPayload } from "@/lib/session";
 
-export async function requireSession(req: NextRequest): Promise<SessionPayload | null> {
-  const token = req.cookies.get(COOKIE_NAME)?.value;
+// Every caller now says which role's cookie it needs — see session.ts for why there are two
+// separate cookies instead of one shared __session.
+export async function requireSession(req: NextRequest, role: "deo" | "admin"): Promise<SessionPayload | null> {
+  const token = req.cookies.get(cookieName(role))?.value;
   if (!token) return null;
-  return verifySession(token);
+  const session = await verifySession(token);
+  if (!session || session.role !== role) return null;
+  return session;
 }

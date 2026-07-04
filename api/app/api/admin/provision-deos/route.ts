@@ -16,7 +16,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // themselves — the server hashes it on ingest since there's no client-side DEO in this flow
 // to have done it already.
 export async function POST(req: NextRequest) {
-  const session = await requireSession(req);
+  const session = await requireSession(req, "admin");
   if (!session || session.role !== "admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

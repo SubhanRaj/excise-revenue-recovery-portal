@@ -51,6 +51,23 @@ They communicate only over HTTP, cross-origin, with credentials (cookies) includ
   itself (migration `0001_nostalgic_stature.sql`) — same value, written at the same time in
   the same submit-route batch, just keyed by `district_id` like the rest of `pac_data` so
   Admin can see who submitted a given year's numbers without joining `users`.
+- `pac_data.locked_at` (migration `0002_jittery_viper.sql`) duplicates `users.locked_at` the
+  same way, for the same reason — the Admin district detail page shows "locked by X on Y"
+  without a join. Stored as a UTC ISO string (`new Date().toISOString()`, same as
+  `users.locked_at`) — **never** convert to IST before writing. `frontend/lib/format.ts`'s
+  `formatIST()` is the one and only place that converts, at display time, via
+  `toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })`. Modeled on the sibling
+  `excise-bakaya-record` project's `admin.html`, which does the same conversion for its own
+  `locked_at` — but that project writes the timestamp via raw SQL `CURRENT_TIMESTAMP`, which
+  SQLite stores as `"YYYY-MM-DD HH:MM:SS"` with **no timezone marker at all** (not even a `Z`),
+  so before it can be parsed correctly as the UTC value it actually is, that project has to
+  manually rewrite it (`row.locked_at.replace(' ', 'T') + 'Z'`) into real ISO 8601 first —
+  skip that string surgery entirely by never writing `locked_at` via SQL `CURRENT_TIMESTAMP`;
+  always write it from JS as `new Date().toISOString()` (already includes the `Z`), same as
+  every other timestamp in this codebase. Plain `toLocaleString("en-IN")` alone only sets
+  locale conventions (comma grouping etc.), not the timezone — omitting `timeZone` renders in
+  whatever zone the browser happens to be in, not IST, which is why `formatIST()` always
+  passes it explicitly.
 
 ## Validation rules — enforce on both client and server, always
 
@@ -66,7 +83,19 @@ They communicate only over HTTP, cross-origin, with credentials (cookies) includ
 
 ## Auth (`api/lib/session.ts`, `api/lib/auth-guard.ts`, `api/middleware.ts`)
 
-Unified 7-day HttpOnly JWT cookie (`__session`, via `jose`), issued by either flow:
+7-day HttpOnly JWT cookies (`jose`), issued by either flow — **two separate cookies,
+`__admin_session` and `__deo_session`, not one shared `__session`.** Every route that needs a
+session says which one via `requireSession(req, "admin" | "deo")`
+(`api/lib/auth-guard.ts`), and the frontend passes the matching `?role=admin`/`?role=deo` on
+`GET /api/auth/me` and `POST /api/auth/logout`. This used to be a single cookie, which meant a
+CUG (DEO) login and a magic-link (Admin) login in the same browser clobbered each other —
+logging into the demo DEO account to test the entry flow would silently kill the admin
+session, forcing a fresh magic-link email (and burning Resend's daily send quota) just to get
+back into `/admin`. Splitting by cookie name means the two logins coexist: an Admin can keep
+their magic-link session alive in one tab while testing `/deo-data-entry` with the demo
+CUG number in another (or the same tab, since both cookies persist regardless of which URL is
+open) without either login evicting the other. Signing/verifying still runs through the same
+`signSession`/`verifySession`; only the cookie name and the guard's expected role changed.
 
 - **CUG flow**: `POST /api/auth/verify-cug` — frontend hashes the mobile number with
   Web Crypto (`frontend/lib/crypto.ts`) before sending; server matches against
@@ -87,16 +116,25 @@ Unified 7-day HttpOnly JWT cookie (`__session`, via `jose`), issued by either fl
   `onboarding@resend.dev`) since `mail.upexciseonline.co` isn't a verified Resend domain
   yet — the sandbox sender can only deliver to the Resend account owner's own address, so
   don't be surprised if a test to a different email silently doesn't arrive.
-- `GET /api/auth/me` — the SPA has no server, so it can't read the HttpOnly cookie itself;
-  every gated page calls this on load to learn `{role, districtId}` before trusting the
-  cached copy in `frontend/lib/session.ts` (localStorage — UI routing hint only, never a
-  trust boundary). Also joins `districts`/`users` to return `email`/`districtName`, purely
-  so the header's profile dropdown (`frontend/components/ui/ProfileMenu.tsx`) has something
-  to show — it's not part of the trust boundary, just avoids a second round trip for display
-  data the guard check was already making a DB call for.
+- `GET /api/auth/me?role=admin|deo` — the SPA has no server, so it can't read the HttpOnly
+  cookie itself; every gated page calls this on load to learn `{role, districtId}`. Pages call
+  it directly and treat a failure as "not logged in as that role" — they do **not**
+  pre-check the cached hint in `frontend/lib/session.ts` (localStorage) before calling it. That
+  hint is a single shared value across the whole browser, so it goes stale the instant the
+  *other* role logs in on a different tab (or the same tab, later); short-circuiting on it
+  before ever asking the server was the actual cause of being bounced to `/login` when
+  switching between `/admin` and `/deo-data-entry` even with a perfectly valid cookie sitting
+  right there — fixed by always asking the server first (`lib/useAdminData.ts`,
+  `app/deo-data-entry/page.tsx`) and only using the localStorage hint for the root `/` page's
+  first-paint redirect guess, never as a gate on a specific role's page. Also joins
+  `districts`/`users` to return `email`/`districtName`, purely so the header's profile
+  dropdown (`frontend/components/ui/ProfileMenu.tsx`) has something to show — it's not part of
+  the trust boundary, just avoids a second round trip for display data the guard check was
+  already making a DB call for.
 - **Revocation**: submitting a DEO's final payload atomically locks the district *and*
-  destroys that session cookie server-side (`destroySessionCookie()`), since there's
-  nothing left for that DEO to do.
+  destroys that DEO's session cookie server-side (`destroySessionCookie("deo")`), since
+  there's nothing left for that DEO to do — an Admin session in the same browser, if any, is
+  untouched (separate cookie, see above).
 
 Because `/frontend` (Pages) and `/api` (Worker) are separate origins in production, the
 cookie is `SameSite=None; Secure`, and `api/middleware.ts` adds matching CORS headers
@@ -137,7 +175,7 @@ text input, not a custom form):
    designation itself instead of a name (e.g. "DEO Shajapur" — also a real recurring
    mistake, caught via a whole-word regex for "deo"/"officer"/etc., not substring match, so
    it doesn't false-positive on real names). Returns `null` on cancel, name string on
-   confirm — `entry/page.tsx`'s `submitAll()` bails out on either step returning falsy.
+   confirm — `deo-data-entry/page.tsx`'s `submitAll()` bails out on either step returning falsy.
 
 Both dialogs are bilingual (English + Hindi). `app/layout.tsx` adds a small global
 `.swal2-container { backdrop-filter: blur(3px) }` rule so every SweetAlert2 modal in the app
@@ -146,7 +184,7 @@ Both dialogs are bilingual (English + Hindi). `app/layout.tsx` adds a small glob
 The Admin dashboard caches all districts + PAC rows in Dexie (`adminDistricts`,
 `adminPacData`) for instant load, with an explicit "Sync" button to refetch from D1.
 
-The Year 1–5 / Master View nav pills in `entry/page.tsx` are `sticky top-16` (just below the
+The Year 1–5 / Master View nav pills in `deo-data-entry/page.tsx` are `sticky top-16` (just below the
 also-`sticky` `AppHeader`) so they stay reachable while scrolling down a long year form,
 matching the `AdminDashboard`'s always-visible toolbar.
 Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
@@ -166,14 +204,23 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   nothing is stored yet. `app/layout.tsx` has a plain blocking inline `<script>` (same
   reasoning as the Tailwind CDN script — must run before first paint) that reads
   `localStorage` and adds the `.dark` class to `<html>` synchronously, so there's no
-  flash-of-wrong-theme on reload. A second `<style type="text/tailwindcss">` block sets
+  flash-of-wrong-theme on reload. A `<style type="text/tailwindcss">` block sets
   `@custom-variant dark (&:where(.dark, .dark *));` so `dark:` utilities key off that class
   instead of Tailwind v4's default `prefers-color-scheme` media query — this is what lets the
-  toggle override the OS setting rather than just mirroring it. `ThemeToggle` lives in
-  `AppHeader` (every gated page) and is also placed directly on `/login` and `/verify`, which
-  have no `AppHeader`. When adding a new component, mirror the existing `dark:bg-slate-900`
-  / `dark:text-slate-100` / `dark:border-slate-800` pattern already used throughout rather
-  than inventing new dark-mode shades.
+  toggle override the OS setting rather than just mirroring it. **This `<style>` block must
+  come *before* the `<script src=".../@tailwindcss/browser@4">` tag in `<head>`, not after** —
+  the CDN script is a plain blocking `<script>` (see below), so it executes as soon as the
+  parser reaches it; a config block written later in the source is simply not in the DOM yet
+  when that happens, and the runtime falls back to the default media-query `dark:` variant.
+  This was an actual bug (dark: utilities were only ever following the OS setting, not the
+  manual toggle) fixed by moving the `@custom-variant` style above the CDN script tag. Don't
+  reorder these two back. `ThemeToggle` lives in `AppHeader` (every gated admin/DEO page); it's
+  **not** shown on `/login` or `/verify` — those pages have no explicit toggle, they just
+  inherit whatever the blocking script already resolved (stored choice, else OS default),
+  since a manual per-page toggle there isn't needed before the user is even signed in. When
+  adding a new component, mirror the existing `dark:bg-slate-900` / `dark:text-slate-100` /
+  `dark:border-slate-800` pattern already used throughout rather than inventing new dark-mode
+  shades.
 
 ## UI conventions
 
@@ -188,7 +235,7 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   not on every keystroke — see `YearStepForm.tsx`'s Recovered Amount field. Generic errors
   that aren't tied to one specific field (e.g. "some field is blank" — could be any of six)
   use `notifyToast()` instead of a `Banner`, since there's no single field to anchor an inline
-  message under — see `saveAndContinue()` in `entry/page.tsx`. Page-level success/failure
+  message under — see `saveAndContinue()` in `deo-data-entry/page.tsx`. Page-level success/failure
   (sync failed, submit failed) still uses `components/ui/Banner.tsx`, modeled on the
   `sent`/`error` state pattern in the sibling `up-excise-spatial-revenue-optimizer` project's
   login form. `window.Swal` (SweetAlert2, CDN) is reserved for: blocking confirms before an
@@ -199,7 +246,7 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   routine errors/success — use `notifyToast()` or a `Banner` instead.
 - **"Welcome" toast fires once per sign-in, not per page load.** `frontend/lib/session.ts`'s
   `markJustAuthed()`/`consumeJustAuthed()` set/clear a `sessionStorage` flag right before the
-  `/login` or `/verify` page redirects to `/entry`/`/admin`; the destination page's existing
+  `/login` or `/verify` page redirects to `/deo-data-entry`/`/admin`; the destination page's existing
   `/api/auth/me` guard call checks and clears it. If you add another place that lands a user
   on those pages after auth, call `markJustAuthed()` there too or the toast won't show.
 - **Help button** (`frontend/components/ui/HelpPanel.tsx`) is a `position: fixed` round
@@ -217,7 +264,7 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   independent dismiss actions: the balloon's `×` just closes it for that moment (button stays,
   reopenable anytime), while "Don't show this again" additionally persists a per-`pageKey`
   `localStorage` flag that only clears the small unread dot on the button — it never hides or
-  disables the button itself. One `HelpPanel` is mounted once per page (`entry/page.tsx`,
+  disables the button itself. One `HelpPanel` is mounted once per page (`deo-data-entry/page.tsx`,
   `admin/page.tsx`), not per sub-view, since it's fixed positioning anyway. If you add a new
   gated page, add one there too rather than leaving help DEO/Admin-page-specific and
   inconsistent.
@@ -268,7 +315,7 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   value.** A district's Gross Arrears can be in the crores (`₹10,00,00,000.00` is a realistic
   value, not an edge case); a fixed-width column can't grow for it and the text
   overlaps/clips. `MasterView.tsx`'s summary table and the admin dashboard's table
-  (`admin/page.tsx`) both rely on natural auto-layout sizing plus `whitespace-nowrap` on money
+  (`admin/districts/page.tsx`) both rely on natural auto-layout sizing plus `whitespace-nowrap` on money
   cells so columns widen to fit, with `overflow-x-auto` on the wrapper as the fallback once
   that exceeds a narrow viewport — don't switch either back to `table-fixed`.
 - **Sticky/pinned table rows and columns need an *opaque* background, not `bg-inherit` off a
@@ -300,25 +347,61 @@ deploys, causing a real production incident — see TESTING.md's Incidents secti
 disconnected. If a Cloudflare dashboard nudges you to "connect to Git" for this Pages
 project, don't.
 
-## Admin Dashboard layout
+## Admin pages: Dashboard / Districts / district detail
 
-`admin/page.tsx` defaults to a **Dashboard** view (`components/AdminDashboard.tsx`) — KPI
-cards (districts/locked/unlocked/gross-arrears/net-recoverable) plus a top-5-districts bar
-list and a locked/unlocked ratio bar, all plain divs with percentage-based widths rather than
-a charting library (ladder rung 4/5 — no new dependency for "some stats at a glance"; add
-Chart.js or similar later if the cards stop being enough). A pill toggle switches to
-**Districts Table**, which is the pre-existing sortable/searchable/pinned-column table, now
-with pagination (`getPaginationRowModel`, a Rows-per-page `<select>` with 25/50/75/100, and
-Prev/Next). The financial-year `<select>` above both views is unchanged — it already filtered
-the table to one year at a time before this pass; that logic wasn't touched, only the
-container it sits above was reorganized into the dashboard/table toggle. Admins are IAS/senior
-officers already comfortable navigating dashboards, so this page favors a compact toolbar
-(`Button size="sm"`, no big page-title heading) — deliberately different from the DEO side,
-which stays verbose/hand-holding on purpose (see the Help button and inline validation
-throughout `entry/page.tsx`). The districts `<table>` itself has no `w-full` — letting it
-auto-size to its content (not stretch to fill the `max-w-[1400px]` container) is what fixed it
-looking oddly stretched-out after the auto-layout fix in "Tables must stay auto-layout" below;
-`overflow-x-auto` on the wrapper is still the fallback for narrow viewports.
+Admin is now **three separate routes**, not one page with an in-page toggle — split apart
+because the single-page toolbar (Sync, DEO Template, Upload, Export, year select, all in one
+row) got visually cramped as features were added:
+
+- **`/admin`** (`components/AdminDashboard.tsx`) — KPI cards (districts/locked/unlocked/
+  gross-arrears/net-recoverable), a top-5-districts bar list, and a lock-status card. Most of
+  that card is still plain CSS divs/percentages (ladder rung 4/5 — no dependency for a bar
+  list), but the locked-vs-unlocked ratio is now an actual **Chart.js donut**
+  (`LockStatusDonut` inside `AdminDashboard.tsx`) loaded from a CDN `<script lazyOnload>` in
+  `layout.tsx` — the one chart the user actually asked to see, added alongside the existing
+  bars rather than replacing them. Chart.js is a `devDependency` purely for its TS types
+  (`window.Chart` in `lib/globals.d.ts`), same pattern as `xlsx`/`sweetalert2` — the real
+  runtime script is CDN-only. Since the script loads lazily, `LockStatusDonut` polls for
+  `window.Chart` every 150ms until it appears rather than assuming it's ready on mount.
+- **`/admin/districts`** — the sortable/searchable/pinned-column table with pagination
+  (`getPaginationRowModel`, Rows-per-page 25/50/75/100, Prev/Next), plus Lock/Unlock, Download
+  DEO Template, Upload DEO Data, and Export to Excel — all the *actions* live here now, not on
+  the Dashboard. Clicking anywhere on a district row navigates to that district's detail page;
+  the Unlock button inside the row calls `e.stopPropagation()` so it doesn't also trigger that
+  navigation (pattern borrowed from the sibling `up-excise-spatial-revenue-optimizer`
+  project's districts table, which does the same for its own row-click-to-detail behavior).
+- **`/admin/districts/detail?id=<districtId>`** — one district's PAC figures across all 5
+  years as a small field × year table, a lock-status badge, and (if locked) who locked it and
+  when, via `formatIST(lockedAt)` (see Data model above). Deliberately a **query-string route,
+  not a `/districts/[id]` dynamic segment** — `next.config.ts` has `output: "export"` (fully
+  static, no server to resolve arbitrary paths at request time), so a dynamic segment would
+  need every district id enumerated via `generateStaticParams`. A single static
+  `detail/index.html` reading `?id=` client-side (`useSearchParams`, wrapped in `<Suspense>`
+  same as `/verify`) avoids that. Has its own search box that filters the *field* rows by
+  matching the query against either the raw number or the formatted (₹, comma-grouped) value
+  across any year — separate from the Districts table's own by-name search box.
+
+All three pages share `frontend/lib/useAdminData.ts` — the admin-only session guard, the
+Dexie-backed `districts`/`pacData` cache, `sync()`, and `unlock()` — so none of them
+re-implements the same fetch/cache dance; before this it was all one page and didn't need
+sharing, but three routes copy-pasting the same effect would have been a real duplication
+smell. `AppHeader` grew two new optional props to go with the split: `navLinks` (the
+Dashboard/Districts pill nav, now in the header instead of an in-page toggle) and
+`onSync`/`syncing` (the Sync button, also moved to the header so it's reachable from every
+admin page, not just wherever the toolbar happened to be) — see `components/ui/AppHeader.tsx`.
+`AppHeader` also takes an optional `districts` prop that, when passed, renders a global
+"jump to a district" search box (`DistrictSearch` inside `AppHeader.tsx`) that autocompletes
+district names and navigates straight to that district's detail page — separate from, and in
+addition to, the Districts table's own row-filtering search box.
+
+Admins are IAS/senior officers already comfortable navigating dashboards, so these pages favor
+a compact toolbar (`Button size="sm"`, no big page-title heading) — deliberately different
+from the DEO side, which stays verbose/hand-holding on purpose (see the Help button and inline
+validation throughout `deo-data-entry/page.tsx`). The districts `<table>` itself has no
+`w-full` — letting it auto-size to its content (not stretch to fill the `max-w-[1400px]`
+container) is what fixed it looking oddly stretched-out after the auto-layout fix in "Tables
+must stay auto-layout" below; `overflow-x-auto` on the wrapper is still the fallback for
+narrow viewports.
 
 Excel export (`exportDistrictsToXlsx()` in `frontend/lib/export.ts`) is **one workbook, five
 sheets** — one per financial year, each sheet districts × the 6 PAC fields for just that year

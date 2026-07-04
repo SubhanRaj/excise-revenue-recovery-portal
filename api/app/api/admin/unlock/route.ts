@@ -5,7 +5,7 @@ import { districts } from "@/db/schema";
 import { requireSession } from "@/lib/auth-guard";
 
 export async function POST(req: NextRequest) {
-  const session = await requireSession(req);
+  const session = await requireSession(req, "admin");
   if (!session || session.role !== "admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

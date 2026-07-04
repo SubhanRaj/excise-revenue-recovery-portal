@@ -48,6 +48,10 @@ export const pacData = sqliteTable("pac_data", {
   // onto the revenue row itself (keyed by district_id, same as everything else in this table)
   // so Admin can see who submitted a given year's numbers without joining users.
   submittedByName: text("submitted_by_name"),
+  // ISO/UTC datetime, duplicated from users.locked_at the same way and for the same reason —
+  // the Admin district detail page needs "locked by X at Y" without a join. Format as IST
+  // (Asia/Kolkata) only at display time (frontend/lib/format.ts); never convert on write.
+  lockedAt: text("locked_at"),
 
   createdAt: text("created_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
 }, (table) => ({

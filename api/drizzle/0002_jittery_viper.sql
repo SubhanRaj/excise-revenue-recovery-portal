@@ -1,0 +1,1 @@
+ALTER TABLE `pac_data` ADD `locked_at` text;

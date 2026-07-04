@@ -70,18 +70,18 @@ test.describe("magic-link verify (live D1 round-trip)", () => {
     // The actual bug report: silently landing back on /login is a failure, not a pass-through.
     await page.waitForURL(/\/(admin|login)/, { timeout: 10_000 });
     const cookies = await page.context().cookies();
-    const sessionCookie = cookies.find((c) => c.name === "__session");
+    const sessionCookie = cookies.find((c) => c.name === "__admin_session");
 
     if (page.url().includes("/login")) {
       const bannerText = await page.locator("body").innerText();
       throw new Error(
-        `Verify bounced back to /login instead of /admin. __session cookie present: ${Boolean(
+        `Verify bounced back to /login instead of /admin. __admin_session cookie present: ${Boolean(
           sessionCookie
         )}. Page text: ${bannerText.slice(0, 500)}`
       );
     }
 
     expect(page.url()).toContain("/admin");
-    expect(sessionCookie, "__session cookie should be set after a successful verify").toBeTruthy();
+    expect(sessionCookie, "__admin_session cookie should be set after a successful verify").toBeTruthy();
   });
 });

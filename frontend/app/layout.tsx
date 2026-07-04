@@ -41,13 +41,19 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
+        {/* Tailwind v4 defaults `dark:` to a prefers-color-scheme media query; this switches it
+            to a `.dark` class-based variant so the toggle (ThemeToggle.tsx) can control it
+            independently of the OS setting once the DEO/Admin picks one explicitly. Must be
+            declared BEFORE the CDN <script> below — the Play/browser runtime reads whatever
+            `text/tailwindcss` config blocks already exist in the document at the moment it
+            initializes, and a blocking script tag executes before the parser even reaches any
+            markup written after it, so a config block placed after the script is invisible to
+            that first pass (this was the actual cause of dark: utilities silently falling back
+            to the default OS-only media query instead of following the manual toggle). */}
+        <style type="text/tailwindcss">{`@custom-variant dark (&:where(.dark, .dark *));`}</style>
         {/* Tailwind CSS v4 (Play CDN, jsDelivr-mirrored) — utility classes only, no build step.
             Plain <script>, not next/script: must block parsing so no unstyled flash. */}
         <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4" />
-        {/* Tailwind v4 defaults `dark:` to a prefers-color-scheme media query; this switches it
-            to a `.dark` class-based variant so the toggle (ThemeToggle.tsx) can control it
-            independently of the OS setting once the DEO/Admin picks one explicitly. */}
-        <style type="text/tailwindcss">{`@custom-variant dark (&:where(.dark, .dark *));`}</style>
         {/* Tabler Icons (CDN) — strictly icons, no emojis anywhere in the UI */}
         <link
           rel="stylesheet"
@@ -77,6 +83,11 @@ export default function RootLayout({
         {/* SheetJS / xlsx (CDN) — used on DEO submit + Admin export/sync */}
         <Script
           src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"
+          strategy="lazyOnload"
+        />
+        {/* Chart.js (CDN) — only consumer today is AdminDashboard's locked/unlocked donut. */}
+        <Script
+          src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"
           strategy="lazyOnload"
         />
       </body>

@@ -41,6 +41,6 @@ export async function POST(req: NextRequest) {
   });
 
   const res = NextResponse.json({ ok: true, role: user.role, districtId: user.districtId });
-  res.headers.set("Set-Cookie", sessionCookie(sessionToken));
+  res.headers.set("Set-Cookie", sessionCookie(sessionToken, user.role as "deo" | "admin"));
   return res;
 }

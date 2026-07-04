@@ -6,7 +6,6 @@ import { apiFetch, ApiError } from "@/lib/api";
 import { saveClientSession, markJustAuthed } from "@/lib/session";
 import Button from "@/components/ui/Button";
 import Banner from "@/components/ui/Banner";
-import ThemeToggle from "@/components/ui/ThemeToggle";
 
 function VerifyForm() {
   const router = useRouter();
@@ -25,7 +24,7 @@ function VerifyForm() {
       );
       saveClientSession(res);
       markJustAuthed();
-      router.push(res.role === "admin" ? "/admin" : "/entry");
+      router.push(res.role === "admin" ? "/admin" : "/deo-data-entry");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Verification failed.");
     } finally {
@@ -35,9 +34,6 @@ function VerifyForm() {
 
   return (
     <div className="relative flex flex-1 items-center justify-center bg-gradient-to-b from-slate-50 to-blue-50 px-4 dark:from-slate-950 dark:to-slate-900">
-      <div className="absolute right-4 top-4">
-        <ThemeToggle />
-      </div>
       <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 text-center shadow-xl shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-300">
           <i className="ti ti-shield-check text-2xl" />

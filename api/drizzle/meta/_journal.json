@@ -15,6 +15,13 @@
       "when": 1783142161589,
       "tag": "0001_nostalgic_stature",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1783146094948,
+      "tag": "0002_jittery_viper",
+      "breakpoints": true
     }
   ]
 }

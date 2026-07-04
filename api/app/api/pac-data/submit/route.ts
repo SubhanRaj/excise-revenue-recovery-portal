@@ -43,8 +43,8 @@ function validateRow(row: YearRow): string | null {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await requireSession(req);
-  if (!session || session.role !== "deo" || !session.districtId) {
+  const session = await requireSession(req, "deo");
+  if (!session || !session.districtId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -97,6 +97,7 @@ export async function POST(req: NextRequest) {
         stayCount: row.stayCount,
         stayAmount: row.stayAmount,
         submittedByName: submittedByName.trim(),
+        lockedAt: now,
       })
     ),
     db.update(districts).set({ lockStatus: 1 }).where(eq(districts.id, session.districtId!)),
@@ -108,6 +109,6 @@ export async function POST(req: NextRequest) {
 
   const res = NextResponse.json({ ok: true });
   // Data is locked — instantly destroy this DEO's session, no further access needed.
-  res.headers.set("Set-Cookie", destroySessionCookie());
+  res.headers.set("Set-Cookie", destroySessionCookie("deo"));
   return res;
 }

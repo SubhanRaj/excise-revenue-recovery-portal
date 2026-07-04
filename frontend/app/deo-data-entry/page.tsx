@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { db, type DraftYear } from "@/lib/db";
 import { FINANCIAL_YEARS, PAC_FIELD_ORDER } from "@/lib/pac-fields";
 import { apiFetch, ApiError } from "@/lib/api";
-import { readClientSession, clearClientSession, consumeJustAuthed } from "@/lib/session";
+import { clearClientSession, consumeJustAuthed } from "@/lib/session";
 import { confirmFinalSubmit, promptDeoNameAndLock, notifyToast } from "@/lib/alerts";
 import YearStepForm from "@/components/YearStepForm";
 import MasterView from "@/components/MasterView";
@@ -43,13 +43,11 @@ export default function EntryPage() {
 
   useEffect(() => {
     (async () => {
-      const session = readClientSession();
-      if (!session || session.role !== "deo") {
-        router.replace("/login");
-        return;
-      }
+      // Ask the server directly rather than pre-checking a local hint — see the matching
+      // comment in lib/useAdminData.ts. This session lives in its own cookie (independent of
+      // any admin session in the same browser), so this always reflects this page's own login.
       try {
-        const p = await apiFetch<Profile>("/api/auth/me");
+        const p = await apiFetch<Profile>("/api/auth/me?role=deo");
         setProfile(p);
         if (consumeJustAuthed()) {
           notifyToast({ icon: "success", title: `Welcome, DEO ${p.districtName ?? ""}`.trim() });
@@ -156,7 +154,7 @@ export default function EntryPage() {
 
   return (
     <div className="flex min-h-full flex-1 flex-col bg-slate-50 dark:bg-slate-950">
-      <AppHeader title="DEO Data Entry" profile={profile} />
+      <AppHeader title="DEO Data Entry" role="deo" profile={profile} />
       <HelpPanel pageKey="deo-entry" title="Filling this form">
         <p>
           Enter all six PAC/RC fields for each year. None may be left blank — type 0 if there

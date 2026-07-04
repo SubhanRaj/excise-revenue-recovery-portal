@@ -74,7 +74,7 @@ echo "re_xxxxxxxxxxxxxxxxxxxxxxxxxxxx" | npx wrangler secret put RESEND_API_KEY
 echo "https://excise-revenue-recovery-portal.pages.dev" | npx wrangler secret put FRONTEND_URL
 ```
 
-- `JWT_SECRET` — signs the `__session` cookie (`api/lib/session.ts`). Rotating it
+- `JWT_SECRET` — signs both the `__admin_session` and `__deo_session` cookies (`api/lib/session.ts`). Rotating it
   invalidates every active session.
 - `RESEND_API_KEY` — sends magic-link emails (`api/app/api/auth/request-magic-link/route.ts`).
 - `FRONTEND_URL` — must exactly match the Pages production origin. Used both as the
@@ -160,7 +160,7 @@ through, and confirm `/admin` loads the 75 districts.
 ## Known deployment constraints
 
 - **Frontend/API are cross-origin in production** (`*.pages.dev` vs `*.workers.dev`), so
-  the `__session` cookie is `SameSite=None; Secure` and every `/api/*` response carries
+  both the `__admin_session` and `__deo_session` cookies are `SameSite=None; Secure` and every `/api/*` response carries
   explicit CORS headers gated on `FRONTEND_URL` (`api/middleware.ts`). If you later put a
   custom domain in front of both under one zone (e.g. a Worker route for
   `example.com/api/*`), this whole cross-origin setup — and `middleware.ts` — becomes

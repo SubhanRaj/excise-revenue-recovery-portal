@@ -39,7 +39,7 @@ often driven from a sandboxed/non-interactive environment with no window server 
    straight out of production D1 (`wrangler d1 execute --remote`, read-only `SELECT`), then
    drives the browser through `/verify?token=...` → click "Verify & Continue" → asserts
    the browser actually lands on `/admin` (not bounced back to `/login`) and that the
-   `__session` cookie is present. This test exists because that exact bounce-with-no-error
+   `__admin_session` cookie is present. This test exists because that exact bounce-with-no-error
    was reported as a live bug — see "Incidents" below for what it actually was.
 
 ### Why this needs `api/` sibling access
@@ -79,7 +79,7 @@ Then:
 1. **Admin**: `/login` → Email tab → `shubhanraj2002@gmail.com` → check inbox for the
    styled login-link email (`api/lib/email.ts`) → Verify & Continue → `/admin` shows all
    75 districts. Try Sync, switching financial years, Export to Excel.
-2. **DEO**: `/login` → CUG tab → the demo CUG → lands on `/entry`. Walk Year 1 → 5: leave a
+2. **DEO**: `/login` → CUG tab → the demo CUG → lands on `/deo-data-entry`. Walk Year 1 → 5: leave a
    field blank and hit "Save & Continue" (a corner toast, not a popup or banner — bilingual),
    make Recovered Amount ≠ RC Amount and blur the field (bold inline bilingual message under
    Recovered Amount, "Save & Continue" disabled), watch Net Recoverable update live, try

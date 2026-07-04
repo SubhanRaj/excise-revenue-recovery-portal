@@ -14,7 +14,7 @@ export default function Home() {
     } else if (session.role === "admin") {
       router.replace("/admin");
     } else {
-      router.replace("/entry");
+      router.replace("/deo-data-entry");
     }
   }, [router]);
 

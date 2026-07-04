@@ -184,6 +184,55 @@
 - [x] Fixed a real e2e regression caught while rebranding: `login.spec.ts` asserted
       `text-indigo-700`, updated to `text-blue-700`
 
+## Milestone 13 — Admin dashboard/districts split, district detail page, global search (done)
+
+- [x] Fixed the actual dark-mode bug: the `@custom-variant dark` `<style>` block was written
+      *after* the blocking Tailwind CDN `<script>` tag in `layout.tsx`'s `<head>`, so it wasn't
+      in the DOM yet when the CDN runtime initialized — `dark:` utilities were silently only
+      ever following the OS `prefers-color-scheme`, never the manual toggle. Reordered the
+      `<style>` above the `<script>`.
+- [x] Removed `ThemeToggle` from `/login` and `/verify` — those pages already inherit whatever
+      the blocking script resolved (stored choice, else OS default); a manual toggle pre-login
+      wasn't needed
+- [x] Renamed the DEO route from `/entry` to `/deo-data-entry` (folder rename + the 3 places
+      that redirected to it: root `page.tsx`, `login/page.tsx`, `verify/page.tsx`)
+- [x] Split the single `/admin` page into three: `/admin` (Dashboard only), `/admin/districts`
+      (the sortable/paginated table + Lock/Unlock + DEO template download/upload + Excel
+      export — all the toolbar actions moved here off the Dashboard), and
+      `/admin/districts/detail?id=` (one district's revenue across all 5 years, reached by
+      clicking a table row). The detail page is a query-string route, not a `/districts/[id]`
+      dynamic segment, since the app is a static export with no server to resolve arbitrary
+      paths at request time.
+- [x] `frontend/lib/useAdminData.ts` — new shared hook (session guard, Dexie cache, `sync()`,
+      `unlock()`) so the three admin routes don't each re-implement the same fetch/cache dance
+- [x] `AppHeader` gained `navLinks` (Dashboard/Districts pill nav) and `onSync`/`syncing`
+      props — the Sync button moved out of each page's own toolbar into the shared header so
+      it's reachable from any admin page
+- [x] Added a real Chart.js donut (`LockStatusDonut` in `AdminDashboard.tsx`, CDN-loaded via
+      `layout.tsx`'s `lazyOnload` script, `chart.js` added as a types-only devDependency) next
+      to the existing locked/unlocked bar — the one chart actually requested, not a wholesale
+      swap of every stat card to a charting library
+- [x] `pac_data.locked_at` (migration `0002_jittery_viper.sql`, applied to remote D1) mirrors
+      `users.locked_at` the same way `submitted_by_name` already did, so the district detail
+      page can show "locked by X on Y" without a join. New `frontend/lib/format.ts`'s
+      `formatIST()` is the one place that converts the stored UTC ISO string to IST
+      (`Asia/Kolkata`) for display — storage stays UTC always.
+- [x] `AppHeader`'s new `districts` prop renders a global "jump to a district" autocomplete
+      search reachable from every admin page, separate from the Districts table's own
+      by-name filter box
+- [x] District detail page has its own search box filtering the field × year table by raw
+      number or formatted value across any year
+- [x] Split the single `__session` cookie into `__admin_session` + `__deo_session` — a CUG
+      (DEO) login and a magic-link (Admin) login in the same browser no longer clobber each
+      other, so testing the demo DEO flow doesn't cost a fresh magic-link email (and doesn't
+      burn Resend's daily quota) just to get back into `/admin`. `requireSession(req, role)`
+      now takes the expected role explicitly; `/api/auth/me` and `/api/auth/logout` take a
+      `?role=` query param
+- [x] Fixed the real cause of the `/admin` ↔ `/deo-data-entry` login bounce: pages were
+      pre-checking a single shared localStorage "last role" hint before ever calling
+      `/api/auth/me`, so it went stale whenever the *other* role logged in anywhere in the
+      same browser. Pages now call the server directly and trust its answer.
+
 ## Backlog / not started
 
 - [ ] Real domain + DNS, and (optional) collapse `/frontend` + `/api` onto one zone via a

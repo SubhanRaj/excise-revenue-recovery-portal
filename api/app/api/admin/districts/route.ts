@@ -5,7 +5,7 @@ import { requireSession } from "@/lib/auth-guard";
 
 // Full dump of all 75 districts + their PAC rows, for the Admin dashboard's Dexie.js cache/sync.
 export async function GET(req: NextRequest) {
-  const session = await requireSession(req);
+  const session = await requireSession(req, "admin");
   if (!session || session.role !== "admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

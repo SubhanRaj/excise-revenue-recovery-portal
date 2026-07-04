@@ -8,7 +8,6 @@ import { saveClientSession, markJustAuthed } from "@/lib/session";
 import Button from "@/components/ui/Button";
 import TextField from "@/components/ui/TextField";
 import Banner from "@/components/ui/Banner";
-import ThemeToggle from "@/components/ui/ThemeToggle";
 
 type Tab = "cug" | "email";
 
@@ -51,7 +50,7 @@ export default function LoginPage() {
       );
       saveClientSession(res);
       markJustAuthed();
-      router.push(res.role === "admin" ? "/admin" : "/entry");
+      router.push(res.role === "admin" ? "/admin" : "/deo-data-entry");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Login failed.");
     } finally {
@@ -78,9 +77,6 @@ export default function LoginPage() {
 
   return (
     <div className="relative flex flex-1 items-center justify-center bg-gradient-to-b from-slate-50 to-blue-50 px-4 py-12 dark:from-slate-950 dark:to-slate-900">
-      <div className="absolute right-4 top-4">
-        <ThemeToggle />
-      </div>
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center text-center">
           <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-700 text-2xl font-bold text-white shadow-lg shadow-blue-200 dark:shadow-none">
