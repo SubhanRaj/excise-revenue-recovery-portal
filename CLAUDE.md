@@ -86,7 +86,10 @@ Unified 7-day HttpOnly JWT cookie (`__session`, via `jose`), issued by either fl
 - `GET /api/auth/me` — the SPA has no server, so it can't read the HttpOnly cookie itself;
   every gated page calls this on load to learn `{role, districtId}` before trusting the
   cached copy in `frontend/lib/session.ts` (localStorage — UI routing hint only, never a
-  trust boundary).
+  trust boundary). Also joins `districts`/`users` to return `email`/`districtName`, purely
+  so the header's profile dropdown (`frontend/components/ui/ProfileMenu.tsx`) has something
+  to show — it's not part of the trust boundary, just avoids a second round trip for display
+  data the guard check was already making a DB call for.
 - **Revocation**: submitting a DEO's final payload atomically locks the district *and*
   destroys that session cookie server-side (`destroySessionCookie()`), since there's
   nothing left for that DEO to do.
@@ -129,10 +132,24 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
 - **Feedback is inline SPA state, not popups.** Each page keeps local `useState` for
   error/success and renders `components/ui/Banner.tsx` next to the relevant control —
   modeled on the `sent`/`error` state pattern in the sibling `up-excise-spatial-revenue-optimizer`
-  project's login form. `window.Swal` (SweetAlert2, CDN) is reserved for exactly one thing:
-  `confirmFinalSubmit()` in `frontend/lib/alerts.ts`, the blocking "are you sure" before an
-  irreversible DEO submit-and-lock. Don't reach for a new SweetAlert popup for routine
-  errors/success messages — add a `Banner` instead.
+  project's login form. Field-specific validation (e.g. the parity check) renders directly
+  under the offending field, bold, rather than in a page-bottom banner — see
+  `YearStepForm.tsx`'s Recovered Amount field. `window.Swal` (SweetAlert2, CDN) is reserved
+  for: blocking confirms before an irreversible or session-ending action
+  (`confirmFinalSubmit()`, `confirmLogout()` in `frontend/lib/alerts.ts`) and brief
+  auth-transition toasts (`notifyToast()` — `toast: true, position: "top-end"`, modeled on
+  the sibling `excise-bakaya-record` project's login/sync/unlock toasts) fired on
+  login/logout. Don't reach for a new SweetAlert popup for routine errors/success messages —
+  add a `Banner` instead.
+- **"Welcome" toast fires once per sign-in, not per page load.** `frontend/lib/session.ts`'s
+  `markJustAuthed()`/`consumeJustAuthed()` set/clear a `sessionStorage` flag right before the
+  `/login` or `/verify` page redirects to `/entry`/`/admin`; the destination page's existing
+  `/api/auth/me` guard call checks and clears it. If you add another place that lands a user
+  on those pages after auth, call `markJustAuthed()` there too or the toast won't show.
+- **Help balloon** (`frontend/components/ui/HelpPanel.tsx`, used in `YearStepForm.tsx`) is
+  ported from the sibling `up-excise-spatial-revenue-optimizer` project's `HelpPanel`, which
+  uses DaisyUI — this repo has no DaisyUI (or shadcn) installed, so it's restyled onto plain
+  Tailwind/indigo classes. Keep that in mind if porting more components from that sibling.
 - No emojis anywhere in the UI — Tabler Icons (CDN webfont, `<link>` in `layout.tsx`)
   instead. Don't put a Tabler `<i>` icon directly inside/overlapping live input text —
   the glyph renders via a CSS `::before` that loads async, so it can flash a fallback tofu
@@ -156,6 +173,12 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   `<body>`). Don't "fix" a styling flash by switching this back to `next/script`.
 - Money inputs use Cleave.js with `numeralThousandsGroupStyle: "lakh"` for native
   Indian-numeral (Lakh/Crore) grouping and a `₹` prefix — don't hand-roll this formatting.
+- `YearStepForm.tsx`'s field grid hardcodes the six PAC fields into four rows (gross arrears
+  full-width; RC count+amount paired two-up with a narrow count column; recovered amount
+  full-width with the parity error inline beneath it; stay count+amount paired the same way
+  as RC) rather than looping `PAC_FIELD_ORDER` — matches the "(i)/(ii)" pairing on the actual
+  government form. If the six-field schema ever changes, update this layout by hand, same as
+  every other place `PAC_FIELD_ORDER` is deliberately duplicated instead of derived.
 - SheetJS exports use the free/Community CDN build, which **cannot write frozen panes**
   (that's a SheetJS Pro feature) — see the `ponytail:` comment in `frontend/lib/export.ts`
   if you're asked to make the exported header row actually freeze.

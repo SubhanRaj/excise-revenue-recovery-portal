@@ -14,11 +14,13 @@ import {
 import { db, type CachedDistrict, type CachedPacData } from "@/lib/db";
 import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable } from "@/lib/pac-fields";
 import { apiFetch, ApiError } from "@/lib/api";
-import { readClientSession, clearClientSession } from "@/lib/session";
+import { readClientSession, clearClientSession, consumeJustAuthed } from "@/lib/session";
+import { notifyToast } from "@/lib/alerts";
 import { exportDistrictsToXlsx } from "@/lib/export";
 import AppHeader from "@/components/ui/AppHeader";
 import Button from "@/components/ui/Button";
 import Banner from "@/components/ui/Banner";
+import type { Profile } from "@/components/ui/ProfileMenu";
 
 type Row = CachedDistrict & Record<(typeof PAC_FIELD_ORDER)[number], number>;
 
@@ -40,6 +42,7 @@ export default function AdminPage() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [syncing, setSyncing] = useState(false);
   const [banner, setBanner] = useState<{ variant: "error" | "success"; message: string } | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
 
   async function sync() {
     setSyncing(true);
@@ -76,7 +79,11 @@ export default function AdminPage() {
         return;
       }
       try {
-        await apiFetch("/api/auth/me");
+        const p = await apiFetch<Profile>("/api/auth/me");
+        setProfile(p);
+        if (consumeJustAuthed()) {
+          notifyToast({ icon: "success", title: `Welcome, ${p.email ?? "Admin"}` });
+        }
       } catch {
         clearClientSession();
         router.replace("/login");
@@ -205,7 +212,7 @@ export default function AdminPage() {
 
   return (
     <div className="flex min-h-full flex-1 flex-col bg-slate-50">
-      <AppHeader title="Admin Dashboard" />
+      <AppHeader title="Admin Dashboard" profile={profile} />
       <div className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-8">
         {banner && (
           <div className="mb-4">

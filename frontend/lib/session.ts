@@ -17,3 +17,17 @@ export function readClientSession(): ClientSession | null {
 export function clearClientSession() {
   localStorage.removeItem(KEY);
 }
+
+// One-shot flag set right before redirecting away from /login or /verify, so the destination
+// page can show a "Welcome" toast exactly once per sign-in rather than on every reload.
+const JUST_AUTHED_KEY = "excise-portal:just-authed";
+
+export function markJustAuthed() {
+  sessionStorage.setItem(JUST_AUTHED_KEY, "1");
+}
+
+export function consumeJustAuthed(): boolean {
+  const flagged = sessionStorage.getItem(JUST_AUTHED_KEY) === "1";
+  if (flagged) sessionStorage.removeItem(JUST_AUTHED_KEY);
+  return flagged;
+}

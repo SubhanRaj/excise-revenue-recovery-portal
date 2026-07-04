@@ -1,7 +1,7 @@
 "use client";
 
 import PacFieldInput from "./PacFieldInput";
-import { PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable } from "@/lib/pac-fields";
+import { PAC_FIELD_LABELS, netRecoverable } from "@/lib/pac-fields";
 import type { DraftYear } from "@/lib/db";
 import Button from "./ui/Button";
 import Banner from "./ui/Banner";
@@ -11,11 +11,19 @@ type Props = {
   year: DraftYear;
   onFieldChange: (field: keyof DraftYear, value: string) => void;
   onSaveAndContinue: () => void;
+  onBack?: () => void;
   isLastYear: boolean;
   blankErrorMessage: string | null;
 };
 
-export default function YearStepForm({ year, onFieldChange, onSaveAndContinue, isLastYear, blankErrorMessage }: Props) {
+export default function YearStepForm({
+  year,
+  onFieldChange,
+  onSaveAndContinue,
+  onBack,
+  isLastYear,
+  blankErrorMessage,
+}: Props) {
   const gross = Number(year.grossArrears) || 0;
   const recovered = Number(year.recoveredAmount) || 0;
   const stay = Number(year.stayAmount) || 0;
@@ -38,21 +46,56 @@ export default function YearStepForm({ year, onFieldChange, onSaveAndContinue, i
       </div>
 
       <div className="grid grid-cols-1 gap-4">
-        {PAC_FIELD_ORDER.map((field) => (
-          <div key={field}>
-            <PacFieldInput
-              label={PAC_FIELD_LABELS[field]}
-              value={year[field]}
-              money={isMoneyField(field)}
-              onChange={(raw) => onFieldChange(field, raw)}
-            />
-            {field === "recoveredAmount" && !parityOk && (
-              <p className="mt-1.5 text-sm font-bold text-red-600">
-                Recovered Amount (3) must equal RC Amount (2.ii).
-              </p>
-            )}
-          </div>
-        ))}
+        <PacFieldInput
+          label={PAC_FIELD_LABELS.grossArrears}
+          value={year.grossArrears}
+          money
+          onChange={(raw) => onFieldChange("grossArrears", raw)}
+        />
+
+        <div className="grid grid-cols-[7rem_1fr] gap-3">
+          <PacFieldInput
+            label={PAC_FIELD_LABELS.rcCount}
+            value={year.rcCount}
+            money={false}
+            onChange={(raw) => onFieldChange("rcCount", raw)}
+          />
+          <PacFieldInput
+            label={PAC_FIELD_LABELS.rcAmount}
+            value={year.rcAmount}
+            money
+            onChange={(raw) => onFieldChange("rcAmount", raw)}
+          />
+        </div>
+
+        <div>
+          <PacFieldInput
+            label={PAC_FIELD_LABELS.recoveredAmount}
+            value={year.recoveredAmount}
+            money
+            onChange={(raw) => onFieldChange("recoveredAmount", raw)}
+          />
+          {!parityOk && (
+            <p className="mt-1.5 text-sm font-bold text-red-600">
+              Recovered Amount (3) must equal RC Amount (2.ii).
+            </p>
+          )}
+        </div>
+
+        <div className="grid grid-cols-[7rem_1fr] gap-3">
+          <PacFieldInput
+            label={PAC_FIELD_LABELS.stayCount}
+            value={year.stayCount}
+            money={false}
+            onChange={(raw) => onFieldChange("stayCount", raw)}
+          />
+          <PacFieldInput
+            label={PAC_FIELD_LABELS.stayAmount}
+            value={year.stayAmount}
+            money
+            onChange={(raw) => onFieldChange("stayAmount", raw)}
+          />
+        </div>
       </div>
 
       {blankErrorMessage && <Banner variant="error">{blankErrorMessage}</Banner>}
@@ -64,10 +107,20 @@ export default function YearStepForm({ year, onFieldChange, onSaveAndContinue, i
         </span>
       </div>
 
-      <Button type="button" onClick={onSaveAndContinue} disabled={!parityOk}>
-        {isLastYear ? "Save & View Summary" : "Save & Continue"}
-        <i className="ti ti-arrow-right text-base" />
-      </Button>
+      <div className="flex items-center justify-between gap-3">
+        {onBack ? (
+          <Button type="button" variant="secondary" onClick={onBack}>
+            <i className="ti ti-arrow-left text-base" />
+            Previous Year
+          </Button>
+        ) : (
+          <span />
+        )}
+        <Button type="button" onClick={onSaveAndContinue} disabled={!parityOk}>
+          {isLastYear ? "Save & View Summary" : "Save & Continue"}
+          <i className="ti ti-arrow-right text-base" />
+        </Button>
+      </div>
     </div>
   );
 }

@@ -106,6 +106,21 @@
       Safari cross-site-cookie risk, confirmed still working correctly in Chrome — see
       TESTING.md's Incidents section
 
+## Milestone 10 — DEO form UX + profile menu + auth toasts (done)
+
+- [x] DEO year form: parity error moved from a bottom banner to a bold inline message under
+      the Recovered Amount field; RC and Stay count/amount fields paired two-up per row
+      (narrow count column) instead of one field per row for every field
+- [x] Added a per-year "Previous Year"/"Save & Continue" two-button nav (was a single button)
+- [x] Added `HelpPanel` (ported from `up-excise-spatial-revenue-optimizer`, restyled off
+      DaisyUI onto plain Tailwind) as a dismiss-once help balloon on the DEO year form
+- [x] `GET /api/auth/me` now also returns `email`/`districtName`; new `ProfileMenu.tsx`
+      dropdown in `AppHeader` shows role/district/email
+- [x] Logout now requires a SweetAlert2 confirm (`confirmLogout()`); added `notifyToast()`
+      (top-end SweetAlert2 toast, modeled on `excise-bakaya-record`) for a one-shot "Welcome,
+      <district/email>" on login and "Logged out" on logout — see CLAUDE.md's UI conventions
+      for the `markJustAuthed`/`consumeJustAuthed` one-shot mechanism
+
 ## Backlog / not started
 
 - [ ] Admin UI to provision DEO users (currently manual DB insert — see CLAUDE.md "Known gaps")

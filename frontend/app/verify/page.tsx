@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch, ApiError } from "@/lib/api";
-import { saveClientSession } from "@/lib/session";
+import { saveClientSession, markJustAuthed } from "@/lib/session";
 import Button from "@/components/ui/Button";
 import Banner from "@/components/ui/Banner";
 
@@ -23,6 +23,7 @@ function VerifyForm() {
         { method: "POST", body: JSON.stringify({ token }) }
       );
       saveClientSession(res);
+      markJustAuthed();
       router.push(res.role === "admin" ? "/admin" : "/entry");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Verification failed.");

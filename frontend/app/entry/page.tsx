@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import { db, type DraftYear } from "@/lib/db";
 import { FINANCIAL_YEARS, PAC_FIELD_ORDER } from "@/lib/pac-fields";
 import { apiFetch, ApiError } from "@/lib/api";
-import { readClientSession, clearClientSession } from "@/lib/session";
-import { confirmFinalSubmit } from "@/lib/alerts";
+import { readClientSession, clearClientSession, consumeJustAuthed } from "@/lib/session";
+import { confirmFinalSubmit, notifyToast } from "@/lib/alerts";
 import YearStepForm from "@/components/YearStepForm";
 import MasterView from "@/components/MasterView";
 import AppHeader from "@/components/ui/AppHeader";
 import Banner from "@/components/ui/Banner";
+import type { Profile } from "@/components/ui/ProfileMenu";
 
 const BLANK_FIELD_MESSAGE =
   "Please do not leave any field blank. Enter 0 if there is no due amount or recovery.";
@@ -38,6 +39,7 @@ export default function EntryPage() {
   const [blankError, setBlankError] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [profile, setProfile] = useState<Profile | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -47,7 +49,11 @@ export default function EntryPage() {
         return;
       }
       try {
-        await apiFetch("/api/auth/me");
+        const p = await apiFetch<Profile>("/api/auth/me");
+        setProfile(p);
+        if (consumeJustAuthed()) {
+          notifyToast({ icon: "success", title: `Welcome, ${p.districtName ?? "DEO"}` });
+        }
       } catch {
         clearClientSession();
         router.replace("/login");
@@ -149,7 +155,7 @@ export default function EntryPage() {
 
   return (
     <div className="flex min-h-full flex-1 flex-col bg-slate-50">
-      <AppHeader title="DEO Data Entry" />
+      <AppHeader title="DEO Data Entry" profile={profile} />
       <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
         <nav className="mb-6 flex flex-wrap items-center gap-2">
           {FINANCIAL_YEARS.map((fy, i) => {
@@ -196,6 +202,14 @@ export default function EntryPage() {
               year={years[step]}
               onFieldChange={(field, value) => updateField(step, field, value)}
               onSaveAndContinue={() => saveAndContinue(step)}
+              onBack={
+                step > 0
+                  ? () => {
+                      setBlankError(false);
+                      setStep(step - 1);
+                    }
+                  : undefined
+              }
               isLastYear={step === 4}
               blankErrorMessage={blankError ? BLANK_FIELD_MESSAGE : null}
             />

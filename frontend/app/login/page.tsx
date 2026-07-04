@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, ApiError } from "@/lib/api";
 import { sha256Hex } from "@/lib/crypto";
-import { saveClientSession } from "@/lib/session";
+import { saveClientSession, markJustAuthed } from "@/lib/session";
 import Button from "@/components/ui/Button";
 import TextField from "@/components/ui/TextField";
 import Banner from "@/components/ui/Banner";
@@ -49,6 +49,7 @@ export default function LoginPage() {
         { method: "POST", body: JSON.stringify({ cugHash }) }
       );
       saveClientSession(res);
+      markJustAuthed();
       router.push(res.role === "admin" ? "/admin" : "/entry");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Login failed.");
