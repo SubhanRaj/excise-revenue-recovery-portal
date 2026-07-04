@@ -176,8 +176,8 @@ export default function EntryPage() {
         </p>
       </HelpPanel>
       <div className={`mx-auto w-full flex-1 px-4 pt-8 pb-24 sm:pb-8 ${step === 5 ? "max-w-6xl" : "max-w-4xl"}`}>
-        <nav className="sticky top-16 z-10 mb-6 flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50/95 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
-          <div className="flex flex-wrap items-center gap-2">
+        <nav className="sticky top-16 z-10 mb-6 flex flex-col items-stretch gap-2 border-b border-slate-100 bg-slate-50/95 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-1 sm:flex-wrap sm:gap-2">
             {FINANCIAL_YEARS.map((fy, i) => {
               const done = years[i]?.completed;
               const locked = i !== 0 && !years[i - 1]?.completed;
@@ -188,7 +188,7 @@ export default function EntryPage() {
                   onClick={() => goToStep(i)}
                   disabled={locked}
                   style={locked ? { cursor: "not-allowed" } : undefined}
-                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                  className={`flex flex-1 items-center justify-center gap-1 rounded-full px-2 py-1 text-xs font-medium transition-colors sm:flex-none sm:justify-start sm:gap-1.5 sm:px-3.5 sm:py-1.5 sm:text-sm ${
                     step === i
                       ? "bg-blue-600 text-white shadow-sm"
                       : done
@@ -196,7 +196,7 @@ export default function EntryPage() {
                         : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
                   } disabled:opacity-40`}
                 >
-                  {done && step !== i && <i className="ti ti-check text-base" />}
+                  {done && step !== i && <i className="ti ti-check text-sm sm:text-base" />}
                   Year {i + 1}
                 </button>
               );
@@ -207,7 +207,7 @@ export default function EntryPage() {
             onClick={() => goToStep(5)}
             disabled={!years.every((y) => y.completed)}
             style={!years.every((y) => y.completed) ? { cursor: "not-allowed" } : undefined}
-            className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors sm:ml-auto ${
+            className={`flex items-center justify-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors sm:ml-auto sm:justify-start ${
               step === 5
                 ? "bg-blue-600 text-white shadow-sm"
                 : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"

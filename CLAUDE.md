@@ -204,11 +204,14 @@ The Admin dashboard caches all districts + PAC rows in Dexie (`adminDistricts`,
 
 The Year 1–5 / Master View nav pills in `deo-data-entry/page.tsx` are `sticky top-16` (just below the
 also-`sticky` `AppHeader`) so they stay reachable while scrolling down a long year form,
-matching the `AdminDashboard`'s always-visible toolbar. The Year pills are grouped in their own
-wrapping `<div>` separate from the Master View pill (`sm:ml-auto` right-aligns it on wider
-screens) — they used to be split by a `flex-1` divider `<span>` in the same flex-wrap row, which
-forced an ugly full-width empty line whenever the pills wrapped on a narrow/mobile viewport.
-Don't reintroduce a flex-growing spacer between the two groups. The page container also carries
+matching the `AdminDashboard`'s always-visible toolbar. The nav is `flex-col` below `sm` (Master
+View drops to its own full-width row under the 5 year pills) and `sm:flex-row` above it (single
+row, Master View right-aligned via `sm:ml-auto`) — they used to be split by a `flex-1` divider
+`<span>` in one always-`flex-wrap` row, which forced an ugly full-width empty line whenever the
+pills wrapped on a narrow/mobile viewport. The year pills themselves also shrink on mobile
+(`px-2 py-1 text-xs`, each `flex-1` so all 5 share one row evenly) and return to their normal
+size/padding at `sm`. Don't reintroduce a flex-growing spacer between the two groups. The page
+container also carries
 `pb-24 sm:pb-8` (not equal top/bottom padding) so the fixed `HelpPanel` button doesn't sit on top
 of the full-width Master View "Submit & Lock" button on mobile.
 Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
