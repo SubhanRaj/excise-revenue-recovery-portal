@@ -22,6 +22,7 @@ import { setNavDistrictId, consumeNavStatusFilter } from "@/lib/adminNav";
 import { apiFetch } from "@/lib/api";
 import AppHeader, { type NavLink } from "@/components/ui/AppHeader";
 import Button from "@/components/ui/Button";
+import Select from "@/components/ui/Select";
 import Banner from "@/components/ui/Banner";
 import HelpPanel from "@/components/ui/HelpPanel";
 import type { CachedDistrict } from "@/lib/db";
@@ -338,16 +339,12 @@ export default function DistrictsPage() {
           />
 
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as "all" | "locked" | "unlocked")}
-              className="rounded-md shadow-sm border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 outline-none hover:bg-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
+            <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "all" | "locked" | "unlocked")}>
               <option value="all">All statuses</option>
               <option value="locked">Locked</option>
               <option value="unlocked">Unlocked</option>
-            </select>
-            <select
+            </Select>
+            <Select
               value={selectedYear}
               disabled={isChangingFY}
               onChange={(e) => {
@@ -358,14 +355,13 @@ export default function DistrictsPage() {
                   setIsChangingFY(false);
                 }, 400);
               }}
-              className="rounded-md shadow-sm border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 outline-none hover:bg-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               {FINANCIAL_YEARS.map((y) => (
                 <option key={y} value={y}>
                   FY {y}
                 </option>
               ))}
-            </select>
+            </Select>
             <Button variant="blue" size="xs" onClick={() => downloadDeoTemplate(districts)}>
               <i className="ti ti-download text-sm" />
               DEO Template
@@ -488,21 +484,20 @@ export default function DistrictsPage() {
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600 dark:text-slate-400">
           <div className="flex items-center gap-2">
             <span>Rows per page</span>
-            <select
+            <Select
               value={pagination.pageSize}
               onChange={(e) => {
                 const size = Number(e.target.value);
                 setPagination((p) => ({ ...p, pageIndex: 0, pageSize: size }));
                 localStorage.setItem("excise-portal:districts-pageSize", String(size));
               }}
-              className="rounded-md shadow-sm border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 outline-none hover:bg-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               {PAGE_SIZE_OPTIONS.map((n) => (
                 <option key={n} value={n}>
                   {n}
                 </option>
               ))}
-            </select>
+            </Select>
             <span>
               of {table.getFilteredRowModel().rows.length} district{table.getFilteredRowModel().rows.length === 1 ? "" : "s"}
             </span>

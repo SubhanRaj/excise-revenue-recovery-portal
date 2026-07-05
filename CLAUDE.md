@@ -525,6 +525,18 @@ condition, give it this same three-way treatment rather than a plain active/inac
   (`<select>`) across the Admin Dashboard have also been updated from `rounded-full` pills to
   `rounded-md shadow-sm py-1.5` to perfectly match these sleek toolbar buttons. If you add a
   new utility button or dropdown, ensure it inherits this `rounded-md` look.
+  **Exception**: the DEO data-entry sticky nav bar's "Clear All" button
+  (`deo-data-entry/page.tsx`) sits directly beside the `rounded-full` FY-pill/Master View
+  buttons (see the three-state color convention above) — it's hand-styled with `rounded-full`
+  instead of pulled from `Button.tsx`, since `Button.tsx`'s shared `SIZES` bake `rounded-md`
+  into the same class string as padding (see the note above `SIZES` in `Button.tsx` about why
+  radius can't just be overridden via `className` without risking the same
+  conflicting-utility/JIT-ordering issue documented under "Never pass two conflicting size
+  utilities"), and a square `dangerSoft` button looked like a mismatched patch wedged between
+  two pills right next to it. This is scoped to that one button, not a reversal of the
+  `rounded-md` convention above — `YearStepForm.tsx`'s per-year "Clear" button (same
+  `dangerSoft` variant, but sitting next to a plain heading, not other pills) is intentionally
+  left as a normal `Button.tsx` instance.
 - **The icon-vs-label vertical misalignment (icon sitting low, extra blank space under the text,
   text nearly touching the button's top border) was a real, separate bug from the "thick"
   corner-radius one above — and the standalone-classes repro that cleared the flex layout
@@ -678,11 +690,18 @@ visually cramped as features were added:
   rebrand (the `bg-red-100`/`bg-emerald-100` light-mode classes don't change with the theme on
   their own, so the badge just looked like a mismatched light patch sitting in an otherwise-dark
   table, not literally invisible, but still wrong). If you add another status badge, copy the
-  color pair from one of these two rather than inventing a new light-only one. Every `<select>` on
-  this page (status filter, FY filter, rows-per-page) and the pagination Prev/Next icon buttons
-  are `rounded-full` with the same border/hover treatment as `Button.tsx`'s `xs`/`sm` variants —
-  they used to be `rounded-md`, which looked like a mismatched square sitting next to the pill-
-  shaped toolbar buttons beside them. Keep new small controls on this page pill-shaped to match.
+  color pair from one of these two rather than inventing a new light-only one. Every `<select>`
+  across all four admin pages (status filter, FY filter, rows-per-page on this page; the event
+  filter on `/admin/audit`) now goes through `components/ui/Select.tsx`, not a hand-rolled
+  `<select className="...">` — it exists because these selects used to mix `text-xs` (status/
+  event filters) and `text-sm` (FY/rows-per-page filters) sitting side by side in the same
+  toolbar row, and every browser's native dropdown arrow is a different size/position that
+  doesn't scale with the rest of the toolbar's `Button.tsx` icons, both of which read as "very
+  padded"/mismatched. `Select` fixes both: one `text-sm` size for every instance, and
+  `appearance-none` plus its own small `ti-chevron-down` (sized/positioned to match the rest of
+  the toolbar's icons) instead of the browser default. If you add another dropdown anywhere in
+  admin, use `Select`, not a bare `<select>`. The pagination Prev/Next icon buttons are a
+  separate, unrelated `rounded-full` case — untouched by this fix.
   **Export as Excel Workbook** and **Export as SQL** both re-sync first (so the export reflects
   the live server state, not a possibly-stale cache), then build their respective file; both show
   a disabled, `animate-pulse` "Exporting..." state on their own button while running (mirroring
@@ -703,7 +722,15 @@ visually cramped as features were added:
 - **`/admin/districts/detail`** — one district's PAC figures across all 5 years as a small
   field × year table (with its own value/field search box, separate from the Districts table's
   by-name one), a lock-status badge, who locked it and when (`formatIST(lockedAt)`), and — if
-  it's currently unlocked — who last unlocked it, when, and why.
+  it's currently unlocked — who last unlocked it, when, and why. The page container is
+  `max-w-6xl` (matching the DEO Master View's width, but narrower than the full-bleed
+  percentage-padding `/admin/districts` table) and the table itself has no `w-full` — same
+  auto-layout reasoning as "Tables must stay auto-layout" below: `w-full` on this money-heavy
+  table was forcing it to exactly the (then-narrower `max-w-5xl`) container width, squeezing
+  columns until values clipped instead of the `overflow-x-auto` wrapper ever kicking in. The
+  Unlock button here is a plain `Button variant="amber"` (with a `ti-lock-open` icon) — it used
+  to be a hand-rolled `<button className="rounded-md border ...">` that looked like an unstyled
+  browser default sitting next to the colorful lock-status badge above it.
 - **`/admin/audit`** — a paginated (100/page), newest-first table of every login/logout,
   district lock/unlock, and DEO provisioning batch, auto-pruned to the last 30 days on read
   (see Data model below). Modeled on the sibling `up-excise-spatial-revenue-optimizer`

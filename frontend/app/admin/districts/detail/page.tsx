@@ -10,6 +10,7 @@ import { notifyToast, promptUnlockReason } from "@/lib/alerts";
 import { useAdminData } from "@/lib/useAdminData";
 import AppHeader, { type NavLink } from "@/components/ui/AppHeader";
 import Banner from "@/components/ui/Banner";
+import Button from "@/components/ui/Button";
 
 const NAV_LINKS: NavLink[] = [
   { label: "Dashboard", href: "/admin" },
@@ -75,7 +76,7 @@ export default function DistrictDetailPage() {
   return (
     <div className="flex min-h-full flex-1 flex-col bg-slate-50 dark:bg-slate-950">
       <AppHeader title="District Detail" role="admin" profile={profile} navLinks={NAV_LINKS} onSync={sync} syncing={syncing} lastSyncedAt={lastSyncedAt} districts={districts} />
-      <div className="mx-auto w-full max-w-5xl flex-1 px-6 py-6 lg:px-10">
+      <div className="mx-auto w-full max-w-6xl flex-1 px-6 py-6 lg:px-10">
         <Link
           href="/admin/districts"
           className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-blue-700 hover:underline dark:text-blue-400"
@@ -119,12 +120,10 @@ export default function DistrictDetailPage() {
                   </div>
                 </div>
                 {district.lockStatus === 1 && (
-                  <button
-                    onClick={() => handleUnlock(district.id, district.districtName)}
-                    className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-                  >
+                  <Button variant="amber" size="sm" onClick={() => handleUnlock(district.id, district.districtName)}>
+                    <i className="ti ti-lock-open text-sm" />
                     Unlock
-                  </button>
+                  </Button>
                 )}
               </div>
               {lockInfo && (
@@ -164,7 +163,11 @@ export default function DistrictDetailPage() {
             </div>
 
             <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <table className="w-full border-collapse text-sm">
+              {/* No w-full — with the auto (default) table layout, forcing the table to exactly
+                  the container's width squeezes/clips money columns instead of letting them
+                  grow, same issue documented for the districts table below. Content sizes
+                  itself; overflow-x-auto on the wrapper is the fallback past that. */}
+              <table className="border-collapse text-sm">
                 <thead>
                   <tr className="bg-slate-50 dark:bg-slate-800">
                     <th className="whitespace-nowrap px-3 py-2.5 text-left font-medium text-slate-600 dark:text-slate-400">

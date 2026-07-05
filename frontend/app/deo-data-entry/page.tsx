@@ -359,16 +359,18 @@ export default function EntryPage() {
               sticky nav row wide enough that hugging their own content (Master View pinned via
               sm:ml-auto) looks right instead. */}
           <div className="flex items-center gap-2 sm:ml-auto">
-            <Button
+            {/* Hand-styled (not Button.tsx) to match the rounded-full pill shape of its FY-pill/
+                Master View neighbors in this bar — Button.tsx's shared SIZES bake in rounded-md
+                for toolbar buttons elsewhere in the app, which reads as an odd square patch
+                sitting between two pills right next to it. */}
+            <button
               type="button"
-              variant="dangerSoft"
-              size="xs"
               onClick={clearAllData}
-              className="flex-1 sm:flex-none"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-3.5 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 sm:flex-none sm:justify-start dark:border-red-900 dark:bg-red-950 dark:text-red-300 dark:hover:bg-red-900"
             >
               <i className="ti ti-trash text-sm" />
               Clear All
-            </Button>
+            </button>
             <button
               type="button"
               onClick={() => goToStep(5)}

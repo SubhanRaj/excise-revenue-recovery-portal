@@ -7,6 +7,7 @@ import { useAdminData } from "@/lib/useAdminData";
 import AppHeader, { type NavLink } from "@/components/ui/AppHeader";
 import Banner from "@/components/ui/Banner";
 import HelpPanel from "@/components/ui/HelpPanel";
+import Select from "@/components/ui/Select";
 
 const NAV_LINKS: NavLink[] = [
   { label: "Dashboard", href: "/admin" },
@@ -136,7 +137,7 @@ export default function AuditLogPage() {
         )}
 
         <div className="mb-4 flex flex-wrap items-center justify-end gap-1.5">
-          <select
+          <Select
             value={eventFilter}
             disabled={isChangingFilter}
             onChange={(e) => {
@@ -147,7 +148,6 @@ export default function AuditLogPage() {
                 setIsChangingFilter(false);
               }, 400);
             }}
-            className="rounded-md shadow-sm border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 outline-none hover:bg-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <option value="all">All events</option>
             {Object.entries(EVENT_LABELS).map(([value, label]) => (
@@ -155,7 +155,7 @@ export default function AuditLogPage() {
                 {label}
               </option>
             ))}
-          </select>
+          </Select>
           <button
             type="button"
             disabled={isChangingFilter}
