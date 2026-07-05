@@ -1,4 +1,4 @@
-import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField } from "./pac-fields";
+import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable } from "./pac-fields";
 import { SITE_TITLE_EN, DATA_PERIOD_EN } from "./site";
 import type { CachedDistrict, CachedPacData } from "./db";
 
@@ -11,15 +11,23 @@ const TITLE_ROWS = 2;
 // fields for just that year, rather than one sheet with all 5 years' columns side by side.
 export function exportDistrictsToXlsx(districts: CachedDistrict[], pacData: CachedPacData[]) {
   const sortedDistricts = [...districts].sort((a, b) => a.districtName.localeCompare(b.districtName));
-  const header = ["District", ...PAC_FIELD_ORDER.map((f) => PAC_FIELD_LABELS[f])];
-  const moneyColumns = PAC_FIELD_ORDER.map((field, i) => (isMoneyField(field) ? i + 1 : -1)).filter((c) => c >= 0);
+  // Net Recoverable is a derived, never-persisted value (see pac-fields.ts) — appended as its
+  // own trailing column here rather than looped in via PAC_FIELD_ORDER, same as it's rendered
+  // as its own extra row (not a 7th PAC_FIELD_ORDER entry) everywhere else it's shown.
+  const header = ["District", ...PAC_FIELD_ORDER.map((f) => PAC_FIELD_LABELS[f]), "Net Recoverable / शुद्ध वसूली योग्य धनराशि"];
+  const netRecoverableCol = header.length - 1;
+  const moneyColumns = [
+    ...PAC_FIELD_ORDER.map((field, i) => (isMoneyField(field) ? i + 1 : -1)).filter((c) => c >= 0),
+    netRecoverableCol,
+  ];
 
   const wb = window.XLSX.utils.book_new();
 
   for (const fy of FINANCIAL_YEARS) {
     const rows: (string | number)[][] = sortedDistricts.map((d) => {
       const match = pacData.find((p) => p.districtId === d.id && p.financialYear === fy);
-      return [d.districtName, ...PAC_FIELD_ORDER.map((field) => match?.[field] ?? 0)];
+      const net = netRecoverable(match?.grossArrears ?? 0, match?.recoveredAmount ?? 0, match?.stayAmount ?? 0);
+      return [d.districtName, ...PAC_FIELD_ORDER.map((field) => match?.[field] ?? 0), net];
     });
 
     const totalRow: (string | number)[] = ["TOTAL"];
@@ -34,7 +42,7 @@ export function exportDistrictsToXlsx(districts: CachedDistrict[], pacData: Cach
       ...rows,
       totalRow,
     ]);
-    ws["!cols"] = [{ wch: 22 }, ...PAC_FIELD_ORDER.map(() => ({ wch: 18 }))];
+    ws["!cols"] = [{ wch: 22 }, ...PAC_FIELD_ORDER.map(() => ({ wch: 18 })), { wch: 18 }];
     // Title/data-period rows only occupy column A; merge them across the full table width so
     // they read as a banner instead of a truncated cell next to empty ones.
     ws["!merges"] = [

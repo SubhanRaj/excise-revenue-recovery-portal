@@ -1,6 +1,6 @@
 "use client";
 
-import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField } from "@/lib/pac-fields";
+import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable } from "@/lib/pac-fields";
 import type { DraftYear } from "@/lib/db";
 import Button from "./ui/Button";
 import Banner from "./ui/Banner";
@@ -74,6 +74,19 @@ export default function MasterView({ years, districtName, onSubmit, busy, error 
                 ))}
               </tr>
             ))}
+            <tr className="border-t-2 border-slate-300 bg-slate-50 font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+              <td className="sticky left-0 bg-inherit px-4 py-3">Net Recoverable / शुद्ध वसूली योग्य धनराशि</td>
+              {years.map((year) => (
+                <td key={year.financialYear} className="whitespace-nowrap px-4 py-3 text-right tabular-nums">
+                  ₹
+                  {netRecoverable(
+                    Number(year.grossArrears) || 0,
+                    Number(year.recoveredAmount) || 0,
+                    Number(year.stayAmount) || 0
+                  ).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </td>
+              ))}
+            </tr>
           </tbody>
         </table>
       </div>

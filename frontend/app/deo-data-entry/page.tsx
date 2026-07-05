@@ -374,7 +374,9 @@ export default function EntryPage() {
               className={`flex flex-1 items-center justify-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors sm:flex-none sm:justify-start ${
                 step === 5
                   ? "bg-blue-600 text-white shadow-sm"
-                  : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                  : years.every((y) => y.completed)
+                    ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                    : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
               } disabled:opacity-40`}
             >
               <i className="ti ti-clipboard-list text-base" />

@@ -73,7 +73,17 @@ They communicate only over HTTP, cross-origin, with credentials (cookies) includ
   mean that amount was actually recovered (field 3) — those two used to always be equal because
   of the parity rule below, which made the choice of which one fed this formula invisible, but
   now that the rule is gone, using the wrong one here would materially overstate what's still
-  recoverable.
+  recoverable. Every place that shows a district's per-financial-year PAC figures shows this
+  computed value alongside them, not just the six raw fields — `YearStepForm.tsx` (live, as the
+  DEO types), `MasterView.tsx`'s summary table (a bolded extra row below the six
+  `PAC_FIELD_ORDER` rows, one value per FY column), the admin district detail page's per-FY
+  table (same bolded-extra-row pattern), the admin districts table (its own column, scoped to
+  the FY currently selected in that page's dropdown), the Admin Dashboard KPI card (summed
+  across all 5 years, per that page's own total-across-years convention), and the Excel export
+  (`exportDistrictsToXlsx()` appends it as a trailing column on every per-FY sheet, computed the
+  same way, not read from a stored field since none exists). If you add another place a
+  district's per-FY PAC figures are rendered, add this same computed row/column too — it's easy
+  to forget since, unlike the six real fields, there's no schema column to remind you it exists.
 - `pac_data.submitted_by_name` duplicates `users.submitted_by_name` onto each revenue row
   itself (migration `0001_nostalgic_stature.sql`) — same value, written at the same time in
   the same submit-route batch, just keyed by `district_id` like the rest of `pac_data` so
@@ -361,6 +371,17 @@ container also carries
 `pb-24 sm:pb-8` (not equal top/bottom padding) so the fixed `HelpPanel` button doesn't sit on top
 of the full-width Master View "Submit & Lock" button on mobile.
 Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
+
+Both the year pills and the Master View button share the same three-state color scheme: active
+(`step === i`, solid `bg-blue-600`/white), available-but-inactive (soft `bg-blue-50`/blue text),
+and locked/unavailable (`bg-slate-100`/grey). For the year pills, "available" is
+`years[i]?.completed`; Master View's equivalent is `years.every((y) => y.completed)` — it must
+use the *same* soft-blue "available" treatment once every year is filled, not just the active
+(`step === 5`) and grey/locked states. This was previously missing (Master View only ever
+rendered solid-blue-when-active or grey-otherwise, with no distinct "ready to view" state), so
+after filling FY 2025-26 the button stayed visually indistinguishable from "still locked" until
+the DEO actually clicked into it. If you add another sticky-nav button gated on a completion
+condition, give it this same three-way treatment rather than a plain active/inactive toggle.
 
 ## Visual language: sober blue, not indigo/purple, and dark mode
 
