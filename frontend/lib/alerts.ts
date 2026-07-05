@@ -153,6 +153,21 @@ export async function confirmClearAll(): Promise<boolean> {
   return result.isConfirmed;
 }
 
+export async function confirmTruncateDemo(): Promise<boolean> {
+  const result = await window.Swal.fire({
+    icon: "warning",
+    title: "Truncate Demo Data?",
+    html:
+      "This will permanently delete the Demo District from the database. " +
+      "This action cannot be undone.",
+    showCancelButton: true,
+    confirmButtonText: "Yes, Delete it!",
+    cancelButtonText: "Cancel",
+    confirmButtonColor: "#dc2626",
+  });
+  return result.isConfirmed;
+}
+
 // Fire-and-forget corner toast for auth transitions (login/logout) and generic validation
 // errors that aren't tied to one specific field (e.g. "a field is blank" — could be any of
 // six). Not awaited by callers — its DOM node attaches to <body>, outside the React tree, so

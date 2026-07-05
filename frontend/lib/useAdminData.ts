@@ -97,5 +97,10 @@ export function useAdminData() {
     await db.adminDistricts.update(districtId, patch);
   }
 
-  return { ready, profile, districts, pacData, setDistricts, setPacData, sync, syncing, lastSyncedAt, unlock, error, setError };
+  async function truncateDemo() {
+    await apiFetch("/api/admin/truncate-demo-data", { method: "POST" });
+    await sync();
+  }
+
+  return { ready, profile, districts, pacData, setDistricts, setPacData, sync, syncing, lastSyncedAt, unlock, truncateDemo, error, setError };
 }

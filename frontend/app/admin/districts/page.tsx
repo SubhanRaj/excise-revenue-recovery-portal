@@ -15,7 +15,7 @@ import {
 } from "@tanstack/react-table";
 import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable } from "@/lib/pac-fields";
 import { ApiError } from "@/lib/api";
-import { notifyToast, promptUnlockReason } from "@/lib/alerts";
+import { notifyToast, promptUnlockReason, confirmTruncateDemo } from "@/lib/alerts";
 import { exportDistrictsToXlsx, exportDistrictsToSql, downloadDeoTemplate, parseDeoTemplateFile } from "@/lib/export";
 import { useAdminData } from "@/lib/useAdminData";
 import { setNavDistrictId, consumeNavStatusFilter } from "@/lib/adminNav";
@@ -46,7 +46,7 @@ function formatValue(field: (typeof PAC_FIELD_ORDER)[number], value: number) {
 
 export default function DistrictsPage() {
   const router = useRouter();
-  const { ready, profile, districts, pacData, sync, syncing, lastSyncedAt, unlock, error, setError } = useAdminData();
+  const { ready, profile, districts, pacData, sync, syncing, lastSyncedAt, unlock, truncateDemo, error, setError } = useAdminData();
   const [selectedYear, setSelectedYear] = useState<(typeof FINANCIAL_YEARS)[number]>(FINANCIAL_YEARS[0]);
   const [statusFilter, setStatusFilter] = useState<"all" | "locked" | "unlocked">("all");
   const [globalFilter, setGlobalFilter] = useState("");
@@ -320,6 +320,23 @@ export default function DistrictsPage() {
             <Button size="xs" onClick={exportSql} disabled={exporting !== null}>
               <i className={`ti ti-database-export text-sm ${exporting === "sql" ? "animate-pulse" : ""}`} />
               {exporting === "sql" ? "Exporting..." : "Export as SQL"}
+            </Button>
+            <Button
+              variant="dangerSoft"
+              size="xs"
+              onClick={async () => {
+                if (await confirmTruncateDemo()) {
+                  try {
+                    await truncateDemo();
+                    notifyToast({ icon: "success", title: "Demo District permanently deleted." });
+                  } catch (err) {
+                    setError(err instanceof ApiError ? err.message : "Truncate failed.");
+                  }
+                }
+              }}
+            >
+              <i className="ti ti-eraser text-sm" />
+              Truncate Demo
             </Button>
           </div>
         </div>
