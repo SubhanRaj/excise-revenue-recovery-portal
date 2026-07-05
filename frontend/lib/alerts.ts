@@ -59,10 +59,11 @@ export async function promptDeoNameAndLock(): Promise<string | null> {
     html:
       "Enter the full name of the District Excise Officer confirming this submission. " +
       "By locking, you confirm the data is accurate — <strong>any incorrect data or error is " +
-      "the submitting DEO's responsibility</strong>, who will be liable for it." +
+      "the submitting DEO's individual responsibility</strong>, who will be personally liable " +
+      "for it." +
       '<br><br><span lang="hi">इस सबमिशन की पुष्टि करने वाले जिला आबकारी अधिकारी का पूरा नाम दर्ज करें। ' +
       "लॉक करने पर, आप पुष्टि करते हैं कि डेटा सही है — <strong>किसी भी गलत डेटा या त्रुटि की जिम्मेदारी " +
-      "संबंधित डीईओ की होगी</strong>, जो इसके लिए उत्तरदायी होंगे।</span>",
+      "व्यक्तिगत रूप से संबंधित डीईओ की होगी</strong>, जो इसके लिए व्यक्तिगत रूप से उत्तरदायी होंगे।</span>",
     input: "text",
     inputPlaceholder: "Full Name (English)",
     showCancelButton: true,
@@ -172,8 +173,7 @@ export async function confirmTruncateDemo(): Promise<boolean> {
 // errors that aren't tied to one specific field (e.g. "a field is blank" — could be any of
 // six). Not awaited by callers — its DOM node attaches to <body>, outside the React tree, so
 // it survives the client-side route change that typically follows (e.g. logout redirecting
-// to /login). Field-specific errors (e.g. the parity check) stay inline under the field
-// instead — see YearStepForm.tsx.
+// to /login). Field-specific errors stay inline under the field instead — see YearStepForm.tsx.
 export function notifyToast(opts: { icon: "success" | "info" | "error"; title: string; text?: string }) {
   // Wider on desktop (bilingual validation text like "Field left blank" was wrapping to several
   // lines in the default ~300px toast, eating vertical space) and near-full-width on mobile
