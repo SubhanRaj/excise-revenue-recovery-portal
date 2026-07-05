@@ -249,8 +249,8 @@ export default function EntryPage() {
             })}
           </div>
           <div className="flex items-center gap-2 sm:ml-auto">
-            <Button type="button" variant="danger" size="sm" onClick={clearAllData}>
-              <i className="ti ti-trash text-sm" />
+            <Button type="button" variant="dangerSoft" size="xs" onClick={clearAllData}>
+              <i className="ti ti-trash text-xs" />
               Clear All
             </Button>
             <button

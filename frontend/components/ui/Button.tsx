@@ -1,7 +1,7 @@
 "use client";
 
 type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "secondary" | "dark" | "danger" | "blue" | "amber";
+  variant?: "primary" | "secondary" | "dark" | "danger" | "dangerSoft" | "blue" | "amber";
   size?: "xs" | "sm" | "md" | "lg";
 };
 
@@ -20,6 +20,12 @@ const VARIANTS: Record<NonNullable<Props["variant"]>, string> = {
   blue: "bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 focus-visible:ring-blue-300 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-900 dark:hover:bg-blue-900",
   amber:
     "bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 focus-visible:ring-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-900 dark:hover:bg-amber-900",
+  // Same soft-tint pattern as blue/amber above, for destructive-but-frequent toolbar actions
+  // (the DEO "Clear"/"Clear All" buttons) where a solid `danger` red reads as too heavy/alarming
+  // sitting next to slim pill nav buttons — the confirm popup already carries the warning
+  // weight, so the button itself doesn't need to shout.
+  dangerSoft:
+    "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 focus-visible:ring-red-300 dark:bg-red-950 dark:text-red-300 dark:border-red-900 dark:hover:bg-red-900",
 };
 
 // Kept out of the base class string and off the `className` override path deliberately —

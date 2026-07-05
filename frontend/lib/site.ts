@@ -2,7 +2,7 @@
 // login page, the DEO title bar (deo-data-entry/page.tsx), and the Excel export title rows
 // (export.ts) — kept in one place so all four stay in sync instead of drifting copies.
 export const SITE_TITLE_EN = "Recovery Certificates (RCs) Issued for Recovery of Excise Revenue Arrears";
-export const SITE_TITLE_HI = "उत्पाद शुल्क राजस्व बकाया की वसूली हेतु जारी वसूली प्रमाण पत्र (आर.सी.)";
+export const SITE_TITLE_HI = "आबकारी राजस्व बकाया की वसूली हेतु जारी वसूली प्रमाण पत्र (आर.सी.)";
 
 // Mirrors the first/last entries of FINANCIAL_YEARS (pac-fields.ts): "2021-22" starts 1 April
 // 2021, "2025-26" ends 31 March 2026. Written out by hand rather than derived, same as every

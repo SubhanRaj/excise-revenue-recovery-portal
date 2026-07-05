@@ -77,23 +77,30 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative flex flex-1 items-center justify-center bg-gradient-to-b from-slate-50 to-blue-50 px-4 py-12 dark:from-slate-950 dark:to-slate-900">
-      <div className="w-full max-w-sm">
-        <div className="mb-6 flex flex-col items-center text-center">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-700 text-2xl font-bold text-white shadow-lg shadow-blue-200 dark:shadow-none">
-            ₹
-          </div>
-          <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            Department of Excise, Uttar Pradesh
-          </h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Excise Revenue Recovery Portal</p>
-          <p className="mt-3 text-xs font-medium text-slate-600 dark:text-slate-300">{SITE_TITLE_EN}</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400" lang="hi">
-            {SITE_TITLE_HI}
-          </p>
-          <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">{DATA_PERIOD_EN}</p>
+    <div className="relative flex flex-1 flex-col items-center justify-center gap-6 bg-gradient-to-b from-slate-50 to-blue-50 px-4 py-12 dark:from-slate-950 dark:to-slate-900">
+      {/* Wider than the login card below on purpose — the RC title/data-period text only needs
+          to avoid wrapping on real desktop widths (a 24" monitor has plenty of room), it doesn't
+          need the login form's own inputs to also stretch that wide. Wrapping (the default) is
+          only disabled from `md` up; below that it wraps naturally to the viewport like any
+          other text. */}
+      <div className="flex w-full max-w-2xl flex-col items-center text-center">
+        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-700 text-2xl font-bold text-white shadow-lg shadow-blue-200 dark:shadow-none">
+          ₹
         </div>
+        <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+          Department of Excise, Uttar Pradesh
+        </h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Excise Revenue Recovery Portal</p>
+        <p className="mt-3 text-xs font-medium text-slate-600 dark:text-slate-300 md:whitespace-nowrap">
+          {SITE_TITLE_EN}
+        </p>
+        <p className="text-xs text-slate-500 dark:text-slate-400 md:whitespace-nowrap" lang="hi">
+          {SITE_TITLE_HI}
+        </p>
+        <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">{DATA_PERIOD_EN}</p>
+      </div>
 
+      <div className="w-full max-w-sm">
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
           <div className="mb-6 flex rounded-lg bg-slate-100 p-1 text-sm dark:bg-slate-800">
             <button

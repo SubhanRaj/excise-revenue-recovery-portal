@@ -185,6 +185,23 @@ rather than derived from `FINANCIAL_YEARS`' first/last entries — if the 5-year
 `FINANCIAL_YEARS` ever shifts, update both `site.ts` strings by hand at the same time, same as
 every other place that duplicates something derived from `FINANCIAL_YEARS`.
 
+**`SITE_TITLE_HI` says "आबकारी" (Abkari/state excise), never "उत्पाद शुल्क" (Utpad Shulk).**
+Utpad Shulk is the Central Excise duty term (GoI) — this portal is Uttar Pradesh *state* excise
+revenue (Abkari/Aakari Bakaya), a different tax entirely, so using the central-government term
+in the state portal's own Hindi title is a substantive terminology error, not just a stylistic
+one. If you add more Hindi copy referring to this revenue/department, use आबकारी (as the
+existing "आबकारी विभाग" department name and `PAC_FIELD_LABELS`' सकल बकाया धनराशि already do),
+never उत्पाद शुल्क.
+
+The login page's title/data-period block sits in its own `max-w-2xl` wrapper, sibling to (not
+nested inside) the `max-w-sm` login-card wrapper — both are children of one `flex-col` centered
+container. This is deliberate: `SITE_TITLE_EN` is long enough to wrap even on a real desktop
+monitor if it's stuck inside the same narrow `max-w-sm` box the login form/tabs use, but the
+login card itself is intentionally kept compact — so the title text gets its own wider budget
+instead of forcing the whole card wider. `md:whitespace-nowrap` on the title/Hindi-title `<p>`s
+keeps them on one line from that breakpoint up; below `md` they wrap normally to the mobile
+viewport width like any other text. Don't merge these two wrappers back into one `max-w-sm` div.
+
 The DEO title bar (`deo-data-entry/page.tsx`, a soft `bg-blue-50`/`border-blue-200` banner —
 same light-toned pattern as other informational callouts, not an alarming solid fill) sits
 below the sticky `AppHeader`/above the year nav pills, in the scrolling page body rather than
@@ -399,7 +416,16 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   because a red button reads as "something is wrong," not "this is a big deal, be sure."
   Icon + label are pinned onto one line via explicit
   `flex-row flex-nowrap whitespace-nowrap` (not left to `inline-flex`'s default) so they can
-  never visually stack even on a very wide (`size="lg" className="w-full"`) button.
+  never visually stack even on a very wide (`size="lg" className="w-full"`) button. It also has
+  a `dangerSoft` variant (soft `bg-red-50`/border, same light-toned pattern as `blue`/`amber`/
+  `dark` above) for *frequent* destructive actions the DEO reaches for often — the per-year
+  "Clear" button (`YearStepForm.tsx`) and "Clear All" (`deo-data-entry/page.tsx`'s nav bar) — as
+  opposed to `danger`'s solid red, which read as too heavy/thick sitting next to the slim pill
+  nav buttons; the blocking confirm popup already carries the "are you sure" weight, so the
+  button itself doesn't need to. Both clear buttons use `size="xs"` with an icon at `text-xs`
+  (matching the button's own font size, not a larger `text-sm` icon next to `text-xs` text) —
+  keep icon size matched to the button's text size at this size, unlike the larger buttons
+  elsewhere in the app where a bigger icon next to smaller text is the norm.
 - **`disabled:cursor-not-allowed` doesn't work on `<button>` in this Tailwind version** —
   the CDN's preflight sets `button { cursor: pointer }` unconditionally, which beats the
   `disabled:` variant regardless of class order. If a disabled button needs to actually
