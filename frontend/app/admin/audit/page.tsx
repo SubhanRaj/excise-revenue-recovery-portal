@@ -1,15 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { apiFetch, ApiError } from "@/lib/api";
-import { clearClientSession, consumeJustAuthed } from "@/lib/session";
-import { notifyToast } from "@/lib/alerts";
 import { formatIST } from "@/lib/format";
+import { useAdminData } from "@/lib/useAdminData";
 import AppHeader, { type NavLink } from "@/components/ui/AppHeader";
 import Banner from "@/components/ui/Banner";
 import HelpPanel from "@/components/ui/HelpPanel";
-import type { Profile } from "@/components/ui/ProfileMenu";
 
 const NAV_LINKS: NavLink[] = [
   { label: "Dashboard", href: "/admin" },
@@ -49,26 +46,27 @@ function describeMetadata(row: AuditRow): string {
 }
 
 export default function AuditLogPage() {
-  const router = useRouter();
-  const [ready, setReady] = useState(false);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  // Shares the same guard/Sync/district-search/Synced-timestamp header as every other admin
+  // page (Dashboard, Districts, District Detail) — this page used to run its own bare-bones
+  // `/api/auth/me` guard and skip districts/onSync entirely, which is why its header used to
+  // look/behave differently (no search box, no Sync button) from the other three.
+  const { ready, profile, districts, sync, syncing, lastSyncedAt } = useAdminData();
   const [rows, setRows] = useState<AuditRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
-  const [eventSort, setEventSort] = useState<"asc" | "desc" | null>(null);
+  const [eventFilter, setEventFilter] = useState<string>("all");
+  const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
 
-  // Sorts only the currently-loaded page's rows — the log is server-paginated, so a true
-  // global sort would need a server-side ORDER BY; not worth it for a 30-day-retention table.
-  const sortedRows = useMemo(() => {
-    if (!eventSort) return rows;
-    const dir = eventSort === "asc" ? 1 : -1;
-    return [...rows].sort((a, b) => {
-      const la = EVENT_LABELS[a.eventType] ?? a.eventType;
-      const lb = EVENT_LABELS[b.eventType] ?? b.eventType;
-      return dir * la.localeCompare(lb);
-    });
-  }, [rows, eventSort]);
+  // Filters + re-sorts only the currently-loaded page's rows — the log itself is already
+  // newest-first from the server and server-paginated, so a true global filter/sort would need
+  // a server-side query; not worth it for a 30-day-retention, single-reader table. Both are
+  // pure client-side operations on data already in memory, no extra request.
+  const visibleRows = useMemo(() => {
+    const filtered = eventFilter === "all" ? rows : rows.filter((r) => r.eventType === eventFilter);
+    const sorted = [...filtered].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    return sortDir === "desc" ? sorted.reverse() : sorted;
+  }, [rows, eventFilter, sortDir]);
 
   async function loadPage(p: number) {
     setLoading(true);
@@ -86,42 +84,66 @@ export default function AuditLogPage() {
   }
 
   useEffect(() => {
-    (async () => {
-      try {
-        const p = await apiFetch<Profile>("/api/auth/me?role=admin");
-        setProfile(p);
-        if (consumeJustAuthed()) {
-          notifyToast({ icon: "success", title: `Welcome, ${p.email ?? "Admin"}` });
-        }
-      } catch {
-        clearClientSession();
-        router.replace("/login");
-        return;
-      }
-      setReady(true);
-      await loadPage(1);
-    })();
+    if (ready) loadPage(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router]);
+  }, [ready]);
 
   if (!ready) return null;
 
   return (
     <div className="flex min-h-full flex-1 flex-col bg-slate-50 dark:bg-slate-950">
-      <AppHeader title="Audit Log" role="admin" profile={profile} navLinks={NAV_LINKS} />
+      <AppHeader
+        title="Audit Log"
+        role="admin"
+        profile={profile}
+        navLinks={NAV_LINKS}
+        onSync={sync}
+        syncing={syncing}
+        lastSyncedAt={lastSyncedAt}
+        districts={districts}
+      />
       <HelpPanel pageKey="admin-audit" title="Reading the audit log">
         <p>
           Every login, logout, district lock/unlock, and DEO provisioning batch is recorded
           here, newest first. Entries older than 30 days are removed automatically.
         </p>
+        <p>
+          Use <strong>Filter by event</strong> to show only one kind of entry, and the sort
+          button to flip between newest-first and oldest-first — both apply only to the page of
+          entries currently loaded below.
+        </p>
         <p>Unlock events include the reason the admin gave when reopening a submission.</p>
       </HelpPanel>
-      <div className="w-full flex-1 px-4 py-6 sm:px-6 lg:px-[15%]">
+      <div className="w-full flex-1 px-4 py-6 sm:px-6 lg:px-[10%] xl:px-[5%] 2xl:px-[3%]">
         {error && (
           <div className="mb-4">
             <Banner variant="error">{error}</Banner>
           </div>
         )}
+
+        <div className="mb-4 flex flex-wrap items-center justify-end gap-1.5">
+          <select
+            value={eventFilter}
+            onChange={(e) => setEventFilter(e.target.value)}
+            className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs text-slate-700 outline-none hover:bg-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            <option value="all">All events</option>
+            {Object.entries(EVENT_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => setSortDir((d) => (d === "desc" ? "asc" : "desc"))}
+            title={sortDir === "desc" ? "Newest first — click for oldest first" : "Oldest first — click for newest first"}
+            className="flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            <i className={`ti ${sortDir === "desc" ? "ti-sort-descending" : "ti-sort-ascending"} text-sm`} />
+            {sortDir === "desc" ? "Newest first" : "Oldest first"}
+          </button>
+        </div>
 
         <div className="max-h-[65vh] overflow-auto rounded-lg border border-slate-200 bg-white shadow-sm [scrollbar-width:thin] scroll-smooth dark:border-slate-800 dark:bg-slate-900">
           <table className="w-full border-collapse text-sm">
@@ -130,12 +152,8 @@ export default function AuditLogPage() {
                 <th className="sticky top-0 z-10 whitespace-nowrap bg-slate-50 px-3 py-2.5 text-left font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">
                   When (IST)
                 </th>
-                <th
-                  onClick={() => setEventSort((s) => (s === "asc" ? "desc" : s === "desc" ? null : "asc"))}
-                  className="sticky top-0 z-10 cursor-pointer select-none whitespace-nowrap bg-slate-50 px-3 py-2.5 text-left font-medium text-slate-600 hover:text-slate-900 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
-                >
+                <th className="sticky top-0 z-10 whitespace-nowrap bg-slate-50 px-3 py-2.5 text-left font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">
                   Event
-                  {eventSort ? { asc: " ▲", desc: " ▼" }[eventSort] : " ⇅"}
                 </th>
                 <th className="sticky top-0 z-10 whitespace-nowrap bg-slate-50 px-3 py-2.5 text-left font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">
                   Actor
@@ -149,14 +167,14 @@ export default function AuditLogPage() {
               </tr>
             </thead>
             <tbody>
-              {sortedRows.length === 0 ? (
+              {visibleRows.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-3 py-6 text-center text-slate-500 dark:text-slate-400">
-                    {loading ? "Loading..." : "No activity in the last 30 days."}
+                    {loading ? "Loading..." : "No matching activity in the last 30 days."}
                   </td>
                 </tr>
               ) : (
-                sortedRows.map((row) => (
+                visibleRows.map((row) => (
                   <tr key={row.id} className="border-t border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-900">
                     <td className="whitespace-nowrap px-3 py-2.5 text-slate-800 dark:text-slate-200">
                       {formatIST(row.createdAt)}

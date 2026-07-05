@@ -81,10 +81,25 @@ Then:
    Dashboard — colored, clickable KPI cards (click Districts/Locked/Unlocked/Gross
    Arrears/Net Recoverable, and a top-5-dues row, to confirm each link goes somewhere useful),
    the locked/unlocked Chart.js donut. Every number here is a total across all 5 FYs (FY
-   2021-22 – FY 2025-26), not filtered by year — there's no year selector on this page.
+   2021-22 – FY 2025-26), not filtered by year — there's no year selector on this page. Note
+   the "Synced: <IST timestamp>" text next to the Sync button in the header — it should already
+   show a time (from the Dexie cache, even before you click Sync on this visit) and update the
+   instant you do click Sync.
    Then **Districts** (top nav) for the sortable/searchable table, its own per-year `FY`
-   selector, the Locked/Unlocked/All status filter, Sync, Export to Excel (check the sheet
-   tabs are named `FY 2021-22` etc, each with a title/data-period banner row above the table).
+   selector, the Locked/Unlocked/All status filter (all now sleek rounded-full pills, matching
+   the toolbar buttons beside them), Sync (same "Synced:" indicator here too), **Export as Excel
+   Workbook** (button shows "Exporting..." while it re-syncs and builds the file — it should
+   never look frozen; check the sheet tabs are named `FY 2021-22` etc, each with a
+   title/data-period banner row above the table), and the new **Export as SQL** (same
+   "Exporting..." feedback; downloads a `.sql` file — open it and confirm it's plain
+   `DELETE`/`INSERT` statements for `districts` and `pac_data` matching `api/db/schema.ts`'s
+   column names). On a 22"/24" monitor, confirm the table now uses noticeably more of the
+   screen width (less side padding) and the table grows to fill the vertical space instead of
+   leaving blank space below it with its own inner scrollbar cutting off early.
+   **Audit Log** (top nav): confirm it now has the same header as the other two pages (Sync
+   button, "Synced:" timestamp, "Jump to district" search) — this used to be missing here. Use
+   the **Filter by event** dropdown to narrow to one event type, and the sort button to flip
+   between "Newest first"/"Oldest first"; both should apply instantly with no network request.
 2. **DEO**: `/login` → CUG tab → the demo CUG → lands on `/deo-data-entry`. Note the title bar
    above the year pills (RC title + data period, bilingual) and that the pills read `FY
    2021-22` etc, not "Year 1". Since this is a *separate* session cookie from the admin one
@@ -101,13 +116,19 @@ Then:
    digits or "DEO Lucknow" to see the validator reject it). Confirming both locks the district,
    kills the DEO session, redirects to `/login`.
 3. **Re-login as the locked DEO**: CUG tab → the demo CUG again → should land on a read-only
-   "Data Already Locked" screen (locked timestamp in IST, contact-Admin message), not a blank
-   form — this is the fix for a real bug where a re-login after locking showed an empty form.
+   "Data Already Locked" screen (locked timestamp in IST, bilingual contact-Admin message), not
+   a blank form — this is the fix for a real bug where a re-login after locking showed an empty
+   form. The card should be noticeably wide (not a narrow column forcing the message onto many
+   short lines) and the Hindi text should be the same size as the English body text, not smaller
+   fine print. Click the card's own **Logout** button — it should log out immediately with no
+   confirmation popup (logout is the only thing to do here, unlike the profile menu's Logout
+   elsewhere, which does still confirm).
 4. **Back to Admin → Districts** → Sync → the district now shows "Locked" with real numbers.
    Click the row to open its detail page (who locked it, when, in IST) → **Back to Districts**
    → **Unlock** now prompts for a reason (blank is rejected) before reversing it — check the
    detail page again to see "Last unlocked by / on / Reason", and check **Audit Log** (top
-   nav) to see the lock and unlock events recorded, newest first.
+   nav) to see the lock and unlock events recorded, newest first — try filtering to just
+   "District locked"/"District unlocked" with the event dropdown to confirm both show up.
 5. **Re-login as the now-unlocked DEO**: CUG tab → the demo CUG → should land on the Master
    View with the previously submitted figures already filled in (re-fetched from D1, not
    blank), not a fresh empty Year 1. Editing and hitting "Submit & Lock" again should succeed

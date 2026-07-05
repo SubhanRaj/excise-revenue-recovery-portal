@@ -318,6 +318,40 @@
       (`flex-1 sm:flex-none`) instead of sitting compact/left-aligned with dead space on the
       right
 
+## Milestone 17 — Admin table polish, export feedback + SQL backup, audit log filter/sort, DEO locked-screen fixes (done)
+
+- [x] Audit Log: "Filter by event" dropdown + a dedicated sort button ("Newest first"/"Oldest
+      first"), replacing the old clickable-column-header sort arrows; header row is now
+      `sticky top-0` (frozen), matching the Districts table
+- [x] Districts table: side padding now shrinks progressively at `xl`/`2xl` breakpoints
+      (`10% -> 5% -> 3%`) instead of a flat `15%`, so 22"/24" FHD admin monitors get real extra
+      table width instead of horizontal scroll; the table's scroll container is `flex-1` in a
+      `flex-col` page instead of a fixed `max-h-[65vh]`, so it fills the blank space at the
+      bottom of tall viewports
+- [x] All `<select>` dropdowns (status/FY/rows-per-page filters) and pagination Prev/Next
+      buttons across Districts and Audit Log are now `rounded-full` pills matching
+      `Button.tsx`'s `xs`/`sm` shape, instead of a mismatched `rounded-md` square
+- [x] Export button clicks no longer freeze the page with no feedback: both "Export as Excel
+      Workbook" and the new "Export as SQL" show a disabled "Exporting..." state on their own
+      button while re-syncing + building the file (same pattern as "Upload DEO Data"'s
+      "Uploading..." state)
+- [x] New **Export as SQL** (`exportDistrictsToSql()`): a plain `.sql` `DELETE`+`INSERT` backup
+      script for `districts`+`pac_data` (the two tables the admin panel caches client-side),
+      downloaded via a native `Blob` — no new dependency
+- [x] `useAdminData.ts`'s `sync()` now returns the freshly-fetched rows instead of only setting
+      state, so Export reads genuinely fresh data instead of the pre-sync render's stale closure
+- [x] New "Synced: <IST timestamp>" indicator in `AppHeader`, backed by a `localStorage`-persisted
+      `lastSyncedAt` in `useAdminData.ts` — visible on every admin page that uses the Dexie
+      cache, so an admin knows how stale the numbers on screen are without clicking Sync first
+- [x] Audit Log page now shares the same `useAdminData()`-backed header as the other three admin
+      pages (Sync button, district-jump search, Synced timestamp) instead of its own bare
+      `/api/auth/me`-only guard with a visibly different (search-less, Sync-less) header
+- [x] DEO "Data Already Locked" screen: widened to `max-w-2xl` (from `max-w-md`) so the
+      English/Hindi messages wrap across one or two natural lines instead of a narrow column;
+      Hindi paragraph bumped to `text-sm` to match the English body text; added a direct
+      full-width **Logout** button on the card itself that skips the blocking confirm dialog
+      (`confirmLogout()`) since logout is the only action available on this screen
+
 ## Backlog / not started
 
 - [ ] Real domain + DNS, and (optional) collapse `/frontend` + `/api` onto one zone via a

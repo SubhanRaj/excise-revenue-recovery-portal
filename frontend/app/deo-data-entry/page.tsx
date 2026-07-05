@@ -157,6 +157,16 @@ export default function EntryPage() {
 
   // Both only reachable pre-lock (these buttons/the whole page disappear once submitAll()
   // locks and redirects away) — clears the local Dexie draft only, never touches D1.
+  // No confirm() popup here, unlike AppHeader's logout (which does ask first) — once a DEO is on
+  // this locked screen, logging out is the *only* thing left to do, so a blocking "are you sure"
+  // would just be an extra click in front of a choice with no other option.
+  async function logoutLocked() {
+    await apiFetch(`/api/auth/logout?role=deo`, { method: "POST" }).catch(() => {});
+    clearClientSession();
+    notifyToast({ icon: "info", title: "Logged out" });
+    router.replace("/login");
+  }
+
   async function clearYear(index: number) {
     const confirmed = await confirmClearYear(`FY ${years[index].financialYear}`);
     if (!confirmed) return;
@@ -244,7 +254,7 @@ export default function EntryPage() {
       <div className="flex min-h-full flex-1 flex-col bg-slate-50 dark:bg-slate-950">
         <AppHeader title="DEO Data Entry" role="deo" profile={profile} />
         <div className="flex flex-1 items-center justify-center px-4 py-12">
-          <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 text-center shadow-xl shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
+          <div className="w-full max-w-2xl rounded-xl border border-slate-200 bg-white p-8 text-center shadow-xl shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-300">
               <i className="ti ti-lock text-2xl" />
             </div>
@@ -260,14 +270,15 @@ export default function EntryPage() {
               You cannot make any further changes. If any data was entered incorrectly or needs
               editing, contact the Admin / Excise Headquarters to have this district unlocked.
             </p>
-            <p className="mt-3 text-xs text-slate-500 dark:text-slate-500" lang="hi">
+            <p className="mt-3 text-sm text-slate-600 dark:text-slate-400" lang="hi">
               आपने अपना डेटा {formatIST(profile?.lockedAt)} IST को लॉक कर दिया है। अब कोई और
               बदलाव संभव नहीं है। किसी भी गलत डेटा या संशोधन के लिए एडमिन / आबकारी मुख्यालय से
               संपर्क करें।
             </p>
-            <p className="mt-4 text-xs text-slate-400 dark:text-slate-500">
-              Use the profile menu (top right) to log out.
-            </p>
+            <Button variant="dark" size="md" className="mt-6 w-full" onClick={logoutLocked}>
+              <i className="ti ti-logout text-sm" />
+              Logout
+            </Button>
           </div>
         </div>
       </div>

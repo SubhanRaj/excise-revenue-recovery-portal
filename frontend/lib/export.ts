@@ -80,6 +80,54 @@ export function downloadDeoTemplate(districts: CachedDistrict[]) {
   window.XLSX.writeFile(wb, "deo-provisioning-template.xlsx");
 }
 
+function sqlLiteral(v: string | number | null): string {
+  if (v === null) return "NULL";
+  if (typeof v === "number") return String(v);
+  return `'${v.replace(/'/g, "''")}'`;
+}
+
+// Plain-text SQL restore script for the two tables the admin panel actually caches client-side
+// (districts, pac_data) — not users/audit_log/magic_link_tokens, which never leave the API. This
+// is a backup/restore aid for the admin, not a full DB dump; column names/order match
+// api/db/schema.ts exactly so the file can be piped straight into `wrangler d1 execute` if ever
+// needed. Uses a plain Blob + anchor download — no new dependency, unlike the .xlsx export which
+// genuinely needs SheetJS for its binary format.
+export function exportDistrictsToSql(districts: CachedDistrict[], pacData: CachedPacData[]) {
+  const lines: string[] = [
+    `-- ${SITE_TITLE_EN}`,
+    `-- SQL backup generated ${new Date().toISOString()} (UTC)`,
+    `-- Covers districts + pac_data only (the tables cached in the admin panel) —`,
+    `-- not users, audit_log, or magic_link_tokens.`,
+    "",
+    "DELETE FROM pac_data;",
+    "DELETE FROM districts;",
+    "",
+  ];
+
+  for (const d of [...districts].sort((a, b) => a.id - b.id)) {
+    lines.push(
+      `INSERT INTO districts (id, district_name, lock_status, unlocked_at, unlock_reason, unlocked_by) VALUES ` +
+        `(${d.id}, ${sqlLiteral(d.districtName)}, ${d.lockStatus}, ${sqlLiteral(d.unlockedAt)}, ${sqlLiteral(d.unlockReason)}, ${sqlLiteral(d.unlockedBy)});`
+    );
+  }
+  lines.push("");
+
+  for (const p of [...pacData].sort((a, b) => a.id - b.id)) {
+    lines.push(
+      `INSERT INTO pac_data (id, district_id, financial_year, gross_arrears, rc_count, rc_amount, recovered_amount, stay_count, stay_amount, submitted_by_name, locked_at) VALUES ` +
+        `(${p.id}, ${p.districtId}, ${sqlLiteral(p.financialYear)}, ${p.grossArrears}, ${p.rcCount}, ${p.rcAmount}, ${p.recoveredAmount}, ${p.stayCount}, ${p.stayAmount}, ${sqlLiteral(p.submittedByName)}, ${sqlLiteral(p.lockedAt)});`
+    );
+  }
+
+  const blob = new Blob([lines.join("\n") + "\n"], { type: "application/sql" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `excise-revenue-recovery-${new Date().toISOString().slice(0, 10)}.sql`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export type DeoTemplateRow = { districtName: string; cugMobile: string; email: string };
 
 // Reads back whatever downloadDeoTemplate produced (or the admin's edited copy of it) —

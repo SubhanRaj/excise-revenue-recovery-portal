@@ -243,8 +243,17 @@ audit stamp, all-or-nothing).
    would just see a blank form and could be confused into thinking their submission vanished.
    Instead the page renders a dedicated read-only screen: "Data Already Locked", `formatIST()`
    of `lockedAt`, and a bilingual message to contact Admin/Excise HQ for any correction — no
-   form, no Clear buttons, just the `AppHeader` (so the profile menu's Logout is still
-   reachable).
+   form, no Clear buttons. The card is `max-w-2xl` (not the tighter `max-w-sm`/`max-w-md` used
+   elsewhere) specifically so the English/Hindi sentences wrap across one or two natural lines
+   instead of a narrow column forcing them onto many short ones, and the Hindi paragraph is
+   `text-sm` (matching the English body text size), not a smaller `text-xs` — this message is
+   the DEO's only information on the page, so it shouldn't read as a secondary/fine-print note.
+   The card has its own direct **Logout** button (`variant="dark"`, full-width) in addition to
+   the profile menu's — since logging out is the *only* action left once a DEO is on this
+   screen, that button skips `confirmLogout()`'s blocking "are you sure" SweetAlert2 entirely
+   (`logoutLocked()` in `deo-data-entry/page.tsx`, not the shared `AppHeader.logout()`): a
+   confirm dialog only earns its keep when there's a real alternative action being protected
+   against, and here there isn't one.
 2. **Unlocked, previously submitted** — an Admin unlock flips `lockStatus` back to 0 but never
    touches `pac_data` (see Data model above), so D1 still holds the real submitted figures.
    `GET /api/pac-data/mine` fetches them and they win over whatever's in the local Dexie draft
@@ -589,17 +598,23 @@ visually cramped as features were added:
 - **`/admin/districts`** — the sortable/searchable/pinned-column table with pagination
   (`getPaginationRowModel`, Rows-per-page 25/50/75/100, Prev/Next), a Locked/Unlocked/All
   status filter, plus Lock/Unlock, Download DEO Template (`variant="blue"`), Upload DEO Data
-  (`variant="amber"`), and Export to Excel — all the *actions* live here now, not on the
-  Dashboard. Numeric column headers show the short English label only, with the full bilingual
-  label as a `title` tooltip (`header: () => <span title={...}>`) — using the full bilingual
-  string as the header text was forcing every column to auto-size to its longest label rather
-  than its much-shorter numeric values, which is what was bloating the table width. Container
-  uses `lg:px-[15%]` instead of a fixed `max-w-*`, so the table gets most of the viewport on
-  large monitors without stretching edge-to-edge. Clicking anywhere on a district row navigates
-  to that district's detail page; the Unlock button inside the row calls `e.stopPropagation()`
-  so it doesn't also trigger that navigation (pattern borrowed from the sibling
-  `up-excise-spatial-revenue-optimizer` project's districts table, which does the same for its
-  own row-click-to-detail behavior). Unlock asks for a reason first (`promptUnlockReason()` in
+  (`variant="amber"`), and two export buttons ("Export as Excel Workbook" and "Export as SQL",
+  see below) — all the *actions* live here now, not on the Dashboard. Numeric column headers
+  show the short English label only, with the full bilingual label as a `title` tooltip
+  (`header: () => <span title={...}>`) — using the full bilingual string as the header text was
+  forcing every column to auto-size to its longest label rather than its much-shorter numeric
+  values, which is what was bloating the table width. Container padding shrinks progressively at
+  wider breakpoints (`lg:px-[10%] xl:px-[5%] 2xl:px-[3%]`, not a flat `lg:px-[15%]`) instead of a
+  fixed `max-w-*`, so a 22"/24" FHD admin monitor gets meaningfully more usable table width rather
+  than a large fixed side margin forcing horizontal scroll. The table's scroll container is
+  `flex-1` inside a `flex-col` page body (not a fixed `max-h-[65vh]`), so it grows to fill
+  whatever vertical space is left in the viewport instead of leaving dead blank space below it on
+  a tall display — if you add another fixed-height table wrapper, prefer this pattern
+  (`flex-1 min-h-[Xvh]` fallback) over a hardcoded viewport-height fraction. Clicking anywhere on
+  a district row navigates to that district's detail page; the Unlock button inside the row calls
+  `e.stopPropagation()` so it doesn't also trigger that navigation (pattern borrowed from the
+  sibling `up-excise-spatial-revenue-optimizer` project's districts table, which does the same for
+  its own row-click-to-detail behavior). Unlock asks for a reason first (`promptUnlockReason()` in
   `lib/alerts.ts`, a blocking SweetAlert2 textarea prompt) — see Data model below for where
   that's stored. The Locked/Unlocked status badge in this table's Status column must carry the
   same `dark:bg-red-950 dark:text-red-300` / `dark:bg-emerald-950 dark:text-emerald-300` pair as
@@ -607,7 +622,28 @@ visually cramped as features were added:
   rebrand (the `bg-red-100`/`bg-emerald-100` light-mode classes don't change with the theme on
   their own, so the badge just looked like a mismatched light patch sitting in an otherwise-dark
   table, not literally invisible, but still wrong). If you add another status badge, copy the
-  color pair from one of these two rather than inventing a new light-only one.
+  color pair from one of these two rather than inventing a new light-only one. Every `<select>` on
+  this page (status filter, FY filter, rows-per-page) and the pagination Prev/Next icon buttons
+  are `rounded-full` with the same border/hover treatment as `Button.tsx`'s `xs`/`sm` variants —
+  they used to be `rounded-md`, which looked like a mismatched square sitting next to the pill-
+  shaped toolbar buttons beside them. Keep new small controls on this page pill-shaped to match.
+  **Export as Excel Workbook** and **Export as SQL** both re-sync first (so the export reflects
+  the live server state, not a possibly-stale cache), then build their respective file; both show
+  a disabled, `animate-pulse` "Exporting..." state on their own button while running (mirroring
+  the existing "Uploading..." pattern on Upload DEO Data) instead of leaving the click with no
+  visible feedback while the sync + file-build blocks the thread. `sync()`
+  (`frontend/lib/useAdminData.ts`) now *returns* the freshly-fetched `{ districts, pacData }`
+  rather than only setting state, and both export functions use that return value (falling back to
+  the pre-sync closure only if `sync()` failed) — using the hook's `districts`/`pacData` directly
+  right after `await sync()` would still read the pre-sync render's stale closure, since a
+  `setState` call doesn't retroactively update a value already captured earlier in the same
+  function. **Export as SQL** (`exportDistrictsToSql()` in `frontend/lib/export.ts`) writes a
+  plain `.sql` file (`DELETE` + `INSERT` statements, column names matching `api/db/schema.ts`
+  exactly) via a native `Blob`/anchor download — no new dependency, unlike the `.xlsx` export
+  which genuinely needs SheetJS. It intentionally covers only `districts` and `pac_data` — the two
+  tables the admin panel actually caches client-side (see `frontend/lib/db.ts`) — not `users`,
+  `audit_log`, or `magic_link_tokens`, which never leave the API; it's a revenue-data backup aid,
+  not a full database dump.
 - **`/admin/districts/detail`** — one district's PAC figures across all 5 years as a small
   field × year table (with its own value/field search box, separate from the Districts table's
   by-name one), a lock-status badge, who locked it and when (`formatIST(lockedAt)`), and — if
@@ -615,7 +651,26 @@ visually cramped as features were added:
 - **`/admin/audit`** — a paginated (100/page), newest-first table of every login/logout,
   district lock/unlock, and DEO provisioning batch, auto-pruned to the last 30 days on read
   (see Data model below). Modeled on the sibling `up-excise-spatial-revenue-optimizer`
-  project's `/admin/audit` page and its `audit_log` table.
+  project's `/admin/audit` page and its `audit_log` table. A **"Filter by event"** `<select>`
+  (same rounded-full pill styling as the Districts table's status/FY filters) narrows the
+  visible rows to one event type, and a separate **sort button** (`ti-sort-descending`/
+  `ti-sort-ascending`, toggling "Newest first"/"Oldest first") flips the row order — both apply
+  only to the *currently-loaded page's* rows in memory, no extra request, since the log is
+  already newest-first from the server and server-paginated (a true global filter/sort would
+  need a server-side query, not worth it for a 30-day-retention, single-reader table). This
+  replaced an earlier version where the Event *column header itself* was the clickable
+  sort control (arrows baked into the header text) — that read as dated/unclear next to a
+  dedicated filter dropdown, and conflated "sort" with "filter" in one ambiguous click target;
+  a plain labeled button plus a plain labeled dropdown says what each one does. The header row
+  is still `sticky top-0` (frozen) the same way the Districts table's header already is, so it
+  stays visible while scrolling a long page of entries. This page now also uses the same
+  `useAdminData()` hook every other admin page uses (Sync button, district-jump search, "Synced:"
+  timestamp — see below), instead of its own bare-bones `/api/auth/me` guard with no
+  Sync/search — the previous exception (documented as intentional, since this page has no
+  districts/pacData of its own to render) was actually the wrong tradeoff: it made this page's
+  header visibly different from the other three admin pages (missing search box, missing Sync,
+  missing "Synced:" timestamp) for a cost (one extra district+PAC sync call) that's effectively
+  free once any other admin page has already populated the Dexie cache in the same session.
 
 **Which district/status to show is passed via `sessionStorage`, never a `?id=`/`?status=` URL
 query string** (`frontend/lib/adminNav.ts`) — this app is a fully static export
@@ -636,9 +691,19 @@ need districts/pacData at all, so it does its own lightweight `/api/auth/me?role
 instead of pulling in a full district sync it would never use). `AppHeader` takes `navLinks`
 (the Dashboard/Districts/Audit Log pill nav, in the header rather than an in-page toggle) and
 `onSync`/`syncing` (the Sync button, also in the header so it's reachable from every admin
-page). Everything on the right side of the header — nav links, the district search, Sync, the
-theme toggle, and the profile menu — lives in one `ml-auto` group, deliberately not spread
-across the header's full width (that read as cluttered once several of these needed a home).
+page). It also takes `lastSyncedAt` — `useAdminData()` persists the ISO timestamp of the last
+successful `sync()` to `localStorage` (`excise-portal:admin-last-sync`, read back synchronously
+on mount via `useState`'s lazy initializer) and shows it in the header as "Synced: <formatIST>"
+next to the Sync button on the three pages that pass `onSync` (Dashboard, Districts, District
+Detail — the pages that actually use the Dexie cache). This exists so an admin who opens a page
+and gets the instant Dexie-cached render (see below) — with no network round trip, and therefore
+no visual cue about freshness — can tell *when* that data was last pulled from the server without
+needing to click Sync just to find out. Persisting to `localStorage` (not just component state)
+matters here: the whole point is surviving page loads and even new sessions, the same reason the
+Dexie cache itself persists. Everything on the right side of the header — nav links, the
+district search, the Synced timestamp, Sync, the theme toggle, and the profile menu — lives in
+one `ml-auto` group, deliberately not spread across the header's full width (that read as
+cluttered once several of these needed a home).
 Logout lives **inside the profile dropdown** (`ProfileMenu`'s `onLogout` prop), not as its own
 top-level header button, for the same decluttering reason — same for both Admin and DEO
 headers. `AppHeader` also takes an optional `districts` prop that, when passed, renders a

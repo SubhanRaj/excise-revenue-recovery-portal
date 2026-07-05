@@ -28,7 +28,7 @@ function formatValue(field: (typeof PAC_FIELD_ORDER)[number], value: number) {
 // sessionStorage avoids that without putting the id in the URL either.
 export default function DistrictDetailPage() {
   const [districtId, setDistrictId] = useState<number | null>(null);
-  const { ready, profile, districts, pacData, sync, syncing } = useAdminData();
+  const { ready, profile, districts, pacData, sync, syncing, lastSyncedAt } = useAdminData();
   const [query, setQuery] = useState("");
 
   useEffect(() => {
@@ -60,7 +60,7 @@ export default function DistrictDetailPage() {
 
   return (
     <div className="flex min-h-full flex-1 flex-col bg-slate-50 dark:bg-slate-950">
-      <AppHeader title="District Detail" role="admin" profile={profile} navLinks={NAV_LINKS} onSync={sync} syncing={syncing} districts={districts} />
+      <AppHeader title="District Detail" role="admin" profile={profile} navLinks={NAV_LINKS} onSync={sync} syncing={syncing} lastSyncedAt={lastSyncedAt} districts={districts} />
       <div className="mx-auto w-full max-w-5xl flex-1 px-6 py-6 lg:px-10">
         <Link
           href="/admin/districts"

@@ -16,7 +16,7 @@ import {
 import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable } from "@/lib/pac-fields";
 import { ApiError } from "@/lib/api";
 import { notifyToast, promptUnlockReason } from "@/lib/alerts";
-import { exportDistrictsToXlsx, downloadDeoTemplate, parseDeoTemplateFile } from "@/lib/export";
+import { exportDistrictsToXlsx, exportDistrictsToSql, downloadDeoTemplate, parseDeoTemplateFile } from "@/lib/export";
 import { useAdminData } from "@/lib/useAdminData";
 import { setNavDistrictId, consumeNavStatusFilter } from "@/lib/adminNav";
 import { apiFetch } from "@/lib/api";
@@ -46,7 +46,7 @@ function formatValue(field: (typeof PAC_FIELD_ORDER)[number], value: number) {
 
 export default function DistrictsPage() {
   const router = useRouter();
-  const { ready, profile, districts, pacData, sync, syncing, unlock, error, setError } = useAdminData();
+  const { ready, profile, districts, pacData, sync, syncing, lastSyncedAt, unlock, error, setError } = useAdminData();
   const [selectedYear, setSelectedYear] = useState<(typeof FINANCIAL_YEARS)[number]>(FINANCIAL_YEARS[0]);
   const [statusFilter, setStatusFilter] = useState<"all" | "locked" | "unlocked">("all");
   const [globalFilter, setGlobalFilter] = useState("");
@@ -60,6 +60,7 @@ export default function DistrictsPage() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 25 });
   const [provisioning, setProvisioning] = useState(false);
+  const [exporting, setExporting] = useState<"xlsx" | "sql" | null>(null);
   const deoFileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleUnlock(districtId: number, districtName: string) {
@@ -74,8 +75,23 @@ export default function DistrictsPage() {
   }
 
   async function exportExcel() {
-    await sync();
-    exportDistrictsToXlsx(districts, pacData);
+    setExporting("xlsx");
+    try {
+      const fresh = await sync();
+      exportDistrictsToXlsx(fresh?.districts ?? districts, fresh?.pacData ?? pacData);
+    } finally {
+      setExporting(null);
+    }
+  }
+
+  async function exportSql() {
+    setExporting("sql");
+    try {
+      const fresh = await sync();
+      exportDistrictsToSql(fresh?.districts ?? districts, fresh?.pacData ?? pacData);
+    } finally {
+      setExporting(null);
+    }
   }
 
   async function handleDeoFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
@@ -219,7 +235,7 @@ export default function DistrictsPage() {
 
   return (
     <div className="flex min-h-full flex-1 flex-col bg-slate-50 dark:bg-slate-950">
-      <AppHeader title="Districts" role="admin" profile={profile} navLinks={NAV_LINKS} onSync={sync} syncing={syncing} districts={districts} />
+      <AppHeader title="Districts" role="admin" profile={profile} navLinks={NAV_LINKS} onSync={sync} syncing={syncing} lastSyncedAt={lastSyncedAt} districts={districts} />
       <HelpPanel pageKey="admin-districts" title="Using the districts table">
         <p>
           Click a column header to sort; use the search box to filter by district name. The
@@ -231,9 +247,12 @@ export default function DistrictsPage() {
           districts.
         </p>
         <p>
-          <strong>Export to Excel</strong> re-syncs first, then builds the spreadsheet from the
-          freshly-synced data. <strong>Unlock</strong> lets a District Excise Officer re-edit a
-          submission they already locked.
+          <strong>Export as Excel Workbook</strong> re-syncs first, then builds a 5-sheet
+          spreadsheet from the freshly-synced data. <strong>Export as SQL</strong> does the same
+          re-sync but downloads a plain <code>.sql</code> restore script instead — useful for
+          taking a manual backup. Both buttons show &quot;Exporting…&quot; while this runs so it
+          doesn&apos;t look like the page has frozen. <strong>Unlock</strong> lets a District
+          Excise Officer re-edit a submission they already locked.
         </p>
         <p>
           <strong>Download DEO Template</strong> gives you all 75 districts pre-filled; type
@@ -294,9 +313,13 @@ export default function DistrictsPage() {
               <i className={`ti ti-upload text-xs ${provisioning ? "animate-pulse" : ""}`} />
               {provisioning ? "Uploading..." : "Upload DEO Data"}
             </Button>
-            <Button size="xs" onClick={exportExcel}>
-              <i className="ti ti-file-spreadsheet text-xs" />
-              Export
+            <Button size="xs" onClick={exportExcel} disabled={exporting !== null}>
+              <i className={`ti ti-file-spreadsheet text-xs ${exporting === "xlsx" ? "animate-pulse" : ""}`} />
+              {exporting === "xlsx" ? "Exporting..." : "Export as Excel Workbook"}
+            </Button>
+            <Button size="xs" onClick={exportSql} disabled={exporting !== null}>
+              <i className={`ti ti-database-export text-xs ${exporting === "sql" ? "animate-pulse" : ""}`} />
+              {exporting === "sql" ? "Exporting..." : "Export as SQL"}
             </Button>
           </div>
         </div>

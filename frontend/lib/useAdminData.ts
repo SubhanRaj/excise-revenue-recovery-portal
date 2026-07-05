@@ -8,6 +8,11 @@ import { clearClientSession, consumeJustAuthed } from "@/lib/session";
 import { notifyToast } from "@/lib/alerts";
 import type { Profile } from "@/components/ui/ProfileMenu";
 
+// Persisted across page loads/sessions (not just component state) so a returning admin who
+// opens a page and gets the Dexie cache instantly (no auto-sync) still sees how stale it is,
+// rather than a blank/undefined timestamp until they next click Sync.
+const LAST_SYNC_KEY = "excise-portal:admin-last-sync";
+
 // Shared by every /admin/* page: the admin-only session guard, the Dexie-backed
 // districts/PAC cache, and the Sync action — so the Dashboard and Districts pages (split
 // out of what used to be one page) don't each re-implement the same fetch/cache dance.
@@ -19,7 +24,12 @@ export function useAdminData() {
   const [pacData, setPacData] = useState<CachedPacData[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : localStorage.getItem(LAST_SYNC_KEY)
+  );
 
+  // Returns the freshly-synced rows (not just void) so callers that need the *current* data
+  // right after syncing — e.g. Export — don't read back their own stale pre-sync render closure.
   async function sync() {
     setSyncing(true);
     try {
@@ -34,8 +44,13 @@ export function useAdminData() {
       });
       setDistricts(res.districts);
       setPacData(res.pacData);
+      const now = new Date().toISOString();
+      localStorage.setItem(LAST_SYNC_KEY, now);
+      setLastSyncedAt(now);
+      return res;
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Sync failed.");
+      return null;
     } finally {
       setSyncing(false);
     }
@@ -82,5 +97,5 @@ export function useAdminData() {
     await db.adminDistricts.update(districtId, patch);
   }
 
-  return { ready, profile, districts, pacData, setDistricts, setPacData, sync, syncing, unlock, error, setError };
+  return { ready, profile, districts, pacData, setDistricts, setPacData, sync, syncing, lastSyncedAt, unlock, error, setError };
 }

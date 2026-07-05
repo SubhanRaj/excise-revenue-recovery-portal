@@ -18,7 +18,7 @@ const NAV_LINKS: NavLink[] = [
 type Row = CachedDistrict & Record<(typeof PAC_FIELD_ORDER)[number], number>;
 
 export default function AdminDashboardPage() {
-  const { ready, profile, districts, pacData, sync, syncing, error } = useAdminData();
+  const { ready, profile, districts, pacData, sync, syncing, lastSyncedAt, error } = useAdminData();
 
   // A district's lock/PAC submission is all 5 years at once (one atomic submit — see
   // CLAUDE.md), never partial, so there's no such thing as "locked for FY 2023-24 but not
@@ -47,7 +47,7 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="flex min-h-full flex-1 flex-col bg-slate-50 dark:bg-slate-950">
-      <AppHeader title="Admin Dashboard" role="admin" profile={profile} navLinks={NAV_LINKS} onSync={sync} syncing={syncing} districts={districts} />
+      <AppHeader title="Admin Dashboard" role="admin" profile={profile} navLinks={NAV_LINKS} onSync={sync} syncing={syncing} lastSyncedAt={lastSyncedAt} districts={districts} />
       <HelpPanel pageKey="admin-dashboard" title="Using this dashboard">
         <p>
           Every stat here is a total across all 5 financial years (FY 2021-22 to 2025-26) —
