@@ -46,7 +46,7 @@ export default function MasterView({ years, districtName, onSubmit, busy, error 
                   key={fy}
                   className="whitespace-nowrap px-4 py-3 text-right font-medium text-slate-600 dark:text-slate-400"
                 >
-                  {fy}
+                  FY {fy}
                 </th>
               ))}
             </tr>

@@ -19,6 +19,7 @@ import Button from "@/components/ui/Button";
 import AppHeader from "@/components/ui/AppHeader";
 import HelpPanel from "@/components/ui/HelpPanel";
 import type { Profile } from "@/components/ui/ProfileMenu";
+import { SITE_TITLE_EN, SITE_TITLE_HI, DATA_PERIOD_EN } from "@/lib/site";
 
 const BLANK_FIELD_TITLE = "Field left blank / फ़ील्ड खाली है";
 const BLANK_FIELD_TEXT =
@@ -106,7 +107,7 @@ export default function EntryPage() {
   // Both only reachable pre-lock (these buttons/the whole page disappear once submitAll()
   // locks and redirects away) — clears the local Dexie draft only, never touches D1.
   async function clearYear(index: number) {
-    const confirmed = await confirmClearYear(`Year ${index + 1} (${years[index].financialYear})`);
+    const confirmed = await confirmClearYear(`FY ${years[index].financialYear}`);
     if (!confirmed) return;
     const blanked = blankYear(years[index].financialYear);
     await db.draftYears.put(blanked);
@@ -205,12 +206,23 @@ export default function EntryPage() {
           display only and is not stored separately.
         </p>
         <p>
-          Year <strong>N+1</strong> unlocks only once year <strong>N</strong> is saved.
+          Each financial year unlocks only once the previous one is saved.
           &quot;Final Submit &amp; Lock&quot; on the Master View is irreversible without an
           Admin unlock.
         </p>
       </HelpPanel>
       <div className={`mx-auto w-full flex-1 px-4 pt-8 pb-24 sm:pb-8 ${step === 5 ? "max-w-6xl" : "max-w-4xl"}`}>
+        {/* Tells the DEO what they're filing before they see any form fields — sits below the
+            header/help button and above the year pills, not inside the sticky nav itself, so it
+            scrolls away once they're deep into a year's fields instead of permanently eating
+            sticky-bar height. */}
+        <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-center dark:border-blue-900 dark:bg-blue-950/40">
+          <p className="text-sm font-semibold text-blue-900 dark:text-blue-200">{SITE_TITLE_EN}</p>
+          <p className="text-xs text-blue-700 dark:text-blue-300" lang="hi">
+            {SITE_TITLE_HI}
+          </p>
+          <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">{DATA_PERIOD_EN}</p>
+        </div>
         <nav className="sticky top-16 z-10 mb-6 flex flex-col items-stretch gap-2 border-b border-slate-100 bg-slate-50/95 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:flex-row sm:items-center">
           <div className="flex items-center gap-1 sm:flex-wrap sm:gap-2">
             {FINANCIAL_YEARS.map((fy, i) => {
@@ -231,7 +243,7 @@ export default function EntryPage() {
                         : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
                   } disabled:opacity-40`}
                 >
-                  Year {i + 1}
+                  FY {fy}
                 </button>
               );
             })}

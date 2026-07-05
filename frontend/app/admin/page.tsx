@@ -67,7 +67,7 @@ export default function AdminDashboardPage() {
           >
             {FINANCIAL_YEARS.map((fy) => (
               <option key={fy} value={fy}>
-                {fy}
+                FY {fy}
               </option>
             ))}
           </select>

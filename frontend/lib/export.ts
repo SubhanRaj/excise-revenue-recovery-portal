@@ -1,7 +1,11 @@
 import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField } from "./pac-fields";
+import { SITE_TITLE_EN, DATA_PERIOD_EN } from "./site";
 import type { CachedDistrict, CachedPacData } from "./db";
 
 const RUPEE_FORMAT = '"₹"#,##0.00';
+// Two extra rows (title + data period) sit above the header row on every sheet — everything
+// below (header row, money-cell formatting, totals) shifts down by this many rows accordingly.
+const TITLE_ROWS = 2;
 
 // One workbook, one sheet per financial year (5 sheets) — each sheet is districts × the 6 PAC
 // fields for just that year, rather than one sheet with all 5 years' columns side by side.
@@ -23,24 +27,36 @@ export function exportDistrictsToXlsx(districts: CachedDistrict[], pacData: Cach
       totalRow.push(rows.reduce((sum, row) => sum + (Number(row[col]) || 0), 0));
     }
 
-    const ws = window.XLSX.utils.aoa_to_sheet([header, ...rows, totalRow]);
+    const ws = window.XLSX.utils.aoa_to_sheet([
+      [`${SITE_TITLE_EN} — FY ${fy}`],
+      [DATA_PERIOD_EN],
+      header,
+      ...rows,
+      totalRow,
+    ]);
     ws["!cols"] = [{ wch: 22 }, ...PAC_FIELD_ORDER.map(() => ({ wch: 18 }))];
+    // Title/data-period rows only occupy column A; merge them across the full table width so
+    // they read as a banner instead of a truncated cell next to empty ones.
+    ws["!merges"] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: header.length - 1 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: header.length - 1 } },
+    ];
 
-    const totalDataRows = rows.length + 1; // header row is row 0
+    const totalDataRows = rows.length + 1; // header row is row 0 pre-shift
     for (let r = 1; r <= totalDataRows; r++) {
       for (const c of moneyColumns) {
-        const cell = window.XLSX.utils.encode_cell({ r, c });
+        const cell = window.XLSX.utils.encode_cell({ r: r + TITLE_ROWS, c });
         if (ws[cell]) ws[cell].z = RUPEE_FORMAT;
       }
     }
 
     // ponytail: SheetJS Community (the free CDN build) can't write frozen panes — that's a
     // Pro-only feature. This line is a no-op today; upgrade to SheetJS Pro to make it real.
-    (ws as unknown as Record<string, unknown>)["!freeze"] = { xSplit: 1, ySplit: 1 };
+    (ws as unknown as Record<string, unknown>)["!freeze"] = { xSplit: 1, ySplit: 1 + TITLE_ROWS };
 
     // Sheet names can't contain "/" — financial years use it (e.g. "2021-22" is fine, but
     // guard generically in case that ever changes).
-    window.XLSX.utils.book_append_sheet(wb, ws, fy.replace(/\//g, "-"));
+    window.XLSX.utils.book_append_sheet(wb, ws, `FY ${fy}`.replace(/\//g, "-"));
   }
 
   window.XLSX.writeFile(wb, `excise-revenue-recovery-${new Date().toISOString().slice(0, 10)}.xlsx`);

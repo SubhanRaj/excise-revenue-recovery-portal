@@ -166,7 +166,7 @@ export default function AdminDashboard({ rows, selectedYear }: { rows: Row[]; se
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
           <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
-            Top 5 districts by Net Recoverable — {selectedYear}
+            Top 5 districts by Net Recoverable — FY {selectedYear}
           </h3>
           <div className="space-y-2.5">
             {topDues.map((d) => (
@@ -191,7 +191,7 @@ export default function AdminDashboard({ rows, selectedYear }: { rows: Row[]; se
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-          <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Lock status — {selectedYear}</h3>
+          <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Lock status — FY {selectedYear}</h3>
           <div className="flex items-center gap-4">
             <LockStatusDonut locked={locked} unlocked={unlocked} />
             <div className="flex-1">
@@ -214,7 +214,7 @@ export default function AdminDashboard({ rows, selectedYear }: { rows: Row[]; se
           </div>
 
           <h3 className="mb-3 mt-5 text-sm font-semibold text-slate-700 dark:text-slate-300">
-            All fields — {selectedYear} total
+            All fields — FY {selectedYear} total
           </h3>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
             {PAC_FIELD_ORDER.map((field) => (

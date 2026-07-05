@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Script from "next/script";
+import { SITE_TITLE_EN, DATA_PERIOD_EN } from "@/lib/site";
 import "./globals.css";
 
 // next/script's beforeInteractive strategy injects scripts via a JS runtime hook, so it
@@ -11,7 +12,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Excise Revenue Recovery Portal | आबकारी विभाग, उत्तर प्रदेश",
-  description: "State Excise Revenue Recovery (PAC/RC) Portal",
+  description: `${SITE_TITLE_EN}. ${DATA_PERIOD_EN}.`,
 };
 
 export default function RootLayout({

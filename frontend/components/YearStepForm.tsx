@@ -53,7 +53,7 @@ export default function YearStepForm({ year, onFieldChange, onSaveAndContinue, o
         <div className="flex items-center gap-2">
           <i className="ti ti-calendar-stats text-xl text-blue-600 dark:text-blue-400" />
           <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-            Financial Year {year.financialYear}
+            FY {year.financialYear}
           </h2>
         </div>
         <Button type="button" variant="danger" size="xs" onClick={onClear}>

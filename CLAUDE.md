@@ -170,6 +170,30 @@ not proof it works in Safari — if a user ever reports auth silently failing (v
 the first thing to check, and the real fix is collapsing both apps onto one zone (see
 above), not a cookie-flag workaround.
 
+## Portal identity strings (`frontend/lib/site.ts`)
+
+`SITE_TITLE_EN`/`SITE_TITLE_HI` ("Recovery Certificates (RCs) Issued for Recovery of Excise
+Revenue Arrears" / its Hindi translation) and `DATA_PERIOD_EN`/`DATA_PERIOD_HI` ("Data Period:
+1 April 2021 to 31 March 2026") live in this one file specifically so the four places that show
+them can't drift out of sync: the browser tab's meta description (`app/layout.tsx`), the login
+page's subtitle block, the DEO data-entry title bar (below, and see the FY nav-pill labeling
+convention above), and the Excel export's per-sheet title/data-period banner rows
+(`export.ts`). Deliberately **not** merged into `pac-fields.ts` — that file is the one
+duplicated byte-for-byte against `api/db/schema.ts` (see top of this document), and this text
+has no server-side equivalent to stay in sync with. `DATA_PERIOD_*` is written out by hand
+rather than derived from `FINANCIAL_YEARS`' first/last entries — if the 5-year window in
+`FINANCIAL_YEARS` ever shifts, update both `site.ts` strings by hand at the same time, same as
+every other place that duplicates something derived from `FINANCIAL_YEARS`.
+
+The DEO title bar (`deo-data-entry/page.tsx`, a soft `bg-blue-50`/`border-blue-200` banner —
+same light-toned pattern as other informational callouts, not an alarming solid fill) sits
+below the sticky `AppHeader`/above the year nav pills, in the scrolling page body rather than
+inside the sticky nav itself, so it scrolls away once a DEO is deep into a year's fields
+instead of permanently eating sticky-bar height on every scroll position. It exists so a DEO
+lands on this page already knowing what "PAC/RC data" concretely means before they see any
+form fields — the six field labels alone (Gross Arrears, RC Amount, etc.) don't spell out that
+this is specifically about Recovery Certificates for excise arrears recovery.
+
 ## Frontend offline flow (`frontend/lib/db.ts`, Dexie)
 
 DEO data entry is 5 sequential year steps + a Master View, gated so year `N+1` unlocks
@@ -191,7 +215,7 @@ tap can't silently wipe entered data:
   automatically), so `clearYear()` also drops `step` back to the cleared year if the DEO was
   currently viewing a later one.
 - **"Clear All"** (sticky nav bar, next to Master View) calls `db.draftYears.clear()` and
-  resets all 5 years to blank, back to Year 1.
+  resets all 5 years to blank, back to the first financial year (FY 2021-22).
 
 Both call sites bump a `clearVersion` counter that's folded into `YearStepForm`'s React `key`
 (`` `${financialYear}-${clearVersion}` ``) to force a remount — the component's own
@@ -228,7 +252,17 @@ Both dialogs are bilingual (English + Hindi). `app/layout.tsx` adds a small glob
 The Admin dashboard caches all districts + PAC rows in Dexie (`adminDistricts`,
 `adminPacData`) for instant load, with an explicit "Sync" button to refetch from D1.
 
-The Year 1–5 / Master View nav pills in `deo-data-entry/page.tsx` are `sticky top-16` (just below the
+The pills read **"FY 2021-22"** etc, not "Year 1"/"Year 2" — a DEO shouldn't have to count
+pills to know which financial year they're editing. This is the one convention that must be
+kept consistent everywhere a year appears in the UI or an export: the DEO nav pills and
+`YearStepForm.tsx`'s per-step heading, the Admin dashboard's/districts table's/district
+detail's year `<select>`/column headers (`FY {fy}`, not bare `{fy}`), `MasterView.tsx`'s
+summary table header row, and the Excel export's sheet names (`export.ts`:
+`` `FY ${fy}`.replace(/\//g, "-") ``). If you add a new place a `FinancialYear` value is
+rendered, prefix it with `FY ` the same way — don't introduce a bare `{fy}` or an ordinal
+"Year N" label again.
+
+FY 1–5 / Master View nav pills in `deo-data-entry/page.tsx` are `sticky top-16` (just below the
 also-`sticky` `AppHeader`) so they stay reachable while scrolling down a long year form,
 matching the `AdminDashboard`'s always-visible toolbar. The nav is `flex-col` below `sm` (Master
 View drops to its own full-width row under the 5 year pills) and `sm:flex-row` above it (single
@@ -533,7 +567,14 @@ viewports.
 
 Excel export (`exportDistrictsToXlsx()` in `frontend/lib/export.ts`) is **one workbook, five
 sheets** — one per financial year, each sheet districts × the 6 PAC fields for just that year
-— not one sheet with all 5 years' columns side by side like the original version.
+— not one sheet with all 5 years' columns side by side like the original version. Sheets are
+named `FY 2021-22`, etc (see the FY-labeling convention above). Each sheet also carries two
+merged banner rows above the district/field header row — `SITE_TITLE_EN` (see Portal identity
+strings above) and `DATA_PERIOD_EN` — so the exported file is self-describing if it's opened
+outside the portal (e.g. emailed to Excise HQ). `TITLE_ROWS` in `export.ts` is the single
+source of truth for how many rows that pushes the header/data/money-formatting/freeze-pane math
+down by — update it, not the individual row-offset call sites, if another banner row is ever
+added.
 
 ## Bulk DEO provisioning (Admin dashboard)
 

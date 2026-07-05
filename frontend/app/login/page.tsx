@@ -8,6 +8,7 @@ import { saveClientSession, markJustAuthed } from "@/lib/session";
 import Button from "@/components/ui/Button";
 import TextField from "@/components/ui/TextField";
 import Banner from "@/components/ui/Banner";
+import { SITE_TITLE_EN, SITE_TITLE_HI, DATA_PERIOD_EN } from "@/lib/site";
 
 type Tab = "cug" | "email";
 
@@ -86,6 +87,11 @@ export default function LoginPage() {
             Department of Excise, Uttar Pradesh
           </h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Excise Revenue Recovery Portal</p>
+          <p className="mt-3 text-xs font-medium text-slate-600 dark:text-slate-300">{SITE_TITLE_EN}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400" lang="hi">
+            {SITE_TITLE_HI}
+          </p>
+          <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">{DATA_PERIOD_EN}</p>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">

@@ -275,7 +275,7 @@ export default function DistrictsPage() {
             >
               {FINANCIAL_YEARS.map((fy) => (
                 <option key={fy} value={fy}>
-                  {fy}
+                  FY {fy}
                 </option>
               ))}
             </select>

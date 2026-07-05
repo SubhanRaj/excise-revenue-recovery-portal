@@ -138,7 +138,7 @@ export default function DistrictDetailPage() {
                         key={fy}
                         className="whitespace-nowrap px-3 py-2.5 text-left font-medium text-slate-600 dark:text-slate-400"
                       >
-                        {fy}
+                        FY {fy}
                       </th>
                     ))}
                   </tr>
