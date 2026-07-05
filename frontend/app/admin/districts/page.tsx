@@ -299,7 +299,7 @@ export default function DistrictsPage() {
               ))}
             </select>
             <Button variant="blue" size="xs" onClick={() => downloadDeoTemplate(districts)}>
-              <i className="ti ti-download text-xs" />
+              <i className="ti ti-download text-sm" />
               DEO Template
             </Button>
             <input
@@ -310,15 +310,15 @@ export default function DistrictsPage() {
               className="hidden"
             />
             <Button variant="amber" size="xs" onClick={() => deoFileInputRef.current?.click()} disabled={provisioning}>
-              <i className={`ti ti-upload text-xs ${provisioning ? "animate-pulse" : ""}`} />
+              <i className={`ti ti-upload text-sm ${provisioning ? "animate-pulse" : ""}`} />
               {provisioning ? "Uploading..." : "Upload DEO Data"}
             </Button>
             <Button size="xs" onClick={exportExcel} disabled={exporting !== null}>
-              <i className={`ti ti-file-spreadsheet text-xs ${exporting === "xlsx" ? "animate-pulse" : ""}`} />
+              <i className={`ti ti-file-spreadsheet text-sm ${exporting === "xlsx" ? "animate-pulse" : ""}`} />
               {exporting === "xlsx" ? "Exporting..." : "Export as Excel Workbook"}
             </Button>
             <Button size="xs" onClick={exportSql} disabled={exporting !== null}>
-              <i className={`ti ti-database-export text-xs ${exporting === "sql" ? "animate-pulse" : ""}`} />
+              <i className={`ti ti-database-export text-sm ${exporting === "sql" ? "animate-pulse" : ""}`} />
               {exporting === "sql" ? "Exporting..." : "Export as SQL"}
             </Button>
           </div>

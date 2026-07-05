@@ -27,6 +27,14 @@ input,
 select,
 button {
   font: inherit;
+  /* Tabler's icon webfont CSS hardcodes `line-height: 1` on every `.ti` icon glyph. Without
+     this, `font: inherit` above pulls in the page's line-height (1.5, from Tailwind's
+     preflight on html/body) for the button's own text — so an icon+label pair inside one
+     flex row sit in two differently-sized line boxes and `items-center` centers each within
+     its own box, not relative to each other. That's what actually produced the repeated
+     "icon low / text high, gap under the text" look — not a flex/alignment bug. Matching
+     line-height here to the icon's fixes both at once. */
+  line-height: 1;
 }
 
 input,

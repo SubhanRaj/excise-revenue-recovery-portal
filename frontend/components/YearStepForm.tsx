@@ -57,7 +57,7 @@ export default function YearStepForm({ year, onFieldChange, onSaveAndContinue, o
           </h2>
         </div>
         <Button type="button" variant="dangerSoft" size="xs" onClick={onClear}>
-          <i className="ti ti-eraser text-xs" />
+          <i className="ti ti-eraser text-sm" />
           Clear
         </Button>
       </div>

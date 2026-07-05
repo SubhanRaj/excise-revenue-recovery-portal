@@ -470,10 +470,15 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   "Clear" button (`YearStepForm.tsx`) and "Clear All" (`deo-data-entry/page.tsx`'s nav bar) — as
   opposed to `danger`'s solid red, which read as too heavy/thick sitting next to the slim pill
   nav buttons; the blocking confirm popup already carries the "are you sure" weight, so the
-  button itself doesn't need to. Both clear buttons use `size="xs"` with an icon at `text-xs`
-  (matching the button's own font size, not a larger `text-sm` icon next to `text-xs` text) —
-  keep icon size matched to the button's text size at this size, unlike the larger buttons
-  elsewhere in the app where a bigger icon next to smaller text is the norm.
+  button itself doesn't need to. Every `size="xs"` button's icon (Clear, Clear All, DEO
+  Template, Upload DEO Data, Export as Excel Workbook, Export as SQL) is `text-sm`, one step
+  larger than the button's own `text-xs` label — this used to be `text-xs` (matched to the
+  label) on the theory that a bigger icon next to smaller text was the "larger buttons only"
+  convention, but at actual `xs` pill size a same-size icon read as visually cramped/compacted
+  next to its label; bumping it one step reads as a deliberate icon, not an alignment
+  afterthought, without the pill growing noticeably taller (the icon's line box is 1 anyway,
+  see below, so a larger icon doesn't inflate the button's own height the way a larger
+  *line-height* would).
 - **`rounded-md`/`shadow-sm`/`font-semibold` are set per-`size` in `Button.tsx`, not in the
   shared base class string** — `xs`/`sm` (every small toolbar-chip button: Clear, Clear All,
   DEO Template, Upload DEO Data, Export) instead get `rounded-full font-medium` with no
@@ -487,6 +492,28 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   `inline-flex`/`items-center`; the "thick" complaint was about corner radius/shadow/weight,
   not alignment). If you add a new small utility button, use `size="xs"`/`"sm"` to inherit this
   — don't hand-roll `rounded-md`/`shadow-sm` on a small button via `className`.
+- **The icon-vs-label vertical misalignment (icon sitting low, extra blank space under the text,
+  text nearly touching the button's top border) was a real, separate bug from the "thick"
+  corner-radius one above — and the standalone-classes repro that cleared the flex layout
+  didn't reproduce it**, because it didn't include this app's actual `frontend/app/globals.css`.
+  That file has `input, select, button { font: inherit }` — deliberately unlayered (see the
+  dark-mode section below for why an unlayered rule always beats a Tailwind `@layer` utility),
+  originally added to stop buttons from using the browser's native UI font. `font: inherit`
+  also inherits `line-height`, which pulls in Tailwind's preflight `line-height: 1.5` from
+  `html`/`body`. Tabler's icon webfont CSS (`tabler-icons.min.css`) hardcodes `line-height: 1`
+  on every `.ti` class. So inside one `inline-flex items-center` button, the icon `<i>` and the
+  text sat in two differently-tall line boxes (1× vs 1.5× the font size) — `items-center`
+  correctly centers each *as a flex item* within its own box, but the boxes themselves don't
+  match, which is what actually produced the reported misalignment and the lopsided
+  padding (all the slack lived under the text, since the button's own vertical padding is
+  applied around that taller 1.5×-line-height box). Fixed with one added declaration —
+  `line-height: 1` on the same `input, select, button` rule in `globals.css` — rather than
+  touching every icon/button call site individually; verified by rendering the real app (a
+  temporary `/debugbuttons` route mounting `Button.tsx` directly, deleted after) with Playwright
+  before/after the change, not just a synthetic snippet. Since `select` is in the same rule,
+  this fixed the same issue on every `<select>` dropdown too, for free. If a future report says
+  "icon and text don't line up," reach for this file before touching flex classes — the flex
+  layout itself has been correct throughout both rounds of this bug.
 - **`disabled:cursor-not-allowed` doesn't work on `<button>` in this Tailwind version** —
   the CDN's preflight sets `button { cursor: pointer }` unconditionally, which beats the
   `disabled:` variant regardless of class order. If a disabled button needs to actually

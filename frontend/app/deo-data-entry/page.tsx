@@ -357,7 +357,7 @@ export default function EntryPage() {
               onClick={clearAllData}
               className="flex-1 sm:flex-none"
             >
-              <i className="ti ti-trash text-xs" />
+              <i className="ti ti-trash text-sm" />
               Clear All
             </Button>
             <button

@@ -202,3 +202,23 @@ Also fixed while investigating (unrelated to the above, found by visual review):
 DEO nav buttons showed a normal pointer cursor instead of "not-allowed" — Tailwind's
 preflight in this version sets `button { cursor: pointer }` unconditionally, beating the
 `disabled:cursor-not-allowed` utility (see CLAUDE.md's UI conventions for the fix pattern).
+
+**2026-07-05 — icon+label buttons repeatedly reported as "icon below, text above"/misaligned,
+with extra blank space under the button text — an earlier pass had already investigated a
+similar-sounding "thick button" complaint and concluded the flex layout was fine, so this
+second report needed an actual empirical re-check, not another guess.**
+
+Built a temporary route (`frontend/app/debugbuttons/page.tsx`, mounting the real `Button.tsx`)
+and rendered it with `npm run dev` + Playwright — a real render of the actual app, not a
+synthetic classes-only snippet like the earlier "thick button" check used. Screenshotted with
+and without the fix (`git stash` on just `globals.css`) to compare directly. Root cause:
+`frontend/app/globals.css`'s `input, select, button { font: inherit }` (deliberately unlayered,
+see CLAUDE.md's dark-mode section) inherits Tailwind preflight's `line-height: 1.5` for button
+text, while Tabler's icon webfont CSS hardcodes `line-height: 1` on every `.ti` icon — two
+different-height line boxes inside one flex row, each correctly centered *on its own* by
+`items-center` but not matching each other. Fixed with one line (`line-height: 1` added to that
+same `globals.css` rule) rather than touching every button/icon call site; since `select` is in
+the same rule, every dropdown's text is now tightened the same way for free. Deleted the debug
+route afterward. See CLAUDE.md's `Button.tsx` section for the full writeup — if this is ever
+reported a third time, check `globals.css`'s line-height before touching flex/alignment classes
+again.

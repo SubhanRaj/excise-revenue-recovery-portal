@@ -351,6 +351,16 @@
       Hindi paragraph bumped to `text-sm` to match the English body text; added a direct
       full-width **Logout** button on the card itself that skips the blocking confirm dialog
       (`confirmLogout()`) since logout is the only action available on this screen
+- [x] Fixed the real root cause of a repeatedly-reported icon/text misalignment on every
+      icon+label button and `<select>` dropdown app-wide: `globals.css`'s `font: inherit` on
+      `input, select, button` was pulling in Tailwind's `line-height: 1.5` for button text while
+      Tabler's icon webfont hardcodes `line-height: 1` — one added `line-height: 1` declaration
+      on that same rule fixes every button and dropdown at once. Verified with an actual
+      Playwright render of `Button.tsx` (temporary `/debugbuttons` route, deleted after), not a
+      synthetic snippet, since an earlier "thick button" investigation had already (correctly,
+      for a different complaint) concluded the flex layout itself was fine.
+- [x] Small (`size="xs"`) button icons bumped from `text-xs` to `text-sm` (one step larger than
+      the label) — they read as visually cramped at the same size as the text they sit next to.
 
 ## Backlog / not started
 
