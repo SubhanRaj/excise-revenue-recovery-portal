@@ -123,6 +123,10 @@ export async function promptUnlockReason(districtName: string): Promise<string |
 // to /login). Field-specific errors (e.g. the parity check) stay inline under the field
 // instead — see YearStepForm.tsx.
 export function notifyToast(opts: { icon: "success" | "info" | "error"; title: string; text?: string }) {
+  // Wider on desktop (bilingual validation text like "Field left blank" was wrapping to several
+  // lines in the default ~300px toast, eating vertical space) and near-full-width on mobile
+  // instead of a cramped corner box. showCloseButton adds a manual ✕ alongside the existing
+  // auto-dismiss timer — closing early no longer requires waiting it out.
   window.Swal.fire({
     toast: true,
     position: "top-end",
@@ -130,7 +134,9 @@ export function notifyToast(opts: { icon: "success" | "info" | "error"; title: s
     title: opts.title,
     text: opts.text,
     showConfirmButton: false,
+    showCloseButton: true,
     timer: opts.text ? 4500 : 2000,
     timerProgressBar: true,
+    width: window.innerWidth < 640 ? "94vw" : "28rem",
   });
 }

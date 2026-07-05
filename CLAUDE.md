@@ -288,7 +288,13 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   `frontend/lib/alerts.ts`) and toasts (`notifyToast()` — `toast: true, position: "top-end"`,
   modeled on the sibling `excise-bakaya-record` project's login/sync/unlock toasts) for
   login/logout and generic validation. Don't reach for a new blocking SweetAlert popup for
-  routine errors/success — use `notifyToast()` or a `Banner` instead.
+  routine errors/success — use `notifyToast()` or a `Banner` instead. `notifyToast()` sets
+  `showCloseButton: true` (a manual ✕ next to the auto-dismiss timer, so a DEO doesn't have to
+  wait it out) and a responsive `width` — `28rem` on desktop, `94vw` on mobile — since the
+  default toast width was narrow enough that bilingual validation text (e.g. "Field left blank
+  / फ़ील्ड खाली है") wrapped across several lines, costing more vertical space than a wider,
+  shorter toast would. If you add a new toast call site, it inherits this from `notifyToast()`
+  automatically — don't call `window.Swal.fire({ toast: true, ... })` directly.
 - **"Welcome" toast fires once per sign-in, not per page load.** `frontend/lib/session.ts`'s
   `markJustAuthed()`/`consumeJustAuthed()` set/clear a `sessionStorage` flag right before the
   `/login` or `/verify` page redirects to `/deo-data-entry`/`/admin`; the destination page's existing
