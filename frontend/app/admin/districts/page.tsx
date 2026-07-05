@@ -191,7 +191,7 @@ export default function DistrictsPage() {
                 e.stopPropagation();
                 handleUnlock(row.original.id, row.original.districtName);
               }}
-              className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               Unlock
             </button>
@@ -242,7 +242,7 @@ export default function DistrictsPage() {
           Existing DEOs are updated, not duplicated, by matching district name.
         </p>
       </HelpPanel>
-      <div className="w-full flex-1 px-4 py-6 sm:px-6 lg:px-[15%]">
+      <div className="flex w-full flex-1 flex-col px-4 py-6 sm:px-6 lg:px-[10%] xl:px-[5%] 2xl:px-[3%]">
         {error && (
           <div className="mb-4">
             <Banner variant="error">{error}</Banner>
@@ -262,7 +262,7 @@ export default function DistrictsPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as "all" | "locked" | "unlocked")}
-              className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+              className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs text-slate-700 outline-none hover:bg-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               <option value="all">All statuses</option>
               <option value="locked">Locked</option>
@@ -271,7 +271,7 @@ export default function DistrictsPage() {
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(e.target.value as (typeof FINANCIAL_YEARS)[number])}
-              className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+              className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs text-slate-700 outline-none hover:bg-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               {FINANCIAL_YEARS.map((fy) => (
                 <option key={fy} value={fy}>
@@ -301,7 +301,7 @@ export default function DistrictsPage() {
           </div>
         </div>
 
-        <div className="max-h-[65vh] overflow-auto rounded-lg border border-slate-200 bg-white shadow-sm [scrollbar-width:thin] scroll-smooth dark:border-slate-800 dark:bg-slate-900">
+        <div className="min-h-[50vh] flex-1 overflow-auto rounded-lg border border-slate-200 bg-white shadow-sm [scrollbar-width:thin] scroll-smooth dark:border-slate-800 dark:bg-slate-900">
           <table className="w-full border-collapse text-sm">
             <thead>
               {table.getHeaderGroups().map((hg) => (
@@ -371,7 +371,7 @@ export default function DistrictsPage() {
             <select
               value={pagination.pageSize}
               onChange={(e) => setPagination((p) => ({ ...p, pageIndex: 0, pageSize: Number(e.target.value) }))}
-              className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+              className="rounded-full border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 outline-none hover:bg-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               {PAGE_SIZE_OPTIONS.map((n) => (
                 <option key={n} value={n}>
@@ -389,7 +389,7 @@ export default function DistrictsPage() {
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
               style={!table.getCanPreviousPage() ? { cursor: "not-allowed" } : undefined}
-              className="rounded-md border border-slate-300 bg-white px-2.5 py-1 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+              className="rounded-full border border-slate-300 bg-white px-2.5 py-1 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:disabled:hover:bg-slate-900"
             >
               <i className="ti ti-chevron-left text-sm" />
             </button>
@@ -401,7 +401,7 @@ export default function DistrictsPage() {
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
               style={!table.getCanNextPage() ? { cursor: "not-allowed" } : undefined}
-              className="rounded-md border border-slate-300 bg-white px-2.5 py-1 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+              className="rounded-full border border-slate-300 bg-white px-2.5 py-1 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:disabled:hover:bg-slate-900"
             >
               <i className="ti ti-chevron-right text-sm" />
             </button>

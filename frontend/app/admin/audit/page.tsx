@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, ApiError } from "@/lib/api";
 import { clearClientSession, consumeJustAuthed } from "@/lib/session";
@@ -56,6 +56,19 @@ export default function AuditLogPage() {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
+  const [eventSort, setEventSort] = useState<"asc" | "desc" | null>(null);
+
+  // Sorts only the currently-loaded page's rows — the log is server-paginated, so a true
+  // global sort would need a server-side ORDER BY; not worth it for a 30-day-retention table.
+  const sortedRows = useMemo(() => {
+    if (!eventSort) return rows;
+    const dir = eventSort === "asc" ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      const la = EVENT_LABELS[a.eventType] ?? a.eventType;
+      const lb = EVENT_LABELS[b.eventType] ?? b.eventType;
+      return dir * la.localeCompare(lb);
+    });
+  }, [rows, eventSort]);
 
   async function loadPage(p: number) {
     setLoading(true);
@@ -110,34 +123,40 @@ export default function AuditLogPage() {
           </div>
         )}
 
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="max-h-[65vh] overflow-auto rounded-lg border border-slate-200 bg-white shadow-sm [scrollbar-width:thin] scroll-smooth dark:border-slate-800 dark:bg-slate-900">
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800">
-                <th className="whitespace-nowrap px-3 py-2.5 text-left font-medium text-slate-600 dark:text-slate-400">
+                <th className="sticky top-0 z-10 whitespace-nowrap bg-slate-50 px-3 py-2.5 text-left font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">
                   When (IST)
                 </th>
-                <th className="whitespace-nowrap px-3 py-2.5 text-left font-medium text-slate-600 dark:text-slate-400">
+                <th
+                  onClick={() => setEventSort((s) => (s === "asc" ? "desc" : s === "desc" ? null : "asc"))}
+                  className="sticky top-0 z-10 cursor-pointer select-none whitespace-nowrap bg-slate-50 px-3 py-2.5 text-left font-medium text-slate-600 hover:text-slate-900 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
+                >
                   Event
+                  {eventSort ? { asc: " ▲", desc: " ▼" }[eventSort] : " ⇅"}
                 </th>
-                <th className="whitespace-nowrap px-3 py-2.5 text-left font-medium text-slate-600 dark:text-slate-400">
+                <th className="sticky top-0 z-10 whitespace-nowrap bg-slate-50 px-3 py-2.5 text-left font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">
                   Actor
                 </th>
-                <th className="whitespace-nowrap px-3 py-2.5 text-left font-medium text-slate-600 dark:text-slate-400">
+                <th className="sticky top-0 z-10 whitespace-nowrap bg-slate-50 px-3 py-2.5 text-left font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">
                   District
                 </th>
-                <th className="px-3 py-2.5 text-left font-medium text-slate-600 dark:text-slate-400">Details</th>
+                <th className="sticky top-0 z-10 bg-slate-50 px-3 py-2.5 text-left font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                  Details
+                </th>
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 ? (
+              {sortedRows.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-3 py-6 text-center text-slate-500 dark:text-slate-400">
                     {loading ? "Loading..." : "No activity in the last 30 days."}
                   </td>
                 </tr>
               ) : (
-                rows.map((row) => (
+                sortedRows.map((row) => (
                   <tr key={row.id} className="border-t border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-900">
                     <td className="whitespace-nowrap px-3 py-2.5 text-slate-800 dark:text-slate-200">
                       {formatIST(row.createdAt)}
@@ -165,7 +184,7 @@ export default function AuditLogPage() {
             onClick={() => loadPage(page - 1)}
             disabled={page <= 1 || loading}
             style={page <= 1 || loading ? { cursor: "not-allowed" } : undefined}
-            className="rounded-md border border-slate-300 bg-white px-2.5 py-1 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+            className="rounded-full border border-slate-300 bg-white px-2.5 py-1 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:disabled:hover:bg-slate-900"
           >
             <i className="ti ti-chevron-left text-sm" />
           </button>
@@ -175,7 +194,7 @@ export default function AuditLogPage() {
             onClick={() => loadPage(page + 1)}
             disabled={rows.length === 0 || loading}
             style={rows.length === 0 || loading ? { cursor: "not-allowed" } : undefined}
-            className="rounded-md border border-slate-300 bg-white px-2.5 py-1 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+            className="rounded-full border border-slate-300 bg-white px-2.5 py-1 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:disabled:hover:bg-slate-900"
           >
             <i className="ti ti-chevron-right text-sm" />
           </button>
