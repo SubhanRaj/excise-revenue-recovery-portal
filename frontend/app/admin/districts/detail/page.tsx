@@ -99,16 +99,24 @@ export default function DistrictDetailPage() {
               <div className="flex items-center gap-4">
                 <div>
                   <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{district.districtName}</h1>
-                  <span
-                    className={`mt-1 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      district.lockStatus === 1
-                        ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
-                        : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                    }`}
-                  >
-                    <i className={`ti ${district.lockStatus === 1 ? "ti-lock" : "ti-lock-open"} text-sm`} />
-                    {district.lockStatus === 1 ? "Locked" : "Unlocked"}
-                  </span>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        district.lockStatus === 1
+                          ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
+                          : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                      }`}
+                    >
+                      <i className={`ti ${district.lockStatus === 1 ? "ti-lock" : "ti-lock-open"} text-sm`} />
+                      {district.lockStatus === 1 ? "Locked" : "Unlocked"}
+                    </span>
+                    {district.deoEmail && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                        <i className="ti ti-mail text-sm" />
+                        {district.deoEmail}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {district.lockStatus === 1 && (
                   <button

@@ -362,6 +362,15 @@
 - [x] Small (`size="xs"`) button icons bumped from `text-xs` to `text-sm` (one step larger than
       the label) — they read as visually cramped at the same size as the text they sit next to.
 
+## Milestone 18 — DEO CUG population & profile UI enhancements (done)
+
+- [x] Processed raw `contact.csv` and `emails.csv` to map district names, map them against `districts` DB IDs, hash the CUG mobile numbers via SHA-256, and generate a batch of 75 `INSERT` statements to pre-provision all 75 DEOs into the `users` table.
+- [x] Executed the generated batch SQL on the remote D1 production database, successfully provisioning all DEO CUG and email credentials.
+- [x] `auditLogInsert` updated to correctly capture and log the `districtName` whenever a DEO logs in, fixing an omission where `login_cug` events previously left the district column blank.
+- [x] Updated the Audit Log table UI to explicitly render the actor as `DEO <District Name>` rather than a bare `(deo)` if the district is known.
+- [x] Profile menu button (`AppHeader`) enhanced to show a pill-shaped `DEO <District Name>` label instead of a simple circular `D` icon.
+- [x] The admin District Detail page now includes the DEO's email address natively alongside the lock status badge (enabled by joining the `users` table over to the Admin Dexie `CachedDistrict` store).
+
 ## Backlog / not started
 
 - [ ] Real domain + DNS, and (optional) collapse `/frontend` + `/api` onto one zone via a
