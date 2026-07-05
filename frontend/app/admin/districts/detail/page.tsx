@@ -10,7 +10,6 @@ import { notifyToast, promptUnlockReason } from "@/lib/alerts";
 import { useAdminData } from "@/lib/useAdminData";
 import AppHeader, { type NavLink } from "@/components/ui/AppHeader";
 import Banner from "@/components/ui/Banner";
-import Button from "@/components/ui/Button";
 
 const NAV_LINKS: NavLink[] = [
   { label: "Dashboard", href: "/admin" },
@@ -76,7 +75,7 @@ export default function DistrictDetailPage() {
   return (
     <div className="flex min-h-full flex-1 flex-col bg-slate-50 dark:bg-slate-950">
       <AppHeader title="District Detail" role="admin" profile={profile} navLinks={NAV_LINKS} onSync={sync} syncing={syncing} lastSyncedAt={lastSyncedAt} districts={districts} />
-      <div className="mx-auto w-full max-w-6xl flex-1 px-6 py-6 lg:px-10">
+      <div className="mx-auto w-full max-w-7xl flex-1 px-6 py-6 lg:px-10">
         <Link
           href="/admin/districts"
           className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-blue-700 hover:underline dark:text-blue-400"
@@ -111,6 +110,18 @@ export default function DistrictDetailPage() {
                       <i className={`ti ${district.lockStatus === 1 ? "ti-lock" : "ti-lock-open"} text-sm`} />
                       {district.lockStatus === 1 ? "Locked" : "Unlocked"}
                     </span>
+                    {district.lockStatus === 1 && (
+                      // Hand-styled to the same pill dimensions as the Locked/email badges it
+                      // sits beside, rather than a full Button.tsx instance — the earlier
+                      // Button size="sm" was noticeably taller/wider than its badge neighbors.
+                      <button
+                        onClick={() => handleUnlock(district.id, district.districtName)}
+                        className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-300 dark:hover:bg-amber-900"
+                      >
+                        <i className="ti ti-lock-open text-sm" />
+                        Unlock
+                      </button>
+                    )}
                     {district.deoEmail && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-400">
                         <i className="ti ti-mail text-sm" />
@@ -119,12 +130,6 @@ export default function DistrictDetailPage() {
                     )}
                   </div>
                 </div>
-                {district.lockStatus === 1 && (
-                  <Button variant="amber" size="sm" onClick={() => handleUnlock(district.id, district.districtName)}>
-                    <i className="ti ti-lock-open text-sm" />
-                    Unlock
-                  </Button>
-                )}
               </div>
               {lockInfo && (
                 <div className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm dark:border-slate-800 dark:bg-slate-900">
@@ -162,21 +167,25 @@ export default function DistrictDetailPage() {
               />
             </div>
 
-            <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            {/* max-h-[70vh] gives this table its own vertical scrollbar on small screens
+                (overflow-x-auto alone was horizontal-only) instead of just extending the whole
+                page — same reasoning as the districts table above. The header stays sticky
+                within that scroll so it doesn't scroll out of view first. */}
+            <div className="max-h-[70vh] overflow-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
               {/* No w-full — with the auto (default) table layout, forcing the table to exactly
                   the container's width squeezes/clips money columns instead of letting them
                   grow, same issue documented for the districts table below. Content sizes
-                  itself; overflow-x-auto on the wrapper is the fallback past that. */}
+                  itself; the wrapper's overflow-auto is the fallback past that. */}
               <table className="border-collapse text-sm">
                 <thead>
                   <tr className="bg-slate-50 dark:bg-slate-800">
-                    <th className="whitespace-nowrap px-3 py-2.5 text-left font-medium text-slate-600 dark:text-slate-400">
+                    <th className="sticky top-0 z-10 whitespace-nowrap bg-slate-50 px-3 py-2.5 text-left font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">
                       Field
                     </th>
                     {FINANCIAL_YEARS.map((fy) => (
                       <th
                         key={fy}
-                        className="whitespace-nowrap px-3 py-2.5 text-left font-medium text-slate-600 dark:text-slate-400"
+                        className="sticky top-0 z-10 whitespace-nowrap bg-slate-50 px-3 py-2.5 text-left font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400"
                       >
                         FY {fy}
                       </th>

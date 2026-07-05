@@ -407,7 +407,13 @@ export default function DistrictsPage() {
           </div>
         </div>
 
-        <div className="min-h-[50vh] flex-1 overflow-auto rounded-lg border border-slate-200 bg-white shadow-sm [scrollbar-width:thin] scroll-smooth dark:border-slate-800 dark:bg-slate-900">
+        {/* max-h-[70vh] is a real cap (not just min-h/flex-1) so this scrolls internally on
+            small screens too — below lg, the toolbar/nav above eat proportionally more of the
+            viewport, and flex-1 alone never clips since every ancestor up to <body> only sets
+            min-height (see layout.tsx), so the table just grew the whole page instead of
+            scrolling in place. lg:max-h-none keeps the original fill-the-viewport behavior on
+            desktop, where there's room for it. */}
+        <div className="max-h-[70vh] min-h-[50vh] flex-1 overflow-auto rounded-lg border border-slate-200 bg-white shadow-sm [scrollbar-width:thin] scroll-smooth dark:border-slate-800 dark:bg-slate-900 lg:max-h-none">
           {isChangingFY ? (
             <div className="p-6">
               <div className="mb-6 h-8 w-full animate-pulse rounded bg-slate-200 dark:bg-slate-800" />

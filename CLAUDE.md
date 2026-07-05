@@ -675,10 +675,18 @@ visually cramped as features were added:
   wider breakpoints (`lg:px-[10%] xl:px-[5%] 2xl:px-[3%]`, not a flat `lg:px-[15%]`) instead of a
   fixed `max-w-*`, so a 22"/24" FHD admin monitor gets meaningfully more usable table width rather
   than a large fixed side margin forcing horizontal scroll. The table's scroll container is
-  `flex-1` inside a `flex-col` page body (not a fixed `max-h-[65vh]`), so it grows to fill
-  whatever vertical space is left in the viewport instead of leaving dead blank space below it on
-  a tall display — if you add another fixed-height table wrapper, prefer this pattern
-  (`flex-1 min-h-[Xvh]` fallback) over a hardcoded viewport-height fraction. Clicking anywhere on
+  `flex-1` inside a `flex-col` page body, so on a tall desktop display it grows to fill whatever
+  vertical space is left in the viewport instead of leaving dead blank space below it — but
+  `flex-1` alone never actually bounds the height on small screens, because every ancestor up to
+  `<body>` (`layout.tsx`) only sets `min-h-full`, never a real `height`, so there's nothing for
+  `flex-1` to fill *up to*; the table just kept growing the whole page instead of scrolling in
+  place. Fixed with an actual cap, `max-h-[70vh] ... lg:max-h-none` — real below `lg` (small/
+  tablet screens get their own internal scrollbar), reverting to the original uncapped
+  fill-the-viewport behavior at `lg`+ where there's room for it. The header row is `sticky
+  top-0` so it stays visible within that scroll. If you add another scrolling table wrapper,
+  follow this same `max-h-[Xvh] ... lg:max-h-none` pattern rather than only `flex-1`/`min-h`,
+  which doesn't reliably clip on its own given this app's `min-height`-only ancestor chain.
+  Clicking anywhere on
   a district row navigates to that district's detail page; the Unlock button inside the row calls
   `e.stopPropagation()` so it doesn't also trigger that navigation (pattern borrowed from the
   sibling `up-excise-spatial-revenue-optimizer` project's districts table, which does the same for
@@ -723,14 +731,20 @@ visually cramped as features were added:
   field × year table (with its own value/field search box, separate from the Districts table's
   by-name one), a lock-status badge, who locked it and when (`formatIST(lockedAt)`), and — if
   it's currently unlocked — who last unlocked it, when, and why. The page container is
-  `max-w-6xl` (matching the DEO Master View's width, but narrower than the full-bleed
+  `max-w-7xl` (wider than the DEO Master View, but still narrower than the full-bleed
   percentage-padding `/admin/districts` table) and the table itself has no `w-full` — same
   auto-layout reasoning as "Tables must stay auto-layout" below: `w-full` on this money-heavy
   table was forcing it to exactly the (then-narrower `max-w-5xl`) container width, squeezing
-  columns until values clipped instead of the `overflow-x-auto` wrapper ever kicking in. The
-  Unlock button here is a plain `Button variant="amber"` (with a `ti-lock-open` icon) — it used
-  to be a hand-rolled `<button className="rounded-md border ...">` that looked like an unstyled
-  browser default sitting next to the colorful lock-status badge above it.
+  columns until values clipped instead of the wrapper's `overflow-auto` ever kicking in. The
+  table's own scroll wrapper is `max-h-[70vh] overflow-auto` (both axes, not just
+  `overflow-x-auto`) with `sticky top-0` on its header cells, same reasoning/pattern as the
+  Districts table below — so it gets its own scrollbar on small screens instead of just
+  extending the whole page. The Unlock button is a small hand-styled pill (`bg-amber-50
+  text-amber-700 rounded-full px-2.5 py-0.5 text-xs`, `ti-lock-open` icon) sized to match the
+  Locked/email badges it sits directly beside in that same badge row — not a full `Button.tsx`
+  instance, which was noticeably taller/wider than its badge neighbors and looked out of place,
+  and not the earlier hand-rolled plain `<button className="rounded-md border ...">` either,
+  which looked like an unstyled browser default.
 - **`/admin/audit`** — a paginated (100/page), newest-first table of every login/logout,
   district lock/unlock, and DEO provisioning batch, auto-pruned to the last 30 days on read
   (see Data model below). Modeled on the sibling `up-excise-spatial-revenue-optimizer`
