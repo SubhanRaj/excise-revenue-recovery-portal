@@ -13,7 +13,7 @@ import {
   type PaginationState,
   type SortingState,
 } from "@tanstack/react-table";
-import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable } from "@/lib/pac-fields";
+import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable, englishLabel } from "@/lib/pac-fields";
 import { formatIST } from "@/lib/format";
 import { ApiError } from "@/lib/api";
 import { notifyToast, promptUnlockReason, confirmTruncateDemo } from "@/lib/alerts";
@@ -239,10 +239,9 @@ export default function DistrictsPage() {
       }),
       ...PAC_FIELD_ORDER.map((field) =>
         columnHelper.accessor(field, {
-          // Full bilingual label only as a tooltip — using it as the header text directly
-          // forced every column to auto-size to its longest label rather than its (much
-          // shorter) numeric values, which is what was bloating the table width.
-          header: () => <span title={PAC_FIELD_LABELS[field]}>{PAC_FIELD_LABELS[field].split(" / ")[0]}</span>,
+          // English only — matches the Excel export's audience convention (see CLAUDE.md),
+          // no Hindi tooltip needed since the header text itself is already the short form.
+          header: () => englishLabel(PAC_FIELD_LABELS[field]),
           cell: (info) => formatValue(field, info.getValue()),
         })
       ),
@@ -420,13 +419,16 @@ export default function DistrictsPage() {
           </div>
         </div>
 
-        {/* max-h-[70vh] is a real cap (not just min-h/flex-1) so this scrolls internally on
-            small screens too — below lg, the toolbar/nav above eat proportionally more of the
-            viewport, and flex-1 alone never clips since every ancestor up to <body> only sets
-            min-height (see layout.tsx), so the table just grew the whole page instead of
-            scrolling in place. lg:max-h-none keeps the original fill-the-viewport behavior on
-            desktop, where there's room for it. */}
-        <div className="max-h-[70vh] min-h-[50vh] flex-1 overflow-auto rounded-lg border border-slate-200 bg-white shadow-sm [scrollbar-width:thin] scroll-smooth dark:border-slate-800 dark:bg-slate-900 lg:max-h-none">
+        {/* max-h-[70vh] is a real cap (not just min-h/flex-1) so this scrolls internally at
+            every breakpoint — every ancestor up to <body> only sets min-height (see
+            layout.tsx), so flex-1 alone never clips and the table would otherwise just grow
+            the whole page. This cap is what lets the sticky <thead> below actually freeze:
+            position: sticky needs a real scrolling ancestor to stick within, and an
+            lg:max-h-none override here previously removed that ancestor on desktop, leaving
+            the header's sticky context fall back to the page/viewport where it competed with
+            AppHeader's own sticky top-0 instead of freezing inside this table. Always capping
+            it keeps the header frozen consistently at every screen size. */}
+        <div className="max-h-[70vh] min-h-[50vh] flex-1 overflow-auto rounded-lg border border-slate-200 bg-white shadow-sm [scrollbar-width:thin] scroll-smooth dark:border-slate-800 dark:bg-slate-900">
           {isChangingFY ? (
             <div className="p-6">
               <div className="mb-6 h-8 w-full animate-pulse rounded bg-slate-200 dark:bg-slate-800" />

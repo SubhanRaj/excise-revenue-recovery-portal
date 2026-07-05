@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import type { Chart } from "chart.js";
-import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable } from "@/lib/pac-fields";
+import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable, englishLabel } from "@/lib/pac-fields";
 import type { CachedDistrict } from "@/lib/db";
 
 type Row = CachedDistrict & Record<(typeof PAC_FIELD_ORDER)[number], number>;
@@ -224,8 +224,8 @@ export default function AdminDashboard({ rows }: { rows: Row[] }) {
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
             {PAC_FIELD_ORDER.map((field) => (
               <div key={field} className="flex items-center justify-between gap-2">
-                <dt className="truncate text-slate-500 dark:text-slate-400" title={PAC_FIELD_LABELS[field]}>
-                  {PAC_FIELD_LABELS[field].split(" / ")[0]}
+                <dt className="truncate text-slate-500 dark:text-slate-400" title={englishLabel(PAC_FIELD_LABELS[field])}>
+                  {englishLabel(PAC_FIELD_LABELS[field])}
                 </dt>
                 <dd className="tabular-nums font-medium text-slate-900 dark:text-slate-100">
                   {isMoneyField(field) ? formatMoney(sums[field]) : sums[field].toLocaleString("en-IN")}

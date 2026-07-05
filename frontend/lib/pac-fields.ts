@@ -41,6 +41,14 @@ export function isMoneyField(field: PacField): field is MoneyField {
   return (MONEY_FIELDS as string[]).includes(field);
 }
 
+// Strips the " / <Hindi>" half off a PAC_FIELD_LABELS entry. Shared by every admin-facing
+// view (Dashboard, Districts table, Excel export) — those audiences don't need the Hindi;
+// only the DEO-facing form (YearStepForm/MasterView) mirrors the actual bilingual government
+// form and keeps both halves.
+export function englishLabel(bilingual: string): string {
+  return bilingual.split(" / ")[0];
+}
+
 // gross_arrears - (recovered_amount + stay_amount), floored at 0. Display-only — never
 // persisted. Uses recovered_amount, not rc_amount — an RC being issued for an amount doesn't
 // mean that amount was actually recovered, so these two fields are independent (no parity

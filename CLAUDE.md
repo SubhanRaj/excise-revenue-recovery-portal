@@ -689,24 +689,34 @@ visually cramped as features were added:
   status filter, plus Lock/Unlock, Download DEO Template (`variant="blue"`), Upload DEO Data
   (`variant="amber"`), and two export buttons ("Export as Excel Workbook" and "Export as SQL",
   see below) — all the *actions* live here now, not on the Dashboard. Numeric column headers
-  show the short English label only, with the full bilingual label as a `title` tooltip
-  (`header: () => <span title={...}>`) — using the full bilingual string as the header text was
-  forcing every column to auto-size to its longest label rather than its much-shorter numeric
-  values, which is what was bloating the table width. Container padding shrinks progressively at
+  show the short English label only (`englishLabel()` in `lib/pac-fields.ts`, shared with the
+  Admin Dashboard's "All fields" list and the Excel export — none of the three admin-facing
+  views carry the Hindi half of `PAC_FIELD_LABELS`, unlike the DEO-facing form). There's no
+  bilingual tooltip on these headers either — an earlier version put the full bilingual label
+  in a `title` attribute so hovering revealed the Hindi half, but once the header itself only
+  ever needs to show the English label, that tooltip was just a redundant hover with no new
+  information, so it was dropped rather than switched to also show the (now-identical) English
+  text. Container padding shrinks progressively at
   wider breakpoints (`lg:px-[10%] xl:px-[5%] 2xl:px-[3%]`, not a flat `lg:px-[15%]`) instead of a
   fixed `max-w-*`, so a 22"/24" FHD admin monitor gets meaningfully more usable table width rather
   than a large fixed side margin forcing horizontal scroll. The table's scroll container is
   `flex-1` inside a `flex-col` page body, so on a tall desktop display it grows to fill whatever
   vertical space is left in the viewport instead of leaving dead blank space below it — but
-  `flex-1` alone never actually bounds the height on small screens, because every ancestor up to
+  `flex-1` alone never actually bounds the height, because every ancestor up to
   `<body>` (`layout.tsx`) only sets `min-h-full`, never a real `height`, so there's nothing for
   `flex-1` to fill *up to*; the table just kept growing the whole page instead of scrolling in
-  place. Fixed with an actual cap, `max-h-[70vh] ... lg:max-h-none` — real below `lg` (small/
-  tablet screens get their own internal scrollbar), reverting to the original uncapped
-  fill-the-viewport behavior at `lg`+ where there's room for it. The header row is `sticky
+  place. Fixed with an actual cap, `max-h-[70vh]`, at every breakpoint — this used to revert to
+  `lg:max-h-none` (uncapped, fill-the-viewport) at desktop widths, but that broke the sticky
+  header below: `position: sticky` needs a real scrolling ancestor to stick *within*, and
+  removing the height cap left this container with nothing to scroll internally, so the
+  `sticky top-0` header's nearest scrollable ancestor fell back to the page/viewport, where it
+  competed with `AppHeader`'s own `sticky top-0` instead of freezing inside the table. Always
+  capping the container is what makes the header actually freeze on scroll, at every screen
+  size. The header row is `sticky
   top-0` so it stays visible within that scroll. If you add another scrolling table wrapper,
-  follow this same `max-h-[Xvh] ... lg:max-h-none` pattern rather than only `flex-1`/`min-h`,
-  which doesn't reliably clip on its own given this app's `min-height`-only ancestor chain.
+  follow this same always-capped `max-h-[Xvh]` pattern rather than only `flex-1`/`min-h` (which
+  doesn't reliably clip on its own given this app's `min-height`-only ancestor chain) or an
+  `lg:`-uncapped override (which breaks a sticky header's scrolling ancestor).
   Clicking anywhere on
   a district row navigates to that district's detail page; the Unlock button inside the row calls
   `e.stopPropagation()` so it doesn't also trigger that navigation (pattern borrowed from the
@@ -737,11 +747,15 @@ visually cramped as features were added:
   filter) pass a wider `className="min-w-[...]"` override — if you add an option list with a
   long label, check the rendered width rather than assuming the `8rem` default covers it. If
   you add another dropdown anywhere in admin, use `Select`, not a bare `<select>`. `Select`
-  also takes its own `size?: "sm" | "md"` prop (default `sm`, `py-1.5`/`py-2`) — a padding
+  also takes its own `size?: "sm" | "md"` prop (default `sm`, `py-1.5`/`py-2.5`) — a padding
   variant like `Button.tsx`'s `SIZES`, not the native HTML `size` attribute (that's `Omit`-ted
   from the props type) — because the FY filter's digit-heavy options ("FY 2021-22") were
   getting visibly cropped at the top at the default padding; it's on `size="md"`, the others
-  stay `sm`. Don't fix a similar crop by passing a `py-*` override via `className` instead —
+  stay `sm`. `md` was bumped once already (from `py-2`) after the first bump still wasn't
+  enough headroom for this particular label — if it's ever cropped again, raise this value
+  further rather than reaching for a `line-height` fix, since the cropping is padding, not
+  line-height (see the unrelated `line-height: 1` `globals.css` fix elsewhere in this doc,
+  which fixed icon/text misalignment, not this). Don't fix a similar crop by passing a `py-*` override via `className` instead —
   same conflicting-utility/JIT-ordering risk as `Button.tsx`, add another `SIZES` entry here if
   a third padding is ever needed. The pagination Prev/Next icon buttons are a separate,
   unrelated `rounded-full` case — untouched by this fix.
@@ -889,11 +903,27 @@ inventing a different one for the export. `exportExcel()`/`exportSql()` in
 bug pattern documented in the Data model section) silently rendered in the admin's own browser
 timezone rather than real IST; fixed to go through `formatIST()` like everywhere else.
 
-Each FY sheet is created with `views: [{ state: "frozen", ySplit: TITLE_ROWS + 1 }]` and
-`pageSetup: { printTitlesRow: "1:" + (TITLE_ROWS + 1) }` passed directly to `wb.addWorksheet()`
-— **frozen panes are real** with ExcelJS (confirmed by a real `<pane ySplit="3" .../>` in the
-output XML, unlike the SheetJS-based attempts before it), freezing the title/data-period/header
-rows on screen, and `_xlnm.Print_Titles` repeats those same rows on every printed page. Sheet
+Every sheet in every exported workbook (Summary, all 5 FY sheets, and the DEO provisioning
+template) shares one `PAGE_SETUP` object in `export.ts` — **A4** (`paperSize: 9`, the ExcelJS/
+OOXML numeric code; the library's own default is US Letter, which is wrong for this portal's
+India-based audience), **landscape** (these tables are wide — up to 8 columns on the FY sheets),
+and `fitToPage: true` with `fitToWidth: 1, fitToHeight: 0` — Excel's "fit all columns to one
+page" combined with "let rows spill onto as many pages as needed" (a `fitToHeight` of `0` means
+no cap on how many pages tall the printout can be, only how many wide). Confirmed via a real
+`wb.xlsx.writeFile()` + XML inspection that this writes `paperSize="9" orientation="landscape"
+fitToWidth="1" fitToHeight="0"` on `<pageSetup>` and `<pageSetUpPr fitToPage="1"/>` inside
+`<sheetPr>` — both are required together; `fitToWidth`/`fitToHeight` alone are silently ignored
+by Excel unless `sheetPr>pageSetUpPr fitToPage="1"` is also set, which is what ExcelJS's own
+`fitToPage: true` option writes. If you add another sheet to any export, spread `PAGE_SETUP` into
+its `pageSetup` option (see the FY-sheet loop below for how it's merged with the per-sheet
+`printTitlesRow`) rather than leaving it on the library's Letter/portrait default.
+
+Each FY sheet is additionally created with `views: [{ state: "frozen", ySplit: TITLE_ROWS + 1 }]`
+and `pageSetup: { ...PAGE_SETUP, printTitlesRow: "1:" + (TITLE_ROWS + 1) }` passed directly to
+`wb.addWorksheet()` — **frozen panes are real** with ExcelJS (confirmed by a real
+`<pane ySplit="3" .../>` in the output XML, unlike the SheetJS-based attempts before it), freezing
+the title/data-period/header rows on screen, and `_xlnm.Print_Titles` repeats those same rows on
+every printed page. Sheet
 indices are handled by ExcelJS itself from insertion order, so the Summary sheet occupying
 position 0 doesn't need any manual index bookkeeping the way the old SheetJS-based
 `printTitleNames`/`wb.Workbook.Names` array did — don't reintroduce that pattern here. **Cell

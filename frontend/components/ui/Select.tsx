@@ -11,9 +11,9 @@ type Props = Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "size"> & {
 // list have unreliable precedence under the Tailwind CDN's JIT.
 const SIZES: Record<NonNullable<Props["size"]>, string> = {
   sm: "py-1.5",
-  // The FY filter's digit-heavy options ("FY 2021-22") were getting cropped at the top at the
-  // default py-1.5 — a touch more vertical padding fixes it without touching every dropdown.
-  md: "py-2",
+  // The FY filter's digit-heavy options ("FY 2021-22") were still getting cropped at the top
+  // at py-2 — bumped again to py-2.5 rather than touching line-height on every dropdown.
+  md: "py-2.5",
 };
 
 // Native <select> arrows vary in size/position across browsers and don't scale with the rest

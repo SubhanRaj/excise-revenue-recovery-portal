@@ -1,5 +1,5 @@
 import type { Workbook, Cell } from "exceljs";
-import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable } from "./pac-fields";
+import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable, englishLabel } from "./pac-fields";
 import { SITE_TITLE_EN, DATA_PERIOD_EN } from "./site";
 import { formatIST } from "./format";
 import type { CachedDistrict, CachedPacData } from "./db";
@@ -16,6 +16,19 @@ const TITLE_ROWS = 2;
 // ExcelJS ARGB colors need a leading alpha channel — "FF" (fully opaque) here.
 const HEADER_FILL = "FF1D4ED8";
 const TOTAL_FILL = "FFDBEAFE";
+
+// Applied to every sheet in every exported workbook: A4 (ExcelJS/OOXML paper size code 9, not
+// the US Letter default), landscape (these tables are wide — districts × 6 PAC fields + Net
+// Recoverable), and fitToWidth: 1 / fitToHeight: 0 so all columns always print on one page's
+// width while rows are free to spill onto as many pages as needed (fitToHeight: 0 means "no
+// limit" — the actual multi-page-by-rows behavior being asked for).
+const PAGE_SETUP = {
+  paperSize: 9,
+  orientation: "landscape",
+  fitToPage: true,
+  fitToWidth: 1,
+  fitToHeight: 0,
+} as const;
 
 function styleTitleCell(cell: Cell) {
   cell.font = { bold: true, size: 14 };
@@ -41,10 +54,6 @@ function styleTotalCell(cell: Cell) {
 // This export is read by auditors/senior officers/commissioners, not DEOs — unlike the rest of
 // the app, PAC_FIELD_LABELS' Hindi half (there for the government form DEOs fill out) isn't
 // needed here, so every label is trimmed to its English half before it reaches a sheet.
-function englishLabel(bilingual: string): string {
-  return bilingual.split(" / ")[0];
-}
-
 // Filename-safe IST timestamp down to the second (e.g. "2026-07-05_20-14-32") — the previous
 // plain `toISOString().slice(0, 10)` only gave the UTC date, which collapsed every export
 // downloaded on the same IST day into one filename; this distinguishes re-downloads on the same
@@ -129,7 +138,7 @@ export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData
   }
   const lockedCount = districts.filter((d) => d.lockStatus === 1).length;
 
-  const summaryWs = wb.addWorksheet("Summary");
+  const summaryWs = wb.addWorksheet("Summary", { pageSetup: PAGE_SETUP });
   summaryWs.columns = [{ width: 32 }, { width: 40 }];
   summaryWs.addRow([SITE_TITLE_EN]);
   summaryWs.addRow([DATA_PERIOD_EN]);
@@ -178,8 +187,9 @@ export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData
       // package nor the "xlsx-js-style" fork write frozen-pane XML at all; confirmed empty
       // <sheetView> in both). ExcelJS's writer genuinely emits the <pane> element Excel needs.
       views: [{ state: "frozen", ySplit: TITLE_ROWS + 1 }],
-      // _xlnm.Print_Titles — repeats the same rows on every *printed* page too.
-      pageSetup: { printTitlesRow: `1:${TITLE_ROWS + 1}` },
+      // _xlnm.Print_Titles — repeats the same rows on every *printed* page too, on top of the
+      // shared A4/landscape/fit-to-width page setup.
+      pageSetup: { ...PAGE_SETUP, printTitlesRow: `1:${TITLE_ROWS + 1}` },
     });
     ws.columns = [{ width: 22 }, ...PAC_FIELD_ORDER.map(() => ({ width: 18 })), { width: 18 }];
 
@@ -225,7 +235,7 @@ export async function downloadDeoTemplate(districts: CachedDistrict[]) {
   const sortedNames = [...districts].map((d) => d.districtName).sort((a, b) => a.localeCompare(b));
 
   const wb = new window.ExcelJS.Workbook();
-  const ws = wb.addWorksheet("DEO Provisioning");
+  const ws = wb.addWorksheet("DEO Provisioning", { pageSetup: PAGE_SETUP });
   ws.columns = [{ width: 24 }, { width: 26 }, { width: 30 }];
   ws.addRow(header);
   for (const name of sortedNames) ws.addRow([name, "", ""]);
