@@ -5,8 +5,11 @@ import Link from "next/link";
 import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable } from "@/lib/pac-fields";
 import { formatIST } from "@/lib/format";
 import { getNavDistrictId } from "@/lib/adminNav";
+import { ApiError } from "@/lib/api";
+import { notifyToast, promptUnlockReason } from "@/lib/alerts";
 import { useAdminData } from "@/lib/useAdminData";
 import AppHeader, { type NavLink } from "@/components/ui/AppHeader";
+import Banner from "@/components/ui/Banner";
 
 const NAV_LINKS: NavLink[] = [
   { label: "Dashboard", href: "/admin" },
@@ -28,7 +31,7 @@ function formatValue(field: (typeof PAC_FIELD_ORDER)[number], value: number) {
 // sessionStorage avoids that without putting the id in the URL either.
 export default function DistrictDetailPage() {
   const [districtId, setDistrictId] = useState<number | null>(null);
-  const { ready, profile, districts, pacData, sync, syncing, lastSyncedAt } = useAdminData();
+  const { ready, profile, districts, pacData, sync, syncing, lastSyncedAt, unlock, error, setError } = useAdminData();
   const [query, setQuery] = useState("");
 
   useEffect(() => {
@@ -56,6 +59,17 @@ export default function DistrictDetailPage() {
       )
     : PAC_FIELD_ORDER;
 
+  async function handleUnlock(id: number, name: string) {
+    const reason = await promptUnlockReason(name);
+    if (!reason) return;
+    try {
+      await unlock(id, reason);
+      notifyToast({ icon: "success", title: "District unlocked" });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Unlock failed.");
+    }
+  }
+
   if (!ready || districtId === null) return null;
 
   return (
@@ -76,19 +90,34 @@ export default function DistrictDetailPage() {
           </p>
         ) : (
           <>
+            {error && (
+              <div className="mb-4">
+                <Banner variant="error">{error}</Banner>
+              </div>
+            )}
             <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{district.districtName}</h1>
-                <span
-                  className={`mt-1 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    district.lockStatus === 1
-                      ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
-                      : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                  }`}
-                >
-                  <i className={`ti ${district.lockStatus === 1 ? "ti-lock" : "ti-lock-open"} text-sm`} />
-                  {district.lockStatus === 1 ? "Locked" : "Unlocked"}
-                </span>
+              <div className="flex items-center gap-4">
+                <div>
+                  <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{district.districtName}</h1>
+                  <span
+                    className={`mt-1 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                      district.lockStatus === 1
+                        ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
+                        : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                    }`}
+                  >
+                    <i className={`ti ${district.lockStatus === 1 ? "ti-lock" : "ti-lock-open"} text-sm`} />
+                    {district.lockStatus === 1 ? "Locked" : "Unlocked"}
+                  </span>
+                </div>
+                {district.lockStatus === 1 && (
+                  <button
+                    onClick={() => handleUnlock(district.id, district.districtName)}
+                    className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                  >
+                    Unlock
+                  </button>
+                )}
               </div>
               {lockInfo && (
                 <div className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm dark:border-slate-800 dark:bg-slate-900">
