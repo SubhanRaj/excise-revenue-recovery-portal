@@ -534,6 +534,19 @@ visually cramped as features were added:
   for its TS types (`window.Chart` in `lib/globals.d.ts`), same pattern as `xlsx`/`sweetalert2`
   — the real runtime script is CDN-only. Since the script loads lazily, `LockStatusDonut` polls
   for `window.Chart` every 150ms until it appears rather than assuming it's ready on mount.
+  **Every number on this page is a total across all 5 financial years, never one FY at a
+  time** — `admin/page.tsx` used to have its own FY `<select>` that filtered every stat down to
+  one year, which was actively wrong for lock status: a district's PAC submission and lock are
+  one atomic action covering all 5 years at once (see the submit route in Data model above), so
+  "locked for FY 2023-24 but not FY 2024-25" can't happen — a per-year lock-status filter had
+  nothing real to filter. `admin/page.tsx`'s `rows` now sums each PAC field across
+  `FINANCIAL_YEARS` per district before handing rows to `AdminDashboard`, so Gross Arrears/Net
+  Recoverable/the top-5 list reflect the district's cumulative position as of 31 March 2026 (the
+  end of FY 2025-26), not a single year snapshot. `AdminDashboard`'s `PERIOD_LABEL` constant
+  (`` `FY ${FINANCIAL_YEARS[0]} – ${FINANCIAL_YEARS[FINANCIAL_YEARS.length - 1]}` ``) is what
+  the "Total (...)" headings reference — don't reintroduce a year selector on this page.
+  `/admin/districts`' own FY `<select>` is unrelated and correctly kept: viewing one year's
+  figures per district in that table is a legitimate, different use case from this overview.
 - **`/admin/districts`** — the sortable/searchable/pinned-column table with pagination
   (`getPaginationRowModel`, Rows-per-page 25/50/75/100, Prev/Next), a Locked/Unlocked/All
   status filter, plus Lock/Unlock, Download DEO Template (`variant="blue"`), Upload DEO Data

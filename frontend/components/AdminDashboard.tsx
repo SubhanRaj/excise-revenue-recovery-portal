@@ -1,10 +1,15 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import type { Chart } from "chart.js";
-import { PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable } from "@/lib/pac-fields";
+import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable } from "@/lib/pac-fields";
 import type { CachedDistrict } from "@/lib/db";
 
 type Row = CachedDistrict & Record<(typeof PAC_FIELD_ORDER)[number], number>;
+
+// Every KpiCard/chart/list on this dashboard is a total across the full 5-year window, not one
+// FY at a time — see the comment in admin/page.tsx for why a per-year filter didn't make sense
+// here. This is just the label for that window.
+const PERIOD_LABEL = `FY ${FINANCIAL_YEARS[0]} – ${FINANCIAL_YEARS[FINANCIAL_YEARS.length - 1]}`;
 
 function formatMoney(value: number) {
   return `₹${value.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
@@ -124,7 +129,7 @@ function KpiCard({
 
 // ponytail: top-5 list and lock-ratio bar stay plain CSS divs — only the one chart the user
 // asked to see (locked vs unlocked, LockStatusDonut above) pulls in Chart.js via CDN.
-export default function AdminDashboard({ rows, selectedYear }: { rows: Row[]; selectedYear: string }) {
+export default function AdminDashboard({ rows }: { rows: Row[] }) {
   const totalDistricts = rows.length;
   const locked = rows.filter((r) => r.lockStatus === 1).length;
   const unlocked = totalDistricts - locked;
@@ -166,7 +171,7 @@ export default function AdminDashboard({ rows, selectedYear }: { rows: Row[]; se
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
           <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
-            Top 5 districts by Net Recoverable — FY {selectedYear}
+            Top 5 districts by Net Recoverable — Total ({PERIOD_LABEL})
           </h3>
           <div className="space-y-2.5">
             {topDues.map((d) => (
@@ -191,7 +196,7 @@ export default function AdminDashboard({ rows, selectedYear }: { rows: Row[]; se
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-          <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Lock status — FY {selectedYear}</h3>
+          <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Lock status</h3>
           <div className="flex items-center gap-4">
             <LockStatusDonut locked={locked} unlocked={unlocked} />
             <div className="flex-1">
@@ -214,7 +219,7 @@ export default function AdminDashboard({ rows, selectedYear }: { rows: Row[]; se
           </div>
 
           <h3 className="mb-3 mt-5 text-sm font-semibold text-slate-700 dark:text-slate-300">
-            All fields — FY {selectedYear} total
+            All fields — Total ({PERIOD_LABEL})
           </h3>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
             {PAC_FIELD_ORDER.map((field) => (
