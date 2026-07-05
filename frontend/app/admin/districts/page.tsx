@@ -350,6 +350,7 @@ export default function DistrictsPage() {
             </Select>
             <Select
               value={selectedYear}
+              size="md"
               disabled={isChangingFY}
               onChange={(e) => {
                 const val = e.target.value as (typeof FINANCIAL_YEARS)[number];

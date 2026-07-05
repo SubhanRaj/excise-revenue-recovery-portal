@@ -715,9 +715,15 @@ visually cramped as features were added:
   doesn't comfortably fit `8rem` (`/admin/districts`' status filter, `/admin/audit`'s event
   filter) pass a wider `className="min-w-[...]"` override — if you add an option list with a
   long label, check the rendered width rather than assuming the `8rem` default covers it. If
-  you add another dropdown anywhere in admin, use `Select`, not a bare `<select>`. The
-  pagination Prev/Next icon buttons are a separate, unrelated `rounded-full` case — untouched
-  by this fix.
+  you add another dropdown anywhere in admin, use `Select`, not a bare `<select>`. `Select`
+  also takes its own `size?: "sm" | "md"` prop (default `sm`, `py-1.5`/`py-2`) — a padding
+  variant like `Button.tsx`'s `SIZES`, not the native HTML `size` attribute (that's `Omit`-ted
+  from the props type) — because the FY filter's digit-heavy options ("FY 2021-22") were
+  getting visibly cropped at the top at the default padding; it's on `size="md"`, the others
+  stay `sm`. Don't fix a similar crop by passing a `py-*` override via `className` instead —
+  same conflicting-utility/JIT-ordering risk as `Button.tsx`, add another `SIZES` entry here if
+  a third padding is ever needed. The pagination Prev/Next icon buttons are a separate,
+  unrelated `rounded-full` case — untouched by this fix.
   **Export as Excel Workbook** and **Export as SQL** both re-sync first (so the export reflects
   the live server state, not a possibly-stale cache), then build their respective file; both show
   a disabled, `animate-pulse` "Exporting..." state on their own button while running (mirroring

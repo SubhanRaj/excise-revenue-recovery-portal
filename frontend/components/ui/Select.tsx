@@ -1,6 +1,20 @@
 "use client";
 
-type Props = React.SelectHTMLAttributes<HTMLSelectElement>;
+// Omit the native `size` attribute (number of visible rows) — this component's own `size`
+// prop is a padding variant, same idea as Button.tsx's, not the HTML attribute.
+type Props = Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "size"> & {
+  size?: "sm" | "md";
+};
+
+// Kept as a size variant rather than a py-* className override, same reasoning as
+// Button.tsx's SIZES: two conflicting padding utilities for the same property in one class
+// list have unreliable precedence under the Tailwind CDN's JIT.
+const SIZES: Record<NonNullable<Props["size"]>, string> = {
+  sm: "py-1.5",
+  // The FY filter's digit-heavy options ("FY 2021-22") were getting cropped at the top at the
+  // default py-1.5 — a touch more vertical padding fixes it without touching every dropdown.
+  md: "py-2",
+};
 
 // Native <select> arrows vary in size/position across browsers and don't scale with the rest
 // of the toolbar's icons — appearance-none plus our own Tabler chevron keeps every dropdown
@@ -8,7 +22,7 @@ type Props = React.SelectHTMLAttributes<HTMLSelectElement>;
 // own bulky default arrow eating extra padding. One text-sm size for every admin dropdown —
 // these used to mix text-xs (status/event filters) and text-sm (FY/rows-per-page filters)
 // sitting side by side in the same toolbar row, which is what made them look mismatched.
-export default function Select({ className = "", ...props }: Props) {
+export default function Select({ className = "", size = "sm", ...props }: Props) {
   return (
     <div className="relative inline-block">
       {/* min-w-[8rem]: with appearance-none + border-box (Tailwind's preflight), browsers'
@@ -18,7 +32,7 @@ export default function Select({ className = "", ...props }: Props) {
           browser to size around our padding correctly. */}
       <select
         {...props}
-        className={`min-w-[8rem] appearance-none rounded-md border border-slate-300 bg-white py-1.5 pl-3 pr-9 text-sm text-slate-700 shadow-sm outline-none hover:bg-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 ${className}`}
+        className={`min-w-[8rem] appearance-none rounded-md border border-slate-300 bg-white pl-3 pr-9 text-sm text-slate-700 shadow-sm outline-none hover:bg-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 ${SIZES[size]} ${className}`}
       />
       <i className="ti ti-chevron-down pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-500 dark:text-slate-400" />
     </div>
