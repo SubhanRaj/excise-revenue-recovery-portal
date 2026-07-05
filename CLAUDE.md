@@ -847,39 +847,60 @@ fixed it looking oddly stretched-out after the auto-layout fix in "Tables must s
 auto-layout" below; `overflow-x-auto` on the wrapper is still the fallback for narrow
 viewports.
 
-Excel export (`exportDistrictsToXlsx()` in `frontend/lib/export.ts`) is **one workbook, five
-sheets** — one per financial year, each sheet districts × the 6 PAC fields for just that year
-— not one sheet with all 5 years' columns side by side like the original version. Sheets are
-named `FY 2021-22`, etc (see the FY-labeling convention above). Each sheet also carries two
-merged banner rows above the district/field header row — `SITE_TITLE_EN` (see Portal identity
-strings above) and, since this file is read by auditors/senior officers/commissioners rather
-than a single DEO, that sheet's own `dataPeriodForFY(fy)` (e.g. "Data Period: 1 April 2021 to
-31 March 2022" on the FY 2021-22 sheet) rather than the portal-wide `DATA_PERIOD_EN` — so the
-exported file is self-describing if it's opened outside the portal (e.g. emailed to Excise HQ).
-`TITLE_ROWS` in `export.ts` is the single source of truth for how many rows that pushes the
+Excel export (`exportDistrictsToXlsx()` in `frontend/lib/export.ts`) is **one workbook, six
+sheets** — a **Summary** cover sheet followed by one sheet per financial year, each of those five
+districts × the 6 PAC fields for just that year — not one sheet with all 5 years' columns side
+by side like the original version. The FY sheets are named `FY 2021-22`, etc (see the
+FY-labeling convention above). Each FY sheet carries two merged banner rows above the
+district/field header row — `SITE_TITLE_EN` (see Portal identity strings above) and, since this
+file is read by auditors/senior officers/commissioners rather than a single DEO, that sheet's own
+`dataPeriodForFY(fy)` (e.g. "Data Period: 1 April 2021 to 31 March 2022" on the FY 2021-22 sheet)
+rather than the portal-wide `DATA_PERIOD_EN` — so each sheet is self-describing about which year
+it covers if it's opened outside the portal (e.g. emailed to Excise HQ). `TITLE_ROWS` in
+`export.ts` is the single source of truth for how many rows that pushes the
 header/data/money-formatting/freeze-pane math down by — update it, not the individual
 row-offset call sites, if another banner row is ever added. **Every column header in this
 export is English-only** (`englishLabel()` strips the ` / <Hindi>` half off `PAC_FIELD_LABELS`
 before it reaches a sheet, and the trailing Net Recoverable column is the bare English string) —
 unlike the DEO-facing UI, where the bilingual labels mirror the government form DEOs actually
-fill out, this file's audience already knows the domain and has no Hindi requirement. Each
-sheet also registers a per-sheet `_xlnm.Print_Titles` defined name on `wb.Workbook.Names`
-covering rows 1–`TITLE_ROWS + 1` (title + data period + header), so those three rows repeat on
-every printed page — unlike frozen panes (`!freeze`, just below), this is a plain OOXML
-workbook-level feature both SheetJS builds genuinely write and Excel genuinely reads, confirmed
-by inspecting `xl/workbook.xml` in a real build's output; don't assume it needs Pro just because
-the adjacent freeze-pane line does. **Cell styling is real** (see the `xlsx-js-style` note under
-"Sober blue" above for why, unlike the stock `xlsx` package): the title (`A1`) and data-period
-(`A2`) cells are bold/italic and centered — since a merge is really just centering the merge's
-top-left cell and hiding the rest underneath it, only that one cell per row needs the alignment
-style, not every column across the merge — the header row (`r: TITLE_ROWS`) is white-on-`HEADER_FILL`
-(the same brand blue used elsewhere, see "Visual language" below) bold and centered, and the
-TOTAL row (`totalRowIndex`) is bold on a soft `TOTAL_FILL` blue tint. Frozen panes remain the
-one exception: confirmed by inspecting `xl/worksheets/sheet1.xml` from a real `xlsx-js-style`
-build that it still emits no `<pane>` element even in a file with real styles elsewhere — that
-fork only patches in style writing, not pane writing, so the existing `!freeze` line stays a
-documented no-op regardless of which build is loaded; true on-screen frozen rows still need
-SheetJS Pro.
+fill out, this file's audience already knows the domain and has no Hindi requirement.
+
+The **Summary** sheet is appended first (`wb.SheetNames` index 0) so it's the first thing the
+reader sees, deliberately *not* a `Generated:` row repeated identically on all 5 FY sheets — it
+carries `SITE_TITLE_EN`, the portal-wide `DATA_PERIOD_EN` (this one sheet is workbook-wide, not
+per-FY, so the full 5-year span is the right text here, unlike the FY sheets' own
+`dataPeriodForFY()`), a `Generated: <formatIST(...)> IST` line (computed once per download, in
+real IST — see the `formatIST()` note below), and a small `Metric`/`Value` table: total/locked/
+unlocked district counts and Gross Arrears/Recovered Amount/Net Recoverable summed across every
+district and all 5 `FINANCIAL_YEARS` — the same "whole 5-year window" totaling convention the
+Admin Dashboard's own KPI cards already use (see `admin/page.tsx` below), reused here rather than
+inventing a different one for the export. `exportExcel()`/`exportSql()` in
+`admin/districts/page.tsx` show the admin a matching pre-download confirmation ("Generated at:
+... IST") using this same `formatIST()` — that dialog used to read
+`new Date().toLocaleString("en-IN")` with no explicit `timeZone`, which (per the `formatIST()`
+bug pattern documented in the Data model section) silently rendered in the admin's own browser
+timezone rather than real IST; fixed to go through `formatIST()` like everywhere else.
+
+Each FY sheet also registers a per-sheet `_xlnm.Print_Titles` defined name on
+`wb.Workbook.Names` covering rows 1–`TITLE_ROWS + 1` (title + data period + header), so those
+three rows repeat on every printed page — unlike frozen panes (`!freeze`, just below), this is a
+plain OOXML workbook-level feature both SheetJS builds genuinely write and Excel genuinely
+reads, confirmed by inspecting `xl/workbook.xml` in a real build's output; don't assume it needs
+Pro just because the adjacent freeze-pane line does. Sheet indices for this defined name are
+read off `wb.SheetNames.length` at append time, so they automatically account for the Summary
+sheet occupying index 0 — don't hardcode a per-FY sheet's index. **Cell styling is real** (see
+the `xlsx-js-style` note under "Sober blue" above for why, unlike the stock `xlsx` package): on
+every sheet (Summary included) the title/data-period/generated-at cells are bold/italic and
+centered — since a merge is really just centering the merge's top-left cell and hiding the rest
+underneath it, only that one cell per row needs the alignment style, not every column across the
+merge — the header row (`r: TITLE_ROWS` on FY sheets, row 4 on Summary) is white-on-`HEADER_FILL`
+(the same brand blue used elsewhere, see "Visual language" below) bold and centered, and each FY
+sheet's TOTAL row (`totalRowIndex`) is bold on a soft `TOTAL_FILL` blue tint. Frozen panes remain
+the one exception: confirmed by inspecting `xl/worksheets/sheet1.xml` from a real
+`xlsx-js-style` build that it still emits no `<pane>` element even in a file with real styles
+elsewhere — that fork only patches in style writing, not pane writing, so the existing `!freeze`
+line stays a documented no-op regardless of which build is loaded; true on-screen frozen rows
+still need SheetJS Pro.
 
 ## Bulk DEO provisioning (Admin dashboard)
 

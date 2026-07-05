@@ -14,6 +14,7 @@ import {
   type SortingState,
 } from "@tanstack/react-table";
 import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable } from "@/lib/pac-fields";
+import { formatIST } from "@/lib/format";
 import { ApiError } from "@/lib/api";
 import { notifyToast, promptUnlockReason, confirmTruncateDemo } from "@/lib/alerts";
 import { exportDistrictsToXlsx, exportDistrictsToSql, downloadDeoTemplate, parseDeoTemplateFile } from "@/lib/export";
@@ -94,10 +95,13 @@ export default function DistrictsPage() {
     });
     try {
       const fresh = await sync();
-      const now = new Date().toLocaleString("en-IN");
+      // formatIST(), not toLocaleString("en-IN") alone — the latter only sets locale
+      // conventions, not the timezone, so it silently renders in the admin's browser's own
+      // local zone instead of real IST (see CLAUDE.md's formatIST() note).
+      const now = formatIST(new Date().toISOString());
       const result = await window.Swal.fire({
         title: "Export Ready",
-        html: `Data is synced and ready.<br>Generated at: <strong>${now}</strong>`,
+        html: `Data is synced and ready.<br>Generated at: <strong>${now} IST</strong>`,
         icon: "success",
         showConfirmButton: true,
         confirmButtonText: "Download Excel File",
@@ -124,10 +128,13 @@ export default function DistrictsPage() {
     });
     try {
       const fresh = await sync();
-      const now = new Date().toLocaleString("en-IN");
+      // formatIST(), not toLocaleString("en-IN") alone — the latter only sets locale
+      // conventions, not the timezone, so it silently renders in the admin's browser's own
+      // local zone instead of real IST (see CLAUDE.md's formatIST() note).
+      const now = formatIST(new Date().toISOString());
       const result = await window.Swal.fire({
         title: "Export Ready",
-        html: `Data is synced and ready.<br>Generated at: <strong>${now}</strong>`,
+        html: `Data is synced and ready.<br>Generated at: <strong>${now} IST</strong>`,
         icon: "success",
         showConfirmButton: true,
         confirmButtonText: "Download SQL File",

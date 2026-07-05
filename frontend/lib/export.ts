@@ -1,5 +1,6 @@
 import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable } from "./pac-fields";
-import { SITE_TITLE_EN } from "./site";
+import { SITE_TITLE_EN, DATA_PERIOD_EN } from "./site";
+import { formatIST } from "./format";
 import type { CachedDistrict, CachedPacData } from "./db";
 
 const RUPEE_FORMAT = '"₹"#,##0.00';
@@ -50,6 +51,71 @@ export function exportDistrictsToXlsx(districts: CachedDistrict[], pacData: Cach
   // the base workbook format and does get written/read by the free build, so "repeat these rows
   // on every printed page" is genuinely achievable here even though "freeze them on screen" isn't.
   const printTitleNames: { Name: string; Sheet: number; Ref: string }[] = [];
+  // One shared timestamp for the whole workbook — this is when the download actually happened,
+  // in real IST (formatIST(), not toLocaleString("en-IN") alone, which silently uses the
+  // browser's own local zone instead).
+  const generatedAt = formatIST(new Date().toISOString());
+
+  // A "Summary" cover sheet, appended first (sheet index 0) so it's the first thing the reader
+  // sees — when the file was generated and a workbook-wide lock/revenue overview — rather than
+  // repeating a generated-at row on all 5 per-FY sheets. Totals here are summed across every
+  // district and all 5 FINANCIAL_YEARS, same "whole 5-year window" convention the Admin
+  // Dashboard's own KPI cards already use (see admin/page.tsx).
+  let totalGrossArrears = 0;
+  let totalRecovered = 0;
+  let totalNetRecoverable = 0;
+  for (const d of districts) {
+    for (const fy of FINANCIAL_YEARS) {
+      const match = pacData.find((p) => p.districtId === d.id && p.financialYear === fy);
+      totalGrossArrears += match?.grossArrears ?? 0;
+      totalRecovered += match?.recoveredAmount ?? 0;
+      totalNetRecoverable += netRecoverable(match?.grossArrears ?? 0, match?.recoveredAmount ?? 0, match?.stayAmount ?? 0);
+    }
+  }
+  const lockedCount = districts.filter((d) => d.lockStatus === 1).length;
+
+  const summaryRows: (string | number)[][] = [
+    [SITE_TITLE_EN],
+    [DATA_PERIOD_EN],
+    [`Generated: ${generatedAt} IST`],
+    [],
+    ["Metric", "Value"],
+    ["Total Districts", districts.length],
+    ["Locked Districts", lockedCount],
+    ["Unlocked Districts", districts.length - lockedCount],
+    ["Total Gross Arrears (all 5 years)", totalGrossArrears],
+    ["Total Recovered Amount (all 5 years)", totalRecovered],
+    ["Total Net Recoverable (all 5 years)", totalNetRecoverable],
+    [],
+    ["Sheets in this workbook", FINANCIAL_YEARS.map((fy) => `FY ${fy}`).join(", ")],
+  ];
+  const summaryWs = window.XLSX.utils.aoa_to_sheet(summaryRows);
+  summaryWs["!cols"] = [{ wch: 32 }, { wch: 40 }];
+  summaryWs["!merges"] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 1 } },
+    { s: { r: 2, c: 0 }, e: { r: 2, c: 1 } },
+  ];
+  summaryWs["A1"].s = { font: { bold: true, sz: 14 }, alignment: { horizontal: "center", vertical: "center" } };
+  summaryWs["A2"].s = { font: { italic: true, sz: 11 }, alignment: { horizontal: "center", vertical: "center" } };
+  summaryWs["A3"].s = {
+    font: { italic: true, sz: 10, color: { rgb: "64748B" } },
+    alignment: { horizontal: "center", vertical: "center" },
+  };
+  for (const c of [0, 1]) {
+    const cell = window.XLSX.utils.encode_cell({ r: 4, c });
+    summaryWs[cell].s = {
+      font: { bold: true, color: { rgb: "FFFFFF" } },
+      fill: { fgColor: { rgb: HEADER_FILL } },
+      alignment: { horizontal: "center", vertical: "center" },
+    };
+  }
+  // Rows 8–10 (0-indexed) are the three money metrics above — format their value column as ₹.
+  for (const r of [8, 9, 10]) {
+    const cell = window.XLSX.utils.encode_cell({ r, c: 1 });
+    summaryWs[cell].z = RUPEE_FORMAT;
+  }
+  window.XLSX.utils.book_append_sheet(wb, summaryWs, "Summary");
 
   for (const fy of FINANCIAL_YEARS) {
     const rows: (string | number)[][] = sortedDistricts.map((d) => {
