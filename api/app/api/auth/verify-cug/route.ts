@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { users } from "@/db/schema";
+import { users, districts } from "@/db/schema";
 import { signSession, sessionCookie } from "@/lib/session";
 import { auditLogInsert } from "@/lib/audit";
 
@@ -15,21 +15,35 @@ export async function POST(req: NextRequest) {
   }
 
   const db = getDb();
-  const [user] = await db.select().from(users).where(eq(users.cugHash, cugHash)).limit(1);
+  const [row] = await db
+    .select({
+      id: users.id,
+      role: users.role,
+      districtId: users.districtId,
+      districtName: districts.districtName,
+    })
+    .from(users)
+    .leftJoin(districts, eq(users.districtId, districts.id))
+    .where(eq(users.cugHash, cugHash))
+    .limit(1);
 
-  if (!user) {
+  if (!row) {
     return NextResponse.json({ error: "Invalid CUG number" }, { status: 401 });
   }
 
   const token = await signSession({
-    userId: user.id,
-    role: user.role as "deo" | "admin",
-    districtId: user.districtId,
+    userId: row.id,
+    role: row.role as "deo" | "admin",
+    districtId: row.districtId,
   });
 
-  await auditLogInsert(db, { eventType: "login_cug", actorRole: user.role as "deo" | "admin" });
+  await auditLogInsert(db, {
+    eventType: "login_cug",
+    actorRole: row.role as "deo" | "admin",
+    districtName: row.districtName,
+  });
 
-  const res = NextResponse.json({ ok: true, role: user.role, districtId: user.districtId });
-  res.headers.set("Set-Cookie", sessionCookie(token, user.role as "deo" | "admin"));
+  const res = NextResponse.json({ ok: true, role: row.role, districtId: row.districtId });
+  res.headers.set("Set-Cookie", sessionCookie(token, row.role as "deo" | "admin"));
   return res;
 }

@@ -38,8 +38,8 @@ export default function ProfileMenu({ profile, onLogout }: { profile: Profile | 
         aria-label="Account details"
         className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
       >
-        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700 dark:bg-blue-900 dark:text-blue-300">
-          {profile.role === "admin" ? "A" : "D"}
+        <span className="flex h-7 items-center justify-center rounded-full bg-blue-100 px-3 text-xs font-semibold text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+          {profile.role === "admin" ? "Admin" : profile.districtName ? `DEO ${profile.districtName}` : "DEO"}
         </span>
         <i className={`ti ti-chevron-down text-sm transition-transform ${open ? "rotate-180" : ""}`} />
       </button>

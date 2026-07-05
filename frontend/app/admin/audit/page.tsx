@@ -221,7 +221,7 @@ export default function AuditLogPage() {
                       {EVENT_LABELS[row.eventType] ?? row.eventType}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-slate-800 dark:text-slate-200">
-                      {row.actorEmail ?? (row.actorRole ? `(${row.actorRole})` : "—")}
+                      {row.actorEmail ?? (row.actorRole === "deo" && row.districtName ? `DEO ${row.districtName}` : row.actorRole ? `(${row.actorRole})` : "—")}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-slate-800 dark:text-slate-200">
                       {row.districtName ?? "—"}
