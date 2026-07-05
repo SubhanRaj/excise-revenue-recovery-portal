@@ -613,21 +613,27 @@ condition, give it this same three-way treatment rather than a plain active/inac
   `bg-slate-50` — not `bg-slate-50/50` — for the alternating stripe); `bg-inherit` on the
   pinned cell then correctly resolves to something opaque. If you add another sticky
   header/column, give its scrolling ancestor rows an opaque background from the start.
-- The Excel export CDN script (`app/layout.tsx`) is **`xlsx-js-style`, not the stock SheetJS
-  `xlsx` package** — same SheetJS Community core (same `window.XLSX` global, same API, genuine
-  drop-in), plus real cell-style (`.s`: fill/font/alignment) write support that stock `xlsx`
-  silently drops on write. Switched to after finding the sibling `excise-bakaya-record`
-  project's own admin export (`frontend/admin.html`) already using it for its colored
-  header/footer rows. Confirmed both ways by writing the same style object with each build and
-  inspecting the output `xl/styles.xml` directly: stock `xlsx@0.18.5` wrote an empty style
-  table, `xlsx-js-style@1.2.0` wrote the real fill/font/alignment entries. **Frozen panes are
-  still a no-op either way** — that's not a stock-vs-fork difference, neither build's writer
-  emits the `<pane>` XML Excel needs (confirmed by inspecting `xl/worksheets/sheet1.xml`: no
-  `<pane>` element even in a file with real styles elsewhere) — see the `ponytail:` comment in
-  `frontend/lib/export.ts` if asked to make the exported header row actually freeze; that still
-  needs SheetJS Pro. `types/index.d.ts` ships inside the `xlsx-js-style` npm package itself
-  (`lib/globals.d.ts` imports types from `"xlsx-js-style"`, not `"xlsx"`), so no separate
-  `@types` package is needed.
+- The Excel export CDN script (`app/layout.tsx`) is **ExcelJS, not SheetJS** — this app went
+  through two SheetJS builds first (the stock `xlsx` package, then the `xlsx-js-style` fork,
+  found via the sibling `excise-bakaya-record` project's own admin export using it for colored
+  header/footer rows) before landing here. Both SheetJS builds share one writer that never emits
+  the `<pane>` XML real frozen panes need (confirmed by inspecting `xl/worksheets/sheet1.xml`
+  from each: no `<pane>` element, even in a file with real cell styles elsewhere) — `xlsx-js-style`
+  only patches in cell-style (fill/font/alignment) write support on top of the same core, not
+  pane writing. ExcelJS is a separate, unrelated, MIT-licensed library whose writer genuinely
+  emits `<pane>` (confirmed the same way, with a real `<pane ySplit="3" .../>` present), on top
+  of the same cell-style/number-format support the SheetJS fork also had — so it's a strict
+  upgrade over `xlsx-js-style`, not a tradeoff. Global is `window.ExcelJS`, not SheetJS's
+  `window.XLSX` — a different API shape (worksheet/row objects with `.addRow()`/`.getCell()`,
+  not an array-of-arrays `aoa_to_sheet()`), so this wasn't a drop-in swap like the earlier
+  `xlsx` → `xlsx-js-style` change was; `frontend/lib/export.ts` and the DEO-template
+  upload-parsing code in `admin/districts/page.tsx` were rewritten against it. ExcelJS has no
+  browser-native `writeFile()` (that's Node-only) — every export funnels through one
+  `downloadWorkbook()` helper in `export.ts` that calls `wb.xlsx.writeBuffer()` and does the
+  Blob + anchor-click download itself, which is also why `exportDistrictsToXlsx()` and
+  `downloadDeoTemplate()` are now `async` where their SheetJS versions weren't. `exceljs` ships
+  its own types (`lib/globals.d.ts` imports `import type * as ExcelJSType from "exceljs"`), so
+  no separate `@types` package is needed.
 - Magic-link emails use a styled table-based HTML template (`api/lib/email.ts`,
   `magicLinkHtml()`) — indigo header band, CTA button, plain-link fallback, footer — not a
   couple of bare `<p>` tags. Modeled on the sibling `up-excise-spatial-revenue-optimizer`
@@ -752,7 +758,7 @@ visually cramped as features were added:
   function. **Export as SQL** (`exportDistrictsToSql()` in `frontend/lib/export.ts`) writes a
   plain `.sql` file (`DELETE` + `INSERT` statements, column names matching `api/db/schema.ts`
   exactly) via a native `Blob`/anchor download — no new dependency, unlike the `.xlsx` export
-  which genuinely needs SheetJS. It intentionally covers only `districts` and `pac_data` — the two
+  which genuinely needs ExcelJS. It intentionally covers only `districts` and `pac_data` — the two
   tables the admin panel actually caches client-side (see `frontend/lib/db.ts`) — not `users`,
   `audit_log`, or `magic_link_tokens`, which never leave the API; it's a revenue-data backup aid,
   not a full database dump.
@@ -847,8 +853,9 @@ fixed it looking oddly stretched-out after the auto-layout fix in "Tables must s
 auto-layout" below; `overflow-x-auto` on the wrapper is still the fallback for narrow
 viewports.
 
-Excel export (`exportDistrictsToXlsx()` in `frontend/lib/export.ts`) is **one workbook, six
-sheets** — a **Summary** cover sheet followed by one sheet per financial year, each of those five
+Excel export (`exportDistrictsToXlsx()` in `frontend/lib/export.ts`, built on ExcelJS — see the
+"Sober blue" note above for why it's ExcelJS and not SheetJS) is **one workbook, six sheets** —
+a **Summary** cover sheet followed by one sheet per financial year, each of those five
 districts × the 6 PAC fields for just that year — not one sheet with all 5 years' columns side
 by side like the original version. The FY sheets are named `FY 2021-22`, etc (see the
 FY-labeling convention above). Each FY sheet carries two merged banner rows above the
@@ -858,19 +865,20 @@ file is read by auditors/senior officers/commissioners rather than a single DEO,
 rather than the portal-wide `DATA_PERIOD_EN` — so each sheet is self-describing about which year
 it covers if it's opened outside the portal (e.g. emailed to Excise HQ). `TITLE_ROWS` in
 `export.ts` is the single source of truth for how many rows that pushes the
-header/data/money-formatting/freeze-pane math down by — update it, not the individual
-row-offset call sites, if another banner row is ever added. **Every column header in this
-export is English-only** (`englishLabel()` strips the ` / <Hindi>` half off `PAC_FIELD_LABELS`
-before it reaches a sheet, and the trailing Net Recoverable column is the bare English string) —
-unlike the DEO-facing UI, where the bilingual labels mirror the government form DEOs actually
-fill out, this file's audience already knows the domain and has no Hindi requirement.
+header/data/money-formatting/freeze-pane/print-titles math down by — update it, not the
+individual row-offset call sites, if another banner row is ever added. **Every column header in
+this export is English-only** (`englishLabel()` strips the ` / <Hindi>` half off
+`PAC_FIELD_LABELS` before it reaches a sheet, and the trailing Net Recoverable column is the bare
+English string) — unlike the DEO-facing UI, where the bilingual labels mirror the government form
+DEOs actually fill out, this file's audience already knows the domain and has no Hindi
+requirement.
 
-The **Summary** sheet is appended first (`wb.SheetNames` index 0) so it's the first thing the
-reader sees, deliberately *not* a `Generated:` row repeated identically on all 5 FY sheets — it
-carries `SITE_TITLE_EN`, the portal-wide `DATA_PERIOD_EN` (this one sheet is workbook-wide, not
-per-FY, so the full 5-year span is the right text here, unlike the FY sheets' own
-`dataPeriodForFY()`), a `Generated: <formatIST(...)> IST` line (computed once per download, in
-real IST — see the `formatIST()` note below), and a small `Metric`/`Value` table: total/locked/
+The **Summary** sheet is added first (`wb.addWorksheet("Summary")` before the FY loop) so it's
+the first thing the reader sees, deliberately *not* a `Generated:` row repeated identically on
+all 5 FY sheets — it carries `SITE_TITLE_EN`, the portal-wide `DATA_PERIOD_EN` (this one sheet is
+workbook-wide, not per-FY, so the full 5-year span is the right text here, unlike the FY sheets'
+own `dataPeriodForFY()`), a `Generated: <formatIST(...)> IST` line (computed once per download,
+in real IST — see the `formatIST()` note below), and a small `Metric`/`Value` table: total/locked/
 unlocked district counts and Gross Arrears/Recovered Amount/Net Recoverable summed across every
 district and all 5 `FINANCIAL_YEARS` — the same "whole 5-year window" totaling convention the
 Admin Dashboard's own KPI cards already use (see `admin/page.tsx` below), reused here rather than
@@ -881,26 +889,28 @@ inventing a different one for the export. `exportExcel()`/`exportSql()` in
 bug pattern documented in the Data model section) silently rendered in the admin's own browser
 timezone rather than real IST; fixed to go through `formatIST()` like everywhere else.
 
-Each FY sheet also registers a per-sheet `_xlnm.Print_Titles` defined name on
-`wb.Workbook.Names` covering rows 1–`TITLE_ROWS + 1` (title + data period + header), so those
-three rows repeat on every printed page — unlike frozen panes (`!freeze`, just below), this is a
-plain OOXML workbook-level feature both SheetJS builds genuinely write and Excel genuinely
-reads, confirmed by inspecting `xl/workbook.xml` in a real build's output; don't assume it needs
-Pro just because the adjacent freeze-pane line does. Sheet indices for this defined name are
-read off `wb.SheetNames.length` at append time, so they automatically account for the Summary
-sheet occupying index 0 — don't hardcode a per-FY sheet's index. **Cell styling is real** (see
-the `xlsx-js-style` note under "Sober blue" above for why, unlike the stock `xlsx` package): on
-every sheet (Summary included) the title/data-period/generated-at cells are bold/italic and
-centered — since a merge is really just centering the merge's top-left cell and hiding the rest
-underneath it, only that one cell per row needs the alignment style, not every column across the
-merge — the header row (`r: TITLE_ROWS` on FY sheets, row 4 on Summary) is white-on-`HEADER_FILL`
-(the same brand blue used elsewhere, see "Visual language" below) bold and centered, and each FY
-sheet's TOTAL row (`totalRowIndex`) is bold on a soft `TOTAL_FILL` blue tint. Frozen panes remain
-the one exception: confirmed by inspecting `xl/worksheets/sheet1.xml` from a real
-`xlsx-js-style` build that it still emits no `<pane>` element even in a file with real styles
-elsewhere — that fork only patches in style writing, not pane writing, so the existing `!freeze`
-line stays a documented no-op regardless of which build is loaded; true on-screen frozen rows
-still need SheetJS Pro.
+Each FY sheet is created with `views: [{ state: "frozen", ySplit: TITLE_ROWS + 1 }]` and
+`pageSetup: { printTitlesRow: "1:" + (TITLE_ROWS + 1) }` passed directly to `wb.addWorksheet()`
+— **frozen panes are real** with ExcelJS (confirmed by a real `<pane ySplit="3" .../>` in the
+output XML, unlike the SheetJS-based attempts before it), freezing the title/data-period/header
+rows on screen, and `_xlnm.Print_Titles` repeats those same rows on every printed page. Sheet
+indices are handled by ExcelJS itself from insertion order, so the Summary sheet occupying
+position 0 doesn't need any manual index bookkeeping the way the old SheetJS-based
+`printTitleNames`/`wb.Workbook.Names` array did — don't reintroduce that pattern here. **Cell
+styling** uses small shared helpers (`styleTitleCell`, `styleSubtitleCell`, `styleHeaderCell`,
+`styleTotalCell` in `export.ts`) applied to `Cell` objects rather than raw `.s` style objects on
+plain data — ExcelJS colors are `argb` (8 hex digits, alpha channel first, e.g. `"FF1D4ED8"`),
+not SheetJS's 6-digit `rgb`. On every sheet (Summary included) the title/data-period/generated-at
+cells are bold/italic and centered — since a merge is really just centering the merge's top-left
+cell and hiding the rest underneath it (`ws.mergeCells(row, 1, row, lastCol)`, 1-based, unlike
+SheetJS's 0-based `!merges` ranges), only that one cell per row needs the alignment style, not
+every column across the merge — the header row is white-on-`HEADER_FILL` (the same brand blue
+used elsewhere, see "Visual language" below) bold and centered, and each FY sheet's TOTAL row is
+bold on a soft `TOTAL_FILL` blue tint. Because ExcelJS has no browser `writeFile()` (Node-only),
+every export downloads through one shared `downloadWorkbook()` helper (`wb.xlsx.writeBuffer()` +
+a Blob/anchor-click, same manual-download pattern `exportDistrictsToSql()` already used for its
+plain-text `.sql` file) — this is also why `exportDistrictsToXlsx()` and `downloadDeoTemplate()`
+are `async` and their callers in `admin/districts/page.tsx` `await` them.
 
 ## Bulk DEO provisioning (Admin dashboard)
 

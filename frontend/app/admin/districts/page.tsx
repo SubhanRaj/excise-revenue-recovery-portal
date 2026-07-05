@@ -111,7 +111,7 @@ export default function DistrictsPage() {
         allowOutsideClick: false,
       });
       if (result.isConfirmed) {
-        exportDistrictsToXlsx(fresh?.districts ?? districts, fresh?.pacData ?? pacData);
+        await exportDistrictsToXlsx(fresh?.districts ?? districts, fresh?.pacData ?? pacData);
       }
     } finally {
       setExporting(null);
@@ -159,7 +159,8 @@ export default function DistrictsPage() {
     setProvisioning(true);
     try {
       const buffer = await file.arrayBuffer();
-      const workbook = window.XLSX.read(buffer, { type: "array" });
+      const workbook = new window.ExcelJS.Workbook();
+      await workbook.xlsx.load(buffer);
       const templateRows = parseDeoTemplateFile(workbook);
       if (templateRows.length === 0) {
         setError("No rows found in the uploaded file.");
@@ -374,7 +375,7 @@ export default function DistrictsPage() {
                 </option>
               ))}
             </Select>
-            <Button variant="blue" size="xs" onClick={() => downloadDeoTemplate(districts)}>
+            <Button variant="blue" size="xs" onClick={() => void downloadDeoTemplate(districts)}>
               <i className="ti ti-download text-sm" />
               DEO Template
             </Button>

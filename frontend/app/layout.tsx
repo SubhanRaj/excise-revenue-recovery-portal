@@ -87,13 +87,15 @@ export default function RootLayout({
           src="https://cdn.jsdelivr.net/npm/sweetalert2@11"
           strategy="beforeInteractive"
         />
-        {/* xlsx-js-style (CDN) — used on DEO submit + Admin export/sync. Not the stock SheetJS
-            "xlsx" package: this is the same SheetJS Community core plus real cell-style (`.s`)
-            write support (fills/fonts/alignment) that the stock free build silently drops on
-            write — confirmed by inspecting xl/styles.xml from each build's output. Same global
-            `window.XLSX` API either way, so this is a drop-in swap. */}
+        {/* ExcelJS (CDN) — admin-only: Excel export, DEO template download/upload
+            (frontend/lib/export.ts, app/admin/districts/page.tsx). Not SheetJS (neither the
+            stock "xlsx" package nor the "xlsx-js-style" fork tried before it) — ExcelJS is a
+            separate, MIT-licensed library whose writer genuinely emits frozen-pane XML, which
+            neither SheetJS build's writer does at any license tier below Pro (confirmed by
+            inspecting each build's raw worksheet XML output). Exposes `window.ExcelJS`, a
+            different global/API than SheetJS's `window.XLSX`. */}
         <Script
-          src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"
+          src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"
           strategy="lazyOnload"
         />
         {/* Chart.js (CDN) — only consumer today is AdminDashboard's locked/unlocked donut. */}
