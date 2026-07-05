@@ -23,12 +23,29 @@ export async function GET(req: NextRequest) {
   }
 
   const db = getDb();
+  // lockStatus/lockedAt/submittedByName let the DEO page distinguish a still-locked district
+  // (show a read-only "you've locked your data" screen) from a freshly-unlocked one (fetch
+  // /api/pac-data/mine and let them re-edit) right after login, instead of re-deriving it from
+  // a blank local Dexie cache that a prior submit already cleared — see CLAUDE.md.
   const [row] = await db
-    .select({ email: users.email, districtName: districts.districtName })
+    .select({
+      email: users.email,
+      districtName: districts.districtName,
+      lockStatus: districts.lockStatus,
+      lockedAt: users.lockedAt,
+      submittedByName: users.submittedByName,
+    })
     .from(users)
     .leftJoin(districts, eq(users.districtId, districts.id))
     .where(eq(users.id, session.userId))
     .limit(1);
 
-  return NextResponse.json({ ...session, email: row?.email ?? null, districtName: row?.districtName ?? null });
+  return NextResponse.json({
+    ...session,
+    email: row?.email ?? null,
+    districtName: row?.districtName ?? null,
+    lockStatus: row?.lockStatus ?? null,
+    lockedAt: row?.lockedAt ?? null,
+    submittedByName: row?.submittedByName ?? null,
+  });
 }

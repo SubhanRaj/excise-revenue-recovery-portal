@@ -6,6 +6,7 @@ import { db, type DraftYear } from "@/lib/db";
 import { FINANCIAL_YEARS, PAC_FIELD_ORDER } from "@/lib/pac-fields";
 import { apiFetch, ApiError } from "@/lib/api";
 import { clearClientSession, consumeJustAuthed } from "@/lib/session";
+import { formatIST } from "@/lib/format";
 import {
   confirmFinalSubmit,
   promptDeoNameAndLock,
@@ -25,6 +26,18 @@ const BLANK_FIELD_TITLE = "Field left blank / फ़ील्ड खाली �
 const BLANK_FIELD_TEXT =
   "Please do not leave any field blank. Enter 0 if there is no due amount or recovery. / " +
   "कृपया कोई भी फ़ील्ड खाली न छोड़ें। यदि कोई धनराशि या वसूली नहीं है तो 0 दर्ज करें।";
+
+// Shape of a row returned by GET /api/pac-data/mine — the raw pac_data table row (numbers),
+// as opposed to DraftYear's raw-string fields (see db.ts for why those stay strings).
+type RemoteYearRow = {
+  financialYear: string;
+  grossArrears: number;
+  rcCount: number;
+  rcAmount: number;
+  recoveredAmount: number;
+  stayCount: number;
+  stayAmount: number;
+};
 
 function blankYear(financialYear: (typeof FINANCIAL_YEARS)[number]): DraftYear {
   return {
@@ -51,14 +64,20 @@ export default function EntryPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
+  // True once we know (from the server, not a cached hint) that this DEO's district is
+  // currently locked — a returning DEO who logs back in after locking (nothing prevents that
+  // login itself) previously saw a blank form, because the local Dexie draft is wiped on
+  // submit and there was nothing checking D1 for the real, current lock state.
+  const [locked, setLocked] = useState(false);
 
   useEffect(() => {
     (async () => {
       // Ask the server directly rather than pre-checking a local hint — see the matching
       // comment in lib/useAdminData.ts. This session lives in its own cookie (independent of
       // any admin session in the same browser), so this always reflects this page's own login.
+      let p: Profile;
       try {
-        const p = await apiFetch<Profile>("/api/auth/me?role=deo");
+        p = await apiFetch<Profile>("/api/auth/me?role=deo");
         setProfile(p);
         if (consumeJustAuthed()) {
           notifyToast({ icon: "success", title: `Welcome, DEO ${p.districtName ?? ""}`.trim() });
@@ -69,10 +88,42 @@ export default function EntryPage() {
         return;
       }
 
+      if (p.lockStatus === 1) {
+        setLocked(true);
+        setReady(true);
+        return;
+      }
+
+      // Unlocked — either a fresh DEO who's never submitted, or one an Admin just unlocked.
+      // In the unlock case D1 still holds the real, previously-submitted figures (an unlock
+      // never clears pac_data — see CLAUDE.md) even though the local Dexie draft was wiped at
+      // submit time, so fetch it and let it win over any (stale/blank) local draft per year.
+      const remoteByYear = new Map<string, DraftYear>();
+      try {
+        const { years: remoteRows } = await apiFetch<{ years: RemoteYearRow[] }>("/api/pac-data/mine");
+        for (const row of remoteRows) {
+          remoteByYear.set(row.financialYear, {
+            financialYear: row.financialYear as (typeof FINANCIAL_YEARS)[number],
+            grossArrears: String(row.grossArrears),
+            rcCount: String(row.rcCount),
+            rcAmount: String(row.rcAmount),
+            recoveredAmount: String(row.recoveredAmount),
+            stayCount: String(row.stayCount),
+            stayAmount: String(row.stayAmount),
+            completed: true,
+          });
+        }
+      } catch {
+        // Best-effort — fall back to whatever's already in the local Dexie cache below.
+      }
+
       const stored = await db.draftYears.toArray();
       const merged = FINANCIAL_YEARS.map(
-        (fy) => stored.find((y) => y.financialYear === fy) ?? blankYear(fy)
+        (fy) => remoteByYear.get(fy) ?? stored.find((y) => y.financialYear === fy) ?? blankYear(fy)
       );
+      // Keep Dexie in sync with whatever D1 just gave us, so Clear/Clear All and every other
+      // local-only operation on this page keep working against real state on the next reload.
+      await db.draftYears.bulkPut(merged);
       setYears(merged);
       const firstIncomplete = merged.findIndex((y) => !y.completed);
       setStep(firstIncomplete === -1 ? 5 : firstIncomplete);
@@ -188,6 +239,41 @@ export default function EntryPage() {
     );
   }
 
+  if (locked) {
+    return (
+      <div className="flex min-h-full flex-1 flex-col bg-slate-50 dark:bg-slate-950">
+        <AppHeader title="DEO Data Entry" role="deo" profile={profile} />
+        <div className="flex flex-1 items-center justify-center px-4 py-12">
+          <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 text-center shadow-xl shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-300">
+              <i className="ti ti-lock text-2xl" />
+            </div>
+            <h1 className="mb-2 text-lg font-semibold text-slate-900 dark:text-slate-100">Data Already Locked</h1>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              You locked your submission on{" "}
+              <span className="font-medium text-slate-900 dark:text-slate-100">
+                {formatIST(profile?.lockedAt)} IST
+              </span>
+              .
+            </p>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+              You cannot make any further changes. If any data was entered incorrectly or needs
+              editing, contact the Admin / Excise Headquarters to have this district unlocked.
+            </p>
+            <p className="mt-3 text-xs text-slate-500 dark:text-slate-500" lang="hi">
+              आपने अपना डेटा {formatIST(profile?.lockedAt)} IST को लॉक कर दिया है। अब कोई और
+              बदलाव संभव नहीं है। किसी भी गलत डेटा या संशोधन के लिए एडमिन / आबकारी मुख्यालय से
+              संपर्क करें।
+            </p>
+            <p className="mt-4 text-xs text-slate-400 dark:text-slate-500">
+              Use the profile menu (top right) to log out.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-full flex-1 flex-col bg-slate-50 dark:bg-slate-950">
       <AppHeader title="DEO Data Entry" role="deo" profile={profile} />
@@ -248,8 +334,18 @@ export default function EntryPage() {
               );
             })}
           </div>
+          {/* flex-1 on both so they split the row edge-to-edge on mobile (rather than sitting
+              compact/left-aligned with dead space on the right) — sm:flex-none once there's a
+              sticky nav row wide enough that hugging their own content (Master View pinned via
+              sm:ml-auto) looks right instead. */}
           <div className="flex items-center gap-2 sm:ml-auto">
-            <Button type="button" variant="dangerSoft" size="xs" onClick={clearAllData}>
+            <Button
+              type="button"
+              variant="dangerSoft"
+              size="xs"
+              onClick={clearAllData}
+              className="flex-1 sm:flex-none"
+            >
               <i className="ti ti-trash text-xs" />
               Clear All
             </Button>
@@ -258,7 +354,7 @@ export default function EntryPage() {
               onClick={() => goToStep(5)}
               disabled={!years.every((y) => y.completed)}
               style={!years.every((y) => y.completed) ? { cursor: "not-allowed" } : undefined}
-              className={`flex items-center justify-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors sm:justify-start ${
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors sm:flex-none sm:justify-start ${
                 step === 5
                   ? "bg-blue-600 text-white shadow-sm"
                   : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"

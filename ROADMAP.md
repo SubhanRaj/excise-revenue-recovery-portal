@@ -278,6 +278,46 @@
 - [x] Parity error under Recovered Amount no longer interleaves English/Hindi mid-sentence —
       split into separate per-language name constants so each line is single-language
 
+## Milestone 16 — Clear buttons, FY labeling, sleeker toolbar buttons, dashboard totals, re-login lock bug (done)
+
+- [x] Per-year "Clear" (`YearStepForm.tsx`) and "Clear All" (`deo-data-entry/page.tsx` nav bar)
+      buttons, both behind a blocking confirm (`confirmClearYear()`/`confirmClearAll()`) —
+      client-only, only reachable pre-lock, never touches D1
+      Widened toast (`showCloseButton`, responsive `width`) so bilingual validation text
+      stops wrapping and can be dismissed manually instead of only auto-timing out
+- [x] Every year label in the UI and Excel export changed from an ordinal "Year 1"/"Year 2"
+      (or a bare `2021-22`) to explicit `FY 2021-22` — DEO nav pills, `YearStepForm` heading,
+      Admin year selectors/column headers, `MasterView`'s table, Excel sheet names
+- [x] New `frontend/lib/site.ts`: shared portal title ("Recovery Certificates (RCs) Issued
+      for Recovery of Excise Revenue Arrears") and data period (1 April 2021 – 31 March
+      2026), surfaced in the meta description, login page, a new DEO title bar above the year
+      pills, and Excel banner rows — Hindi copy uses "आबकारी" (state excise/Abkari), not
+      "उत्पाद शुल्क" (the Central Excise/GoI term)
+- [x] `Button.tsx`: new `dangerSoft` variant (soft red, matches `blue`/`amber`/`dark`) for the
+      Clear buttons instead of solid `danger` red; `rounded-md`/`shadow-sm`/`font-semibold`
+      moved out of the shared base string into per-`size`, so `xs`/`sm` toolbar-chip buttons
+      (Clear, Clear All, DEO Template, Upload, Export) render as sleek borderless pills
+      matching the nav pills beside them, while `md`/`lg` primary buttons keep their original
+      bolder look
+- [x] Admin Dashboard KPI cards/charts changed from filtered-by-one-FY to summed across all 5
+      financial years — a district's lock/submission is one atomic action across all years,
+      so a per-year lock-status filter had nothing real to filter; Gross Arrears/Net
+      Recoverable now reflect each district's cumulative position as of 31 March 2026.
+      `/admin/districts`' own per-year filter is unrelated and unchanged.
+- [x] Fixed a real bug: a DEO who submitted & locked could still log back in afterward (only
+      the session cookie is destroyed at submit, not the CUG login), and saw a blank form
+      because the local Dexie draft is wiped on submit with no fallback. `GET
+      /api/auth/me?role=deo` now also returns `lockStatus`/`lockedAt`/`submittedByName`; a
+      still-locked DEO now sees a read-only "Data Already Locked" screen instead of a form; an
+      Admin-unlocked DEO gets their real submitted figures re-fetched from D1 (new `GET
+      /api/pac-data/mine`) instead of a blank draft. Also fixed `POST /api/pac-data/submit` to
+      delete-then-insert instead of plain insert, since a second submit after an unlock would
+      otherwise fail the `(district_id, financial_year)` unique index (an unlock never clears
+      `pac_data`).
+- [x] Mobile: "Clear All"/Master View buttons now split their row edge-to-edge
+      (`flex-1 sm:flex-none`) instead of sitting compact/left-aligned with dead space on the
+      right
+
 ## Backlog / not started
 
 - [ ] Real domain + DNS, and (optional) collapse `/frontend` + `/api` onto one zone via a

@@ -7,6 +7,11 @@ export type Profile = {
   districtId: number | null;
   districtName: string | null;
   email: string | null;
+  // Only meaningful for role "deo" — null for admin profiles. Lets deo-data-entry/page.tsx tell
+  // a still-locked district apart from a freshly-unlocked one right after login.
+  lockStatus?: number | null;
+  lockedAt?: string | null;
+  submittedByName?: string | null;
 };
 
 export default function ProfileMenu({ profile, onLogout }: { profile: Profile | null; onLogout?: () => void }) {

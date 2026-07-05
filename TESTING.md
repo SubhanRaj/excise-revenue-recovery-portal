@@ -80,26 +80,39 @@ Then:
    styled login-link email (`api/lib/email.ts`) → Verify & Continue → `/admin` shows the
    Dashboard — colored, clickable KPI cards (click Districts/Locked/Unlocked/Gross
    Arrears/Net Recoverable, and a top-5-dues row, to confirm each link goes somewhere useful),
-   the locked/unlocked Chart.js donut, switching financial years. Then **Districts** (top nav)
-   for the sortable/searchable table, the Locked/Unlocked/All status filter, Sync, Export to
-   Excel.
-2. **DEO**: `/login` → CUG tab → the demo CUG → lands on `/deo-data-entry`. Since this is a
-   *separate* session cookie from the admin one above (see CLAUDE.md's Auth section), the
-   admin tab/session stays logged in the whole time — no need to re-request a magic link just
-   to switch back and forth. Walk Year 1 → 5: leave a field blank and hit "Save & Continue"
-   (a corner toast, not a popup or banner — bilingual), make Recovered Amount ≠ RC Amount and
-   blur the field (bold inline bilingual message under Recovered Amount, "Save & Continue"
-   disabled), watch Net Recoverable update live, try "Previous Year" to go back a step. On
-   Year 5, reach Master View (title now shows the district name, English + smaller Hindi
-   line), hit the big "Submit & Lock" button — this triggers two SweetAlert2 dialogs: first a
-   "verify the data is correct" confirm, then a name-entry prompt with a liability disclaimer
-   (try typing digits or "DEO Lucknow" to see the validator reject it). Confirming both locks
-   the district, kills the DEO session, redirects to `/login`.
-3. **Back to Admin → Districts** → Sync → the district now shows "Locked" with real numbers.
+   the locked/unlocked Chart.js donut. Every number here is a total across all 5 FYs (FY
+   2021-22 – FY 2025-26), not filtered by year — there's no year selector on this page.
+   Then **Districts** (top nav) for the sortable/searchable table, its own per-year `FY`
+   selector, the Locked/Unlocked/All status filter, Sync, Export to Excel (check the sheet
+   tabs are named `FY 2021-22` etc, each with a title/data-period banner row above the table).
+2. **DEO**: `/login` → CUG tab → the demo CUG → lands on `/deo-data-entry`. Note the title bar
+   above the year pills (RC title + data period, bilingual) and that the pills read `FY
+   2021-22` etc, not "Year 1". Since this is a *separate* session cookie from the admin one
+   above (see CLAUDE.md's Auth section), the admin tab/session stays logged in the whole time
+   — no need to re-request a magic link just to switch back and forth. Walk FY 2021-22 → FY
+   2025-26: leave a field blank and hit "Save & Continue" (a corner toast, not a popup or
+   banner — bilingual, closeable, doesn't wrap), make Recovered Amount ≠ RC Amount and blur the
+   field (bold inline bilingual message under Recovered Amount, "Save & Continue" disabled),
+   watch Net Recoverable update live, try "Previous Year" to go back a step, try the per-year
+   "Clear" button and the nav bar's "Clear All" (both prompt a confirm first). On FY 2025-26,
+   reach Master View (title now shows the district name, English + smaller Hindi line), hit
+   the big "Submit & Lock" button — this triggers two SweetAlert2 dialogs: first a "verify the
+   data is correct" confirm, then a name-entry prompt with a liability disclaimer (try typing
+   digits or "DEO Lucknow" to see the validator reject it). Confirming both locks the district,
+   kills the DEO session, redirects to `/login`.
+3. **Re-login as the locked DEO**: CUG tab → the demo CUG again → should land on a read-only
+   "Data Already Locked" screen (locked timestamp in IST, contact-Admin message), not a blank
+   form — this is the fix for a real bug where a re-login after locking showed an empty form.
+4. **Back to Admin → Districts** → Sync → the district now shows "Locked" with real numbers.
    Click the row to open its detail page (who locked it, when, in IST) → **Back to Districts**
    → **Unlock** now prompts for a reason (blank is rejected) before reversing it — check the
    detail page again to see "Last unlocked by / on / Reason", and check **Audit Log** (top
    nav) to see the lock and unlock events recorded, newest first.
+5. **Re-login as the now-unlocked DEO**: CUG tab → the demo CUG → should land on the Master
+   View with the previously submitted figures already filled in (re-fetched from D1, not
+   blank), not a fresh empty Year 1. Editing and hitting "Submit & Lock" again should succeed
+   (the submit route now deletes-then-inserts, so a second submit for the same district doesn't
+   fail the unique index).
 
 Reset for another pass:
 

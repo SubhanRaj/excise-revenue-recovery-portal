@@ -36,7 +36,15 @@ They communicate only over HTTP, cross-origin, with credentials (cookies) includ
   CUG mobile number — the server never sees the raw number). Admins authenticate via
   magic link (`email`). `locked_at` / `submitted_by_name` are stamped when a DEO locks.
 - `pac_data` — exactly one row per `(district_id, financial_year)`, enforced by a unique
-  index. Six fields per year, in this fixed order (matches the Hindi form the DEOs see):
+  index. `POST /api/pac-data/submit` deletes any existing rows for the district before
+  inserting the new 5, all inside the same atomic `db.batch()` — needed because an Admin
+  unlock never clears `pac_data` (see below), so a DEO who submits, gets unlocked, edits, and
+  submits again is inserting into a district that already has rows for every financial year;
+  without the delete, that second submit would fail the unique index instead of replacing the
+  row. `GET /api/pac-data/mine` (role `deo`) is the read-side counterpart, letting the DEO
+  frontend re-fetch its own district's rows after a login that follows an Admin unlock — see
+  "Frontend offline flow" below. Six fields per year, in this fixed order (matches the Hindi
+  form the DEOs see):
 
   | Field              | Hindi label                                      | Type    |
   | ------------------ | ------------------------------------------------- | ------- |
@@ -152,7 +160,14 @@ open) without either login evicting the other. Signing/verifying still runs thro
 - **Revocation**: submitting a DEO's final payload atomically locks the district *and*
   destroys that DEO's session cookie server-side (`destroySessionCookie("deo")`), since
   there's nothing left for that DEO to do — an Admin session in the same browser, if any, is
-  untouched (separate cookie, see above).
+  untouched (separate cookie, see above). This only destroys the *cookie*, not the CUG login
+  itself — nothing stops that DEO from logging back in later (e.g. days after locking, or after
+  an Admin unlock). `GET /api/auth/me?role=deo` now also returns `lockStatus`/`lockedAt`/
+  `submittedByName` (joined from `districts`/`users`) specifically so `deo-data-entry/page.tsx`
+  can tell, on every fresh login, which of two states this is — see "Frontend offline flow"
+  below for what each one renders. Don't cache this in `localStorage` the way `lib/session.ts`
+  caches the role hint; it must be re-asked of the server every load since an Admin unlock can
+  happen at any time and this value gates what the DEO can do next.
 
 Because `/frontend` (Pages) and `/api` (Worker) are separate origins in production, the
 cookie is `SameSite=None; Secure`, and `api/middleware.ts` adds matching CORS headers
@@ -218,6 +233,26 @@ only once year `N` is marked `completed`. Every keystroke persists to Dexie
 (`draftYears` table) — **no network call happens until final submit**, which sends all 5
 years in one atomic payload (`db.batch()` on the API side: 5 inserts + lock flip + user
 audit stamp, all-or-nothing).
+
+**A returning DEO's login branches into one of three states**, decided in
+`deo-data-entry/page.tsx`'s load effect off the *server's* current `lockStatus` (from `GET
+/api/auth/me?role=deo`), never a cached/local value:
+1. **Still locked** — nothing in the CUG flow stops a DEO from logging back in after locking
+   (only the session *cookie* is destroyed at submit time, not the login itself), and the local
+   Dexie draft is wiped on that same submit — so without this check, a returning locked DEO
+   would just see a blank form and could be confused into thinking their submission vanished.
+   Instead the page renders a dedicated read-only screen: "Data Already Locked", `formatIST()`
+   of `lockedAt`, and a bilingual message to contact Admin/Excise HQ for any correction — no
+   form, no Clear buttons, just the `AppHeader` (so the profile menu's Logout is still
+   reachable).
+2. **Unlocked, previously submitted** — an Admin unlock flips `lockStatus` back to 0 but never
+   touches `pac_data` (see Data model above), so D1 still holds the real submitted figures.
+   `GET /api/pac-data/mine` fetches them and they win over whatever's in the local Dexie draft
+   per financial year (which may be blank/stale from the original submit's `db.draftYears.clear()`),
+   are written back into Dexie via `bulkPut`, and every year is marked `completed` — landing the
+   DEO on the Master View to review/edit already-real data instead of an empty Year 1.
+3. **Unlocked, never submitted** — the original behavior: merge whatever's already in the local
+   Dexie draft (or start every year blank).
 
 **Clearing a draft is a client-only, pre-lock-only operation** — it never calls the API,
 since there's nothing on the server yet to clear (that only exists after final submit, at
@@ -287,7 +322,11 @@ row, Master View right-aligned via `sm:ml-auto`) — they used to be split by a 
 `<span>` in one always-`flex-wrap` row, which forced an ugly full-width empty line whenever the
 pills wrapped on a narrow/mobile viewport. The year pills themselves also shrink on mobile
 (`px-2 py-1 text-xs`, each `flex-1` so all 5 share one row evenly) and return to their normal
-size/padding at `sm`. Don't reintroduce a flex-growing spacer between the two groups. The page
+size/padding at `sm`. Don't reintroduce a flex-growing spacer between the two groups. The
+"Clear All"/Master View row (below the year pills on mobile) gets the same treatment — both
+buttons carry `flex-1 sm:flex-none` so they split that row edge-to-edge on mobile instead of
+sitting compact/left-aligned with dead space on the right, reverting to content-hugging width
+at `sm` where Master View is pinned right via the parent's `sm:ml-auto` instead. The page
 container also carries
 `pb-24 sm:pb-8` (not equal top/bottom padding) so the fixed `HelpPanel` button doesn't sit on top
 of the full-width Master View "Submit & Lock" button on mobile.

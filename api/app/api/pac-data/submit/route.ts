@@ -85,8 +85,12 @@ export async function POST(req: NextRequest) {
 
   const now = new Date().toISOString();
 
-  // D1 batch = atomic: all 5 year rows + lock flip + user audit fields, or nothing.
+  // D1 batch = atomic: wipe any prior rows for this district + all 5 new year rows + lock flip
+  // + user audit fields, or nothing. The delete makes this idempotent for the re-submit-after-
+  // Admin-unlock case — an Admin unlock never removes pac_data (see CLAUDE.md), so without it a
+  // second submit would hit the (district_id, financial_year) unique index on plain INSERT.
   await db.batch([
+    db.delete(pacData).where(eq(pacData.districtId, session.districtId!)),
     ...years.map((row) =>
       db.insert(pacData).values({
         districtId: session.districtId!,
