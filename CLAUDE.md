@@ -426,6 +426,19 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   (matching the button's own font size, not a larger `text-sm` icon next to `text-xs` text) —
   keep icon size matched to the button's text size at this size, unlike the larger buttons
   elsewhere in the app where a bigger icon next to smaller text is the norm.
+- **`rounded-md`/`shadow-sm`/`font-semibold` are set per-`size` in `Button.tsx`, not in the
+  shared base class string** — `xs`/`sm` (every small toolbar-chip button: Clear, Clear All,
+  DEO Template, Upload DEO Data, Export) instead get `rounded-full font-medium` with no
+  `shadow-sm`, while `md`/`lg` (the real primary-action buttons — Login, Save & Continue,
+  Submit & Lock) keep the original `rounded-md font-semibold shadow-sm`. These toolbar chips
+  sit right next to fully-rounded pill buttons that aren't built from `Button.tsx` at all (the
+  DEO year nav pills, the Master View pill) — at `rounded-md` + a visible border + `shadow-sm`
+  + bold text, they read as a visually "thick"/blocky rectangle next to those thin pills even
+  though the flex layout itself was never actually broken (confirmed by rendering the exact
+  Tailwind CDN classes standalone — icon and label always sat correctly inline via
+  `inline-flex`/`items-center`; the "thick" complaint was about corner radius/shadow/weight,
+  not alignment). If you add a new small utility button, use `size="xs"`/`"sm"` to inherit this
+  — don't hand-roll `rounded-md`/`shadow-sm` on a small button via `className`.
 - **`disabled:cursor-not-allowed` doesn't work on `<button>` in this Tailwind version** —
   the CDN's preflight sets `button { cursor: pointer }` unconditionally, which beats the
   `disabled:` variant regardless of class order. If a disabled button needs to actually
