@@ -38,15 +38,15 @@ export const pacData = sqliteTable("pac_data", {
   districtId: integer("district_id").notNull().references(() => districts.id),
   financialYear: text("financial_year").notNull(), // "2021-22" .. "2025-26"
 
-  // 1. सकल बकाया धनराशि
+  // 1. सकल बकाया धनराशि (मूल धन + ब्याज) — Gross Arrears (Principal + Interest)
   grossArrears: real("gross_arrears").notNull(),
-  // 2. (i) प्रेषित आर.सी. (R.C.) की संख्या
+  // 2. (i) जारी आर.सी. (R.C.) की संख्या — No. of RCs Issued
   rcCount: integer("rc_count").notNull(),
   // 2. (ii) आर.सी. में निहित धनराशि
   rcAmount: real("rc_amount").notNull(),
-  // 3. वसूल की गयी धनराशि
+  // 3. वसूल की गयी धनराशि — independent of rc_amount, no parity requirement (see CLAUDE.md)
   recoveredAmount: real("recovered_amount").notNull(),
-  // 4. (i) स्थगन आदेशों की संख्या
+  // 4. (i) स्थगन आदेशों की संख्या — No. of Stay Orders
   stayCount: integer("stay_count").notNull(),
   // 4. (ii) सक्षम न्यायालय द्वारा स्थगित धनराशि
   stayAmount: real("stay_amount").notNull(),

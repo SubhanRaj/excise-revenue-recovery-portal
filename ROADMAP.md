@@ -371,6 +371,43 @@
 - [x] Profile menu button (`AppHeader`) enhanced to show a pill-shaped `DEO <District Name>` label instead of a simple circular `D` icon.
 - [x] The admin District Detail page now includes the DEO's email address natively alongside the lock status badge (enabled by joining the `users` table over to the Admin Dexie `CachedDistrict` store).
 
+## Milestone 19 — Decouple RC Amount/Recovered Amount, field-label corrections, Net Recoverable fix (done)
+
+- [x] Removed the parity rule that forced `recoveredAmount === rcAmount` (client-side disabled
+      "Save & Continue" + inline error, and server-side rejection in `validateRow()`). An RC's
+      issued amount and what's actually recovered against it are independent real-world figures
+      — an RC can be issued for more or less than what's recovered, and recoveries can happen in
+      a year with no RC issued at all (e.g. clearing a prior year's dues). Also removed the
+      Recovered-Amount-auto-fills-from-RC-Amount behavior in `YearStepForm.tsx`, which existed
+      only to make the (now-removed) parity rule easy to satisfy.
+- [x] `YearStepForm.tsx` no longer holds any local component state (no `followRc`/
+      `parityTouched`) — it's now a fully controlled component reading/writing straight through
+      `onFieldChange`. This also made the `clearVersion`-keyed forced-remount trick in
+      `deo-data-entry/page.tsx` unnecessary (it existed solely to reset that now-gone internal
+      state on Clear/Clear All), so it was removed too.
+- [x] `grossArrears`'s bilingual label now reads "Gross Arrears (Principal + Interest) / सकल
+      बकाया धनराशि (मूल धन + ब्याज)" — the field is the DEO's combined total, not principal
+      alone, and DEOs were at risk of entering only the principal and expecting interest to be
+      tracked separately (there is no separate interest field anywhere in this schema).
+- [x] `rcCount`'s English label changed from "RCs Sent" to "No. of RCs Issued" (Hindi: जारी
+      आर.सी. (R.C.) की संख्या, replacing प्रेषित/"sent") — "issued" is the accurate term for RC
+      generation, and now that RC Amount/Recovered Amount are decoupled, "sent" read as
+      conflating RC issuance with the recovery/dispatch process itself.
+- [x] `stayCount`'s English label changed from "Stay Orders" to "No. of Stay Orders", for
+      parallel wording with the RC count field.
+- [x] Confirmed (no code change needed) that `netRecoverable()` already computed
+      `grossArrears - recoveredAmount - stayAmount` — i.e. `1 - (3 + 4.ii)` in the form's own
+      numbering — using `recoveredAmount`, not `rcAmount`. Before this milestone the parity rule
+      made that choice invisible (the two fields were always equal); documented explicitly in
+      CLAUDE.md now that they can diverge, since using `rcAmount` here would overstate what's
+      still recoverable whenever an RC is issued for more than what actually gets recovered.
+- [x] No database schema change — all six `pac_data` columns are unchanged; this was a
+      validation-rule and label change only, so no migration was needed. Updated the Hindi-label
+      code comments in `api/db/schema.ts` to match.
+- [x] Documented all of the above in `CLAUDE.md` (Data model, Validation rules, UI conventions)
+      and updated `TESTING.md`'s manual demo script, which previously exercised the parity-error
+      path as its DEO-side validation demo step.
+
 ## Backlog / not started
 
 - [ ] Real domain + DNS, and (optional) collapse `/frontend` + `/api` onto one zone via a

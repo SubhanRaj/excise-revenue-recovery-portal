@@ -29,11 +29,11 @@ export const PAC_FIELD_ORDER: PacField[] = [
 // Bilingual by design — these are the only labels in the UI required to carry Hindi
 // (the government PAC/RC form's field names). Everything else (buttons, nav, alerts) is English.
 export const PAC_FIELD_LABELS: Record<PacField, string> = {
-  grossArrears: "1. Gross Arrears / सकल बकाया धनराशि",
-  rcCount: "2. (i) RCs Sent / प्रेषित आर.सी. की संख्या",
+  grossArrears: "1. Gross Arrears (Principal + Interest) / सकल बकाया धनराशि (मूल धन + ब्याज)",
+  rcCount: "2. (i) No. of RCs Issued / जारी आर.सी. (R.C.) की संख्या",
   rcAmount: "2. (ii) RC Amount / आर.सी. में निहित धनराशि",
   recoveredAmount: "3. Recovered Amount / वसूल की गयी धनराशि",
-  stayCount: "4. (i) Stay Orders / स्थगन आदेशों की संख्या",
+  stayCount: "4. (i) No. of Stay Orders / स्थगन आदेशों की संख्या",
   stayAmount: "4. (ii) Stayed Amount / सक्षम न्यायालय द्वारा स्थगित धनराशि",
 };
 
@@ -41,7 +41,10 @@ export function isMoneyField(field: PacField): field is MoneyField {
   return (MONEY_FIELDS as string[]).includes(field);
 }
 
-// gross_arrears - recovered_amount - stay_amount, floored at 0. Display-only — never persisted.
+// gross_arrears - (recovered_amount + stay_amount), floored at 0. Display-only — never
+// persisted. Uses recovered_amount, not rc_amount — an RC being issued for an amount doesn't
+// mean that amount was actually recovered, so these two fields are independent (no parity
+// requirement between them; see CLAUDE.md's Validation rules).
 export function netRecoverable(grossArrears: number, recoveredAmount: number, stayAmount: number): number {
   return Math.max(0, grossArrears - recoveredAmount - stayAmount);
 }

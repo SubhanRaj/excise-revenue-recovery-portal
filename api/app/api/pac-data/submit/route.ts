@@ -37,9 +37,9 @@ function validateRow(row: YearRow): string | null {
       return `Field "${field}" for ${row.financialYear} must be a non-negative number`;
     }
   }
-  if (row.recoveredAmount !== row.rcAmount) {
-    return `Parity check failed for ${row.financialYear}: recovered_amount must equal rc_amount`;
-  }
+  // rc_amount and recovered_amount are independent by design — an RC issued for an amount
+  // doesn't mean that amount was actually recovered, and dues can be recovered without a
+  // matching RC in the same year (e.g. clearing a prior year's arrears). No parity requirement.
   return null;
 }
 

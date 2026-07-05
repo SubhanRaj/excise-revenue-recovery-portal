@@ -106,9 +106,12 @@ Then:
    above (see CLAUDE.md's Auth section), the admin tab/session stays logged in the whole time
    — no need to re-request a magic link just to switch back and forth. Walk FY 2021-22 → FY
    2025-26: leave a field blank and hit "Save & Continue" (a corner toast, not a popup or
-   banner — bilingual, closeable, doesn't wrap), make Recovered Amount ≠ RC Amount and blur the
-   field (bold inline bilingual message under Recovered Amount, "Save & Continue" disabled),
-   watch Net Recoverable update live, try "Previous Year" to go back a step, try the per-year
+   banner — bilingual, closeable, doesn't wrap), enter a Recovered Amount different from RC
+   Amount and confirm both accept independently with no error (RC Amount and Recovered Amount
+   have no parity requirement — see CLAUDE.md's Validation rules), try a year with Gross
+   Arrears left at 0 but a non-zero Recovered Amount (also valid — a year can have recoveries
+   with no fresh dues), watch Net Recoverable update live, try "Previous Year" to go back a step,
+   try the per-year
    "Clear" button and the nav bar's "Clear All" (both prompt a confirm first). On FY 2025-26,
    reach Master View (title now shows the district name, English + smaller Hindi line), hit
    the big "Submit & Lock" button — this triggers two SweetAlert2 dialogs: first a "verify the

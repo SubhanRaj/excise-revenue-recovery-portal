@@ -57,9 +57,6 @@ export default function EntryPage() {
   const [ready, setReady] = useState(false);
   const [years, setYears] = useState<DraftYear[]>(FINANCIAL_YEARS.map(blankYear));
   const [step, setStep] = useState(0); // 0..4 = year steps, 5 = master view
-  // Bumped on every clear so YearStepForm remounts (key includes this) — it otherwise keeps its
-  // own internal followRc/parityTouched state across a clear that only resets Dexie/parent state.
-  const [clearVersion, setClearVersion] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -177,7 +174,6 @@ export default function EntryPage() {
       next[index] = blanked;
       return next;
     });
-    setClearVersion((v) => v + 1);
     if (step > index) setStep(index);
   }
 
@@ -186,7 +182,6 @@ export default function EntryPage() {
     if (!confirmed) return;
     await db.draftYears.clear();
     setYears(FINANCIAL_YEARS.map(blankYear));
-    setClearVersion((v) => v + 1);
     setStep(0);
   }
 
@@ -391,7 +386,6 @@ export default function EntryPage() {
         <div key={step} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 animate-in fade-in slide-in-from-right-2 duration-300">
           {step < 5 ? (
             <YearStepForm
-              key={`${years[step].financialYear}-${clearVersion}`}
               year={years[step]}
               onFieldChange={(field, value) => updateField(step, field, value)}
               onSaveAndContinue={() => saveAndContinue(step)}

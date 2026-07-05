@@ -48,18 +48,32 @@ They communicate only over HTTP, cross-origin, with credentials (cookies) includ
 
   | Field              | Hindi label                                      | Type    |
   | ------------------ | ------------------------------------------------- | ------- |
-  | `grossArrears`      | 1. सकल बकाया धनराशि                                 | money   |
-  | `rcCount`            | 2. (i) प्रेषित आर.सी. (R.C.) की संख्या                | integer |
+  | `grossArrears`      | 1. सकल बकाया धनराशि (मूल धन + ब्याज) — Gross Arrears (Principal + Interest) | money   |
+  | `rcCount`            | 2. (i) जारी आर.सी. (R.C.) की संख्या — No. of RCs Issued | integer |
   | `rcAmount`           | 2. (ii) आर.सी. में निहित धनराशि                       | money   |
   | `recoveredAmount`    | 3. वसूल की गयी धनराशि                               | money   |
-  | `stayCount`          | 4. (i) स्थगन आदेशों की संख्या                        | integer |
+  | `stayCount`          | 4. (i) स्थगन आदेशों की संख्या — No. of Stay Orders   | integer |
   | `stayAmount`         | 4. (ii) सक्षम न्यायालय द्वारा स्थगित धनराशि            | money   |
 
   `financial_year` is one of `"2021-22" .. "2025-26"` (`FINANCIAL_YEARS` in both apps).
+  `grossArrears` is the DEO's **total** outstanding figure — principal plus interest already
+  combined, not principal alone — the "(Principal + Interest)" / "(मूल धन + ब्याज)" suffix on
+  the label exists specifically so a DEO doesn't enter only the principal and expect interest
+  to be added separately elsewhere; there is no separate interest field anywhere in this schema.
+  A district can legitimately have `grossArrears: 0` for a year with a non-zero
+  `recoveredAmount` — e.g. no fresh dues arose in FY 2024-25, but the DEO still recovered money
+  against a prior year's arrears in that FY. There's no cross-field requirement forcing
+  `grossArrears` to be present/non-zero whenever `recoveredAmount` is; each of the six fields is
+  validated independently (Anti-Blank + non-negative, see Validation rules below).
 
 - **Net Recoverable is never persisted.** It's `max(0, grossArrears - recoveredAmount -
-  stayAmount)`, computed client-side for display only (`netRecoverable()` in
-  `frontend/lib/pac-fields.ts`).
+  stayAmount)` — i.e. `1 - (3 + 4.ii)` in the form's own numbering — computed client-side for
+  display only (`netRecoverable()` in `frontend/lib/pac-fields.ts`). It deliberately uses
+  `recoveredAmount`, never `rcAmount`: an RC being issued for an amount (field 2.ii) doesn't
+  mean that amount was actually recovered (field 3) — those two used to always be equal because
+  of the parity rule below, which made the choice of which one fed this formula invisible, but
+  now that the rule is gone, using the wrong one here would materially overstate what's still
+  recoverable.
 - `pac_data.submitted_by_name` duplicates `users.submitted_by_name` onto each revenue row
   itself (migration `0001_nostalgic_stature.sql`) — same value, written at the same time in
   the same submit-route batch, just keyed by `district_id` like the rest of `pac_data` so
@@ -101,8 +115,14 @@ They communicate only over HTTP, cross-origin, with credentials (cookies) includ
    (`api/app/api/pac-data/submit/route.ts`) rejects non-numeric/missing values outright;
    the frontend tracks field values as raw strings in Dexie specifically so `""` (never
    typed) stays distinguishable from `"0"` (explicit zero) until submit time.
-2. **Parity check**: `recoveredAmount` must exactly equal `rcAmount`. Enforced client-side
-   (disables the "next" button) and re-checked server-side (never trust the client).
+2. **No parity requirement between `rcAmount` and `recoveredAmount`.** These used to be forced
+   equal (`recoveredAmount === rcAmount`, disabling the "next" button and rejected server-side)
+   under the assumption that an RC's issued amount and what actually got recovered were the
+   same number. That assumption was wrong: an RC can be issued for more or less than what's
+   ultimately recovered against it, and money can be recovered in a year with no RC issued at
+   all (e.g. clearing a prior year's dues). The two fields are now fully independent — enter
+   each one as its own real figure, no cross-check, no auto-fill of one from the other in
+   `YearStepForm.tsx`.
 3. **Zero-trust on submit**: the submit endpoint re-validates every field itself — it does
    not assume the frontend's validation ran. If you add a new client-side rule, mirror it
    in `validateRow()` in the submit route.
@@ -278,11 +298,12 @@ tap can't silently wipe entered data:
 - **"Clear All"** (sticky nav bar, next to Master View) calls `db.draftYears.clear()` and
   resets all 5 years to blank, back to the first financial year (FY 2021-22).
 
-Both call sites bump a `clearVersion` counter that's folded into `YearStepForm`'s React `key`
-(`` `${financialYear}-${clearVersion}` ``) to force a remount — the component's own
-`followRc`/`parityTouched` state only initializes once per mount, so without the key change a
-clear would reset the Dexie data but leave stale internal form state behind (e.g. Recovered
-Amount no longer auto-filling from RC Amount even though both are freshly blank).
+`YearStepForm` is a plain controlled component with no internal field state of its own (every
+field reads/writes straight through `onFieldChange` to the parent's `years`/Dexie state), so
+clearing a year is just overwriting that year's `DraftYear` — no remount trick needed to avoid
+stale internal state. (An earlier version auto-filled Recovered Amount from RC Amount and
+tracked that coupling in local component state, which did need a forced remount on clear; that
+behavior was removed — see Validation rules above — and the remount hack went with it.)
 
 This is deliberately asymmetric with unlocking: an Admin unlock (`districts.lock_status` →
 0, see Data model above) only lets the DEO edit again — it never clears any `pac_data` rows,
@@ -400,9 +421,12 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   title — because those mirror the actual government form and department name, not because
   "Hindi UI" is a general goal. Don't add Hindi to new chrome text.
 - **Feedback is inline SPA state or a toast, never a page-bottom banner for validation.**
-  Field-specific errors (the parity check knows exactly which two fields are wrong) render
-  directly under the offending field, bold, bilingual, and only after the field is blurred —
-  not on every keystroke — see `YearStepForm.tsx`'s Recovered Amount field. Generic errors
+  A field-specific error (one that names exactly which field is wrong) renders directly under
+  the offending field, bold, bilingual, and only after the field is blurred — not on every
+  keystroke. `YearStepForm.tsx` doesn't currently have one (the old Recovered-Amount-vs-
+  RC-Amount parity error was this pattern's original example, removed along with the parity
+  rule itself — see Validation rules above), but a new per-field rule should follow the same
+  shape rather than reaching for a toast. Generic errors
   that aren't tied to one specific field (e.g. "some field is blank" — could be any of six)
   use `notifyToast()` instead of a `Banner`, since there's no single field to anchor an inline
   message under — see `saveAndContinue()` in `deo-data-entry/page.tsx`. Page-level success/failure
@@ -520,22 +544,18 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   Indian-numeral (Lakh/Crore) grouping and a `₹` prefix — don't hand-roll this formatting.
 - `YearStepForm.tsx`'s field grid hardcodes the six PAC fields into four rows (gross arrears
   full-width; RC count+amount paired two-up with a narrow count column; recovered amount
-  full-width with the parity error inline beneath it; stay count+amount paired the same way
-  as RC) rather than looping `PAC_FIELD_ORDER` — matches the "(i)/(ii)" pairing on the actual
-  government form. The two-up pairing only applies from the `sm` breakpoint up
-  (`grid-cols-1 sm:grid-cols-[16rem_1fr]`) — below that, each field gets its own row, since the
-  count column has no room to breathe on a phone-width form. The count column was widened from
-  an earlier `11rem` because the RC/Stay count field's bilingual label (e.g. "2. (i) प्रेषित
-  आर.सी. (R.C.) की संख्या") wrapped onto multiple lines at that width, while the paired amount
-  column had spare room to give up on desktop. If the six-field schema
-  ever changes, update this layout by hand, same as every other place `PAC_FIELD_ORDER` is
-  deliberately duplicated instead of derived. Recovered Amount auto-fills from RC Amount as the
-  DEO types it, until they edit Recovered Amount directly — then it stops following (it's never
-  locked/read-only, just pre-filled). The parity error message keeps English and Hindi on
-  separate lines built from plain per-language field name constants
-  (`RECOVERED_AMOUNT_EN`/`_HI`, `RC_AMOUNT_EN`/`_HI`) — don't go back to interpolating the
-  combined bilingual `"English / हिन्दी"` label into one sentence, that mixes both languages
-  mid-line instead of one clean line per language. The Previous Year / Save & Continue row is
+  full-width; stay count+amount paired the same way as RC) rather than looping
+  `PAC_FIELD_ORDER` — matches the "(i)/(ii)" pairing on the actual government form. The two-up
+  pairing only applies from the `sm` breakpoint up (`grid-cols-1 sm:grid-cols-[16rem_1fr]`) —
+  below that, each field gets its own row, since the count column has no room to breathe on a
+  phone-width form. The count column was widened from an earlier `11rem` because the RC/Stay
+  count field's bilingual label (e.g. "2. (i) जारी आर.सी. (R.C.) की संख्या") wrapped onto
+  multiple lines at that width, while the paired amount column had spare room to give up on
+  desktop. If the six-field schema ever changes, update this layout by hand, same as every other
+  place `PAC_FIELD_ORDER` is deliberately duplicated instead of derived. RC Amount and Recovered
+  Amount are two independent, plain `PacFieldInput`s with no cross-field behavior between them
+  (no auto-fill, no parity validation/error message) — see Validation rules above for why that
+  coupling was removed; don't reintroduce it. The Previous Year / Save & Continue row is
   `flex-col-reverse` below `sm` (each button `w-full`) and `sm:flex-row` above it — `Button`'s
   base classes force `whitespace-nowrap`, so the longest label ("Save & View Summary") plus
   "Previous Year" side by side overflowed a phone-width container before this; `-reverse` keeps
