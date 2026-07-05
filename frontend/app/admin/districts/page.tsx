@@ -59,6 +59,12 @@ export default function DistrictsPage() {
   }, []);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 25 });
+  useEffect(() => {
+    const saved = localStorage.getItem("excise-portal:districts-pageSize");
+    if (saved) {
+      setPagination((p) => ({ ...p, pageSize: Number(saved) }));
+    }
+  }, []);
   const [provisioning, setProvisioning] = useState(false);
   const [exporting, setExporting] = useState<"xlsx" | "sql" | null>(null);
   const deoFileInputRef = useRef<HTMLInputElement>(null);
@@ -78,9 +84,29 @@ export default function DistrictsPage() {
 
   async function exportExcel() {
     setExporting("xlsx");
+    window.Swal.fire({
+      title: "Preparing Excel Export",
+      html: "Syncing latest data...<br><br><i class='ti ti-loader animate-spin text-4xl text-blue-600'></i>",
+      showConfirmButton: false,
+      allowOutsideClick: false,
+    });
     try {
       const fresh = await sync();
-      exportDistrictsToXlsx(fresh?.districts ?? districts, fresh?.pacData ?? pacData);
+      const now = new Date().toLocaleString("en-IN");
+      const result = await window.Swal.fire({
+        title: "Export Ready",
+        html: `Data is synced and ready.<br>Generated at: <strong>${now}</strong>`,
+        icon: "success",
+        showConfirmButton: true,
+        confirmButtonText: "Download Excel File",
+        confirmButtonColor: "#2563eb",
+        showCancelButton: true,
+        cancelButtonText: "Cancel",
+        allowOutsideClick: false,
+      });
+      if (result.isConfirmed) {
+        exportDistrictsToXlsx(fresh?.districts ?? districts, fresh?.pacData ?? pacData);
+      }
     } finally {
       setExporting(null);
     }
@@ -88,9 +114,29 @@ export default function DistrictsPage() {
 
   async function exportSql() {
     setExporting("sql");
+    window.Swal.fire({
+      title: "Preparing SQL Export",
+      html: "Syncing latest data...<br><br><i class='ti ti-loader animate-spin text-4xl text-blue-600'></i>",
+      showConfirmButton: false,
+      allowOutsideClick: false,
+    });
     try {
       const fresh = await sync();
-      exportDistrictsToSql(fresh?.districts ?? districts, fresh?.pacData ?? pacData);
+      const now = new Date().toLocaleString("en-IN");
+      const result = await window.Swal.fire({
+        title: "Export Ready",
+        html: `Data is synced and ready.<br>Generated at: <strong>${now}</strong>`,
+        icon: "success",
+        showConfirmButton: true,
+        confirmButtonText: "Download SQL File",
+        confirmButtonColor: "#2563eb",
+        showCancelButton: true,
+        cancelButtonText: "Cancel",
+        allowOutsideClick: false,
+      });
+      if (result.isConfirmed) {
+        exportDistrictsToSql(fresh?.districts ?? districts, fresh?.pacData ?? pacData);
+      }
     } finally {
       setExporting(null);
     }
@@ -414,7 +460,11 @@ export default function DistrictsPage() {
             <span>Rows per page</span>
             <select
               value={pagination.pageSize}
-              onChange={(e) => setPagination((p) => ({ ...p, pageIndex: 0, pageSize: Number(e.target.value) }))}
+              onChange={(e) => {
+                const size = Number(e.target.value);
+                setPagination((p) => ({ ...p, pageIndex: 0, pageSize: size }));
+                localStorage.setItem("excise-portal:districts-pageSize", String(size));
+              }}
               className="rounded-md shadow-sm border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 outline-none hover:bg-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               {PAGE_SIZE_OPTIONS.map((n) => (
