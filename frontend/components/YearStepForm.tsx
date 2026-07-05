@@ -42,7 +42,7 @@ export default function YearStepForm({ year, onFieldChange, onSaveAndContinue, o
           onChange={(raw) => onFieldChange("grossArrears", raw)}
         />
 
-        <div className="grid grid-cols-1 sm:grid-cols-[16rem_1fr] gap-4 sm:items-end">
+        <div className="grid grid-cols-1 sm:grid-cols-[16rem_1fr] lg:grid-cols-[26rem_1fr] gap-4 sm:items-end">
           <PacFieldInput
             label={PAC_FIELD_LABELS.rcCount}
             value={year.rcCount}
@@ -64,7 +64,7 @@ export default function YearStepForm({ year, onFieldChange, onSaveAndContinue, o
           onChange={(raw) => onFieldChange("recoveredAmount", raw)}
         />
 
-        <div className="grid grid-cols-1 sm:grid-cols-[16rem_1fr] gap-4 sm:items-end">
+        <div className="grid grid-cols-1 sm:grid-cols-[16rem_1fr] lg:grid-cols-[26rem_1fr] gap-4 sm:items-end">
           <PacFieldInput
             label={PAC_FIELD_LABELS.stayCount}
             value={year.stayCount}
