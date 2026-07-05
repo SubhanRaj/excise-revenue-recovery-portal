@@ -59,6 +59,7 @@ export default function DistrictsPage() {
   }, []);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 25 });
+  const [isChangingFY, setIsChangingFY] = useState(false);
   useEffect(() => {
     const saved = localStorage.getItem("excise-portal:districts-pageSize");
     if (saved) {
@@ -279,7 +280,18 @@ export default function DistrictsPage() {
     getPaginationRowModel: getPaginationRowModel(),
   });
 
-  if (!ready) return null;
+  if (!ready) {
+    return (
+      <div className="flex min-h-full flex-1 flex-col bg-slate-50 p-6 dark:bg-slate-950">
+        <div className="h-8 w-64 animate-pulse rounded-md bg-slate-200 dark:bg-slate-800" />
+        <div className="mt-8 flex gap-4">
+          <div className="h-10 w-40 animate-pulse rounded-md bg-slate-200 dark:bg-slate-800" />
+          <div className="h-10 w-40 animate-pulse rounded-md bg-slate-200 dark:bg-slate-800" />
+        </div>
+        <div className="mt-6 flex-1 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-800" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-full flex-1 flex-col bg-slate-50 dark:bg-slate-950">
@@ -335,17 +347,32 @@ export default function DistrictsPage() {
               <option value="locked">Locked</option>
               <option value="unlocked">Unlocked</option>
             </select>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value as (typeof FINANCIAL_YEARS)[number])}
-              className="rounded-md shadow-sm border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 outline-none hover:bg-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              {FINANCIAL_YEARS.map((fy) => (
-                <option key={fy} value={fy}>
-                  FY {fy}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                value={selectedYear}
+                disabled={isChangingFY}
+                onChange={(e) => {
+                  const val = e.target.value as (typeof FINANCIAL_YEARS)[number];
+                  setIsChangingFY(true);
+                  setTimeout(() => {
+                    setSelectedYear(val);
+                    setIsChangingFY(false);
+                  }, 400);
+                }}
+                className="appearance-none rounded-md shadow-sm border border-slate-300 bg-white py-1.5 pl-3 pr-8 text-sm font-medium text-slate-700 outline-none hover:bg-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                {FINANCIAL_YEARS.map((y) => (
+                  <option key={y} value={y}>
+                    FY {y}
+                  </option>
+                ))}
+              </select>
+              {isChangingFY ? (
+                <i className="ti ti-loader animate-spin absolute right-2.5 top-1/2 -translate-y-1/2 text-sm text-slate-400" />
+              ) : (
+                <i className="ti ti-chevron-down pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-sm text-slate-400" />
+              )}
+            </div>
             <Button variant="blue" size="xs" onClick={() => downloadDeoTemplate(districts)}>
               <i className="ti ti-download text-sm" />
               DEO Template
@@ -414,7 +441,7 @@ export default function DistrictsPage() {
                 </tr>
               ))}
             </thead>
-            <tbody>
+            <tbody key={selectedYear + statusFilter} className="animate-in fade-in duration-500">
               {table.getRowModel().rows.map((row) => (
                 <tr
                   key={row.id}
