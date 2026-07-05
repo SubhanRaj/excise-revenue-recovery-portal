@@ -178,6 +178,32 @@ only once year `N` is marked `completed`. Every keystroke persists to Dexie
 years in one atomic payload (`db.batch()` on the API side: 5 inserts + lock flip + user
 audit stamp, all-or-nothing).
 
+**Clearing a draft is a client-only, pre-lock-only operation** — it never calls the API,
+since there's nothing on the server yet to clear (that only exists after final submit, at
+which point this whole page redirects away to `/login`). Two entry points, both behind a
+blocking SweetAlert2 confirm (`confirmClearYear()`/`confirmClearAll()` in
+`frontend/lib/alerts.ts`, same shape as `confirmFinalSubmit()`/`confirmLogout()`) so a stray
+tap can't silently wipe entered data:
+- **Per-year "Clear"** (`YearStepForm.tsx`, top-right of the year heading) resets just that
+  step back to a blank `DraftYear` in both React state and Dexie via `clearYear()` in
+  `deo-data-entry/page.tsx`. If the cleared year was already `completed`, every later year it
+  had unlocked becomes locked again (the existing `years[i-1].completed` gate recomputes
+  automatically), so `clearYear()` also drops `step` back to the cleared year if the DEO was
+  currently viewing a later one.
+- **"Clear All"** (sticky nav bar, next to Master View) calls `db.draftYears.clear()` and
+  resets all 5 years to blank, back to Year 1.
+
+Both call sites bump a `clearVersion` counter that's folded into `YearStepForm`'s React `key`
+(`` `${financialYear}-${clearVersion}` ``) to force a remount — the component's own
+`followRc`/`parityTouched` state only initializes once per mount, so without the key change a
+clear would reset the Dexie data but leave stale internal form state behind (e.g. Recovered
+Amount no longer auto-filling from RC Amount even though both are freshly blank).
+
+This is deliberately asymmetric with unlocking: an Admin unlock (`districts.lock_status` →
+0, see Data model above) only lets the DEO edit again — it never clears any `pac_data` rows,
+since the whole point of an unlock is usually to *correct* existing figures, not restart from
+zero.
+
 **The DEO's name is not a form field — it's collected in the lock confirmation itself.**
 `MasterView.tsx` has no name input; it's just the table plus a big `size="lg"` "Submit &
 Lock" button. Clicking it runs a two-step SweetAlert2 flow in `frontend/lib/alerts.ts`,

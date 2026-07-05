@@ -6,9 +6,16 @@ import { db, type DraftYear } from "@/lib/db";
 import { FINANCIAL_YEARS, PAC_FIELD_ORDER } from "@/lib/pac-fields";
 import { apiFetch, ApiError } from "@/lib/api";
 import { clearClientSession, consumeJustAuthed } from "@/lib/session";
-import { confirmFinalSubmit, promptDeoNameAndLock, notifyToast } from "@/lib/alerts";
+import {
+  confirmFinalSubmit,
+  promptDeoNameAndLock,
+  confirmClearYear,
+  confirmClearAll,
+  notifyToast,
+} from "@/lib/alerts";
 import YearStepForm from "@/components/YearStepForm";
 import MasterView from "@/components/MasterView";
+import Button from "@/components/ui/Button";
 import AppHeader from "@/components/ui/AppHeader";
 import HelpPanel from "@/components/ui/HelpPanel";
 import type { Profile } from "@/components/ui/ProfileMenu";
@@ -36,6 +43,9 @@ export default function EntryPage() {
   const [ready, setReady] = useState(false);
   const [years, setYears] = useState<DraftYear[]>(FINANCIAL_YEARS.map(blankYear));
   const [step, setStep] = useState(0); // 0..4 = year steps, 5 = master view
+  // Bumped on every clear so YearStepForm remounts (key includes this) — it otherwise keeps its
+  // own internal followRc/parityTouched state across a clear that only resets Dexie/parent state.
+  const [clearVersion, setClearVersion] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -91,6 +101,31 @@ export default function EntryPage() {
     });
     await db.draftYears.put(updated);
     setStep(index + 1 <= 4 ? index + 1 : 5);
+  }
+
+  // Both only reachable pre-lock (these buttons/the whole page disappear once submitAll()
+  // locks and redirects away) — clears the local Dexie draft only, never touches D1.
+  async function clearYear(index: number) {
+    const confirmed = await confirmClearYear(`Year ${index + 1} (${years[index].financialYear})`);
+    if (!confirmed) return;
+    const blanked = blankYear(years[index].financialYear);
+    await db.draftYears.put(blanked);
+    setYears((prev) => {
+      const next = [...prev];
+      next[index] = blanked;
+      return next;
+    });
+    setClearVersion((v) => v + 1);
+    if (step > index) setStep(index);
+  }
+
+  async function clearAllData() {
+    const confirmed = await confirmClearAll();
+    if (!confirmed) return;
+    await db.draftYears.clear();
+    setYears(FINANCIAL_YEARS.map(blankYear));
+    setClearVersion((v) => v + 1);
+    setStep(0);
   }
 
   function goToStep(target: number) {
@@ -201,30 +236,37 @@ export default function EntryPage() {
               );
             })}
           </div>
-          <button
-            type="button"
-            onClick={() => goToStep(5)}
-            disabled={!years.every((y) => y.completed)}
-            style={!years.every((y) => y.completed) ? { cursor: "not-allowed" } : undefined}
-            className={`flex items-center justify-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors sm:ml-auto sm:justify-start ${
-              step === 5
-                ? "bg-blue-600 text-white shadow-sm"
-                : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
-            } disabled:opacity-40`}
-          >
-            <i className="ti ti-clipboard-list text-base" />
-            Master View
-          </button>
+          <div className="flex items-center gap-2 sm:ml-auto">
+            <Button type="button" variant="danger" size="sm" onClick={clearAllData}>
+              <i className="ti ti-trash text-sm" />
+              Clear All
+            </Button>
+            <button
+              type="button"
+              onClick={() => goToStep(5)}
+              disabled={!years.every((y) => y.completed)}
+              style={!years.every((y) => y.completed) ? { cursor: "not-allowed" } : undefined}
+              className={`flex items-center justify-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors sm:justify-start ${
+                step === 5
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+              } disabled:opacity-40`}
+            >
+              <i className="ti ti-clipboard-list text-base" />
+              Master View
+            </button>
+          </div>
         </nav>
 
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           {step < 5 ? (
             <YearStepForm
-              key={years[step].financialYear}
+              key={`${years[step].financialYear}-${clearVersion}`}
               year={years[step]}
               onFieldChange={(field, value) => updateField(step, field, value)}
               onSaveAndContinue={() => saveAndContinue(step)}
               onBack={step > 0 ? () => setStep(step - 1) : undefined}
+              onClear={() => clearYear(step)}
               isLastYear={step === 4}
             />
           ) : (

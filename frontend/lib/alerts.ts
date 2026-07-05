@@ -116,6 +116,43 @@ export async function promptUnlockReason(districtName: string): Promise<string |
   return result.isConfirmed ? (result.value as string).trim() : null;
 }
 
+// Both clear flows are only reachable pre-lock (the buttons that call these disappear once the
+// district is submitted/locked, since submitAll() redirects away from this page) — clearing
+// never touches server data, only this browser's Dexie draft, so an Admin unlock never needs to
+// restore anything here.
+export async function confirmClearYear(yearLabel: string): Promise<boolean> {
+  const result = await window.Swal.fire({
+    icon: "warning",
+    title: `Clear ${yearLabel}?`,
+    html:
+      `This will erase all data entered for ${yearLabel} on this device. This cannot be undone.` +
+      `<br><br><span lang="hi">इससे इस डिवाइस पर ${yearLabel} के लिए दर्ज किया गया सभी डेटा मिट ` +
+      "जाएगा। यह पूर्ववत नहीं किया जा सकता।</span>",
+    showCancelButton: true,
+    confirmButtonText: "Yes, clear it",
+    cancelButtonText: "Cancel",
+    confirmButtonColor: "#dc2626",
+  });
+  return result.isConfirmed;
+}
+
+export async function confirmClearAll(): Promise<boolean> {
+  const result = await window.Swal.fire({
+    icon: "warning",
+    title: "Clear all 5 years?",
+    html:
+      "This will erase every year's entered data on this device and return to a blank form. " +
+      "This cannot be undone." +
+      '<br><br><span lang="hi">इससे इस डिवाइस पर सभी 5 वर्षों का दर्ज किया गया डेटा मिट जाएगा ' +
+      "और फॉर्म खाली हो जाएगा। यह पूर्ववत नहीं किया जा सकता।</span>",
+    showCancelButton: true,
+    confirmButtonText: "Yes, clear everything",
+    cancelButtonText: "Cancel",
+    confirmButtonColor: "#dc2626",
+  });
+  return result.isConfirmed;
+}
+
 // Fire-and-forget corner toast for auth transitions (login/logout) and generic validation
 // errors that aren't tied to one specific field (e.g. "a field is blank" — could be any of
 // six). Not awaited by callers — its DOM node attaches to <body>, outside the React tree, so

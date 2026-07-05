@@ -19,10 +19,11 @@ type Props = {
   onFieldChange: (field: keyof DraftYear, value: string) => void;
   onSaveAndContinue: () => void;
   onBack?: () => void;
+  onClear: () => void;
   isLastYear: boolean;
 };
 
-export default function YearStepForm({ year, onFieldChange, onSaveAndContinue, onBack, isLastYear }: Props) {
+export default function YearStepForm({ year, onFieldChange, onSaveAndContinue, onBack, onClear, isLastYear }: Props) {
   const gross = Number(year.grossArrears) || 0;
   const recovered = Number(year.recoveredAmount) || 0;
   const stay = Number(year.stayAmount) || 0;
@@ -48,11 +49,17 @@ export default function YearStepForm({ year, onFieldChange, onSaveAndContinue, o
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-2 border-b border-slate-100 pb-4 dark:border-slate-800">
-        <i className="ti ti-calendar-stats text-xl text-blue-600 dark:text-blue-400" />
-        <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-          Financial Year {year.financialYear}
-        </h2>
+      <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-4 dark:border-slate-800">
+        <div className="flex items-center gap-2">
+          <i className="ti ti-calendar-stats text-xl text-blue-600 dark:text-blue-400" />
+          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+            Financial Year {year.financialYear}
+          </h2>
+        </div>
+        <Button type="button" variant="danger" size="xs" onClick={onClear}>
+          <i className="ti ti-eraser text-sm" />
+          Clear
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 gap-4">
