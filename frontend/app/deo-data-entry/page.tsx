@@ -314,7 +314,10 @@ export default function EntryPage() {
           Admin unlock.
         </p>
       </HelpPanel>
-      <div className={`mx-auto w-full flex-1 px-4 pt-8 pb-24 sm:pb-8 ${step === 5 ? "max-w-6xl" : "max-w-4xl"}`}>
+      {/* Same max-w-6xl regardless of step — this used to shrink to max-w-4xl outside the Master
+          View, which made switching between a year's form and the (correctly wide) summary
+          table page-jump/resize oddly. w-full still caps it at the viewport on mobile. */}
+      <div className="mx-auto w-full max-w-6xl flex-1 px-4 pt-8 pb-24 sm:pb-8">
         {/* Tells the DEO what they're filing before they see any form fields — sits below the
             header/help button and above the year pills, not inside the sticky nav itself, so it
             scrolls away once they're deep into a year's fields instead of permanently eating
