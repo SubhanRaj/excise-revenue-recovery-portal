@@ -63,6 +63,8 @@ export default function DistrictsPage() {
   const [exporting, setExporting] = useState<"xlsx" | "sql" | null>(null);
   const deoFileInputRef = useRef<HTMLInputElement>(null);
 
+  const hasDemoDistrict = districts.some(d => d.districtName === "Demo District");
+
   async function handleUnlock(districtId: number, districtName: string) {
     const reason = await promptUnlockReason(districtName);
     if (!reason) return;
@@ -321,23 +323,25 @@ export default function DistrictsPage() {
               <i className={`ti ti-database-export text-sm ${exporting === "sql" ? "animate-pulse" : ""}`} />
               {exporting === "sql" ? "Exporting..." : "Export as SQL"}
             </Button>
-            <Button
-              variant="dangerSoft"
-              size="xs"
-              onClick={async () => {
-                if (await confirmTruncateDemo()) {
-                  try {
-                    await truncateDemo();
-                    notifyToast({ icon: "success", title: "Demo District permanently deleted." });
-                  } catch (err) {
-                    setError(err instanceof ApiError ? err.message : "Truncate failed.");
+            {hasDemoDistrict && (
+              <Button
+                variant="dangerSoft"
+                size="xs"
+                onClick={async () => {
+                  if (await confirmTruncateDemo()) {
+                    try {
+                      await truncateDemo();
+                      notifyToast({ icon: "success", title: "Demo District permanently deleted." });
+                    } catch (err) {
+                      setError(err instanceof ApiError ? err.message : "Truncate failed.");
+                    }
                   }
-                }
-              }}
-            >
-              <i className="ti ti-eraser text-sm" />
-              Truncate Demo
-            </Button>
+                }}
+              >
+                <i className="ti ti-eraser text-sm" />
+                Truncate Demo
+              </Button>
+            )}
           </div>
         </div>
 
