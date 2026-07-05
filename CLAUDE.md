@@ -355,8 +355,11 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   full-width with the parity error inline beneath it; stay count+amount paired the same way
   as RC) rather than looping `PAC_FIELD_ORDER` — matches the "(i)/(ii)" pairing on the actual
   government form. The two-up pairing only applies from the `sm` breakpoint up
-  (`grid-cols-1 sm:grid-cols-[11rem_1fr]`) — below that, each field gets its own row, since the
-  narrow count column has no room to breathe on a phone-width form. If the six-field schema
+  (`grid-cols-1 sm:grid-cols-[16rem_1fr]`) — below that, each field gets its own row, since the
+  count column has no room to breathe on a phone-width form. The count column was widened from
+  an earlier `11rem` because the RC/Stay count field's bilingual label (e.g. "2. (i) प्रेषित
+  आर.सी. (R.C.) की संख्या") wrapped onto multiple lines at that width, while the paired amount
+  column had spare room to give up on desktop. If the six-field schema
   ever changes, update this layout by hand, same as every other place `PAC_FIELD_ORDER` is
   deliberately duplicated instead of derived. Recovered Amount auto-fills from RC Amount as the
   DEO types it, until they edit Recovered Amount directly — then it stops following (it's never
