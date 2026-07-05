@@ -49,6 +49,14 @@ export function englishLabel(bilingual: string): string {
   return bilingual.split(" / ")[0];
 }
 
+// englishLabel() minus the government form's own numbering ("1.", "2. (i)", "4. (ii)") — used
+// by summary/stat views (the Admin Dashboard's "All fields" list) that aren't laid out to mirror
+// the form's field order/grouping the way YearStepForm/MasterView/the Districts table are, so the
+// numbering there is just noise rather than a useful cross-reference.
+export function plainLabel(bilingual: string): string {
+  return englishLabel(bilingual).replace(/^\d+\.\s*(\([ivx]+\)\s*)?/i, "");
+}
+
 // gross_arrears - (recovered_amount + stay_amount), floored at 0. Display-only — never
 // persisted. Uses recovered_amount, not rc_amount — an RC being issued for an amount doesn't
 // mean that amount was actually recovered, so these two fields are independent (no parity

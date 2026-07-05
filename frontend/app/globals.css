@@ -37,11 +37,21 @@ button {
   line-height: 1;
 }
 
-input,
-select {
-  border: 1px solid #cbd5e1;
-  border-radius: 0.375rem;
-  padding: 0.5rem 0.75rem;
+/* Wrapped in @layer base (unlike the rules above) specifically so components' own Tailwind
+   padding utility classes (py-1.5, px-3, etc) can still override this fallback padding/border —
+   same cascade-layers reasoning as the `color` note above: an unlayered rule permanently
+   outranks every @layer-wrapped Tailwind utility for the same property, no matter the class
+   list or specificity. This was a real bug: components/ui/Select.tsx's `size` prop sets a
+   vertical padding utility via className, but this bare rule's padding: 0.5rem 0.75rem silently
+   won every time regardless of which value Select.tsx used — bumping that value repeatedly had
+   no visible effect at all, since the unlayered fallback never actually lost the cascade. */
+@layer base {
+  input,
+  select {
+    border: 1px solid #cbd5e1;
+    border-radius: 0.375rem;
+    padding: 0.5rem 0.75rem;
+  }
 }
 
 button {

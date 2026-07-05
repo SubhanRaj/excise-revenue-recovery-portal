@@ -1,7 +1,9 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Chart } from "chart.js";
-import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable, englishLabel } from "@/lib/pac-fields";
+import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable, plainLabel } from "@/lib/pac-fields";
+import { setNavDistrictId } from "@/lib/adminNav";
 import type { CachedDistrict } from "@/lib/db";
 
 type Row = CachedDistrict & Record<(typeof PAC_FIELD_ORDER)[number], number>;
@@ -14,6 +16,13 @@ const PERIOD_LABEL = `FY ${FINANCIAL_YEARS[0]} – ${FINANCIAL_YEARS[FINANCIAL_Y
 function formatMoney(value: number) {
   return `₹${value.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
 }
+
+// Green = Locked, red = Unlocked — inverted from the usual "red is bad" reading, because this
+// portal's whole goal is 100% of districts *locked* (submission complete); an unlocked district
+// is the one still needing attention, so it gets the red. Matches KPI_COLORS' Locked/Unlocked
+// card colors below — keep both in sync if this ever changes.
+const LOCKED_COLOR = "#10b981";
+const UNLOCKED_COLOR = "#ef4444";
 
 // Chart.js loads from a CDN <script lazyOnload> (layout.tsx), so it may not be on
 // `window` the instant this mounts — poll briefly instead of assuming it's ready.
@@ -32,7 +41,7 @@ function LockStatusDonut({ locked, unlocked }: { locked: number; unlocked: numbe
         type: "doughnut",
         data: {
           labels: ["Locked", "Unlocked"],
-          datasets: [{ data: [locked, unlocked], backgroundColor: ["#ef4444", "#10b981"], borderWidth: 0 }],
+          datasets: [{ data: [locked, unlocked], backgroundColor: [LOCKED_COLOR, UNLOCKED_COLOR], borderWidth: 0 }],
         },
         options: {
           plugins: { legend: { display: false } },
@@ -61,7 +70,88 @@ function LockStatusDonut({ locked, unlocked }: { locked: number; unlocked: numbe
   }, [locked, unlocked]);
 
   return (
-    <div className="relative h-28 w-28 shrink-0">
+    <div className="relative h-44 w-44 shrink-0">
+      <canvas ref={canvasRef} />
+    </div>
+  );
+}
+
+// Vertical bar chart (Chart.js default 'bar' orientation — category names along the x-axis,
+// values as bar height) replacing the old plain-CSS horizontal progress-bar list, so the top-5
+// districts get the same real-chart treatment as the lock-status donut instead of looking like a
+// lesser, hand-rolled version next to it.
+function TopDistrictsBarChart({
+  districts,
+  onBarClick,
+}: {
+  districts: { name: string; dues: number }[];
+  onBarClick: (index: number) => void;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<Chart | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    let poll: ReturnType<typeof setInterval> | undefined;
+
+    function render() {
+      if (!canvasRef.current || cancelled) return;
+      chartRef.current?.destroy();
+      chartRef.current = new window.Chart(canvasRef.current, {
+        type: "bar",
+        data: {
+          labels: districts.map((d) => d.name),
+          datasets: [
+            {
+              data: districts.map((d) => d.dues),
+              backgroundColor: "#2563eb",
+              borderRadius: 4,
+              maxBarThickness: 48,
+            },
+          ],
+        },
+        options: {
+          plugins: { legend: { display: false } },
+          maintainAspectRatio: false,
+          onHover: (event, elements) => {
+            const target = event.native?.target as HTMLElement | undefined;
+            if (target) target.style.cursor = elements.length ? "pointer" : "default";
+          },
+          // Same district-detail navigation every other click-to-detail spot in admin uses
+          // (setNavDistrictId + router.push, sessionStorage-based — see adminNav.ts, never a
+          // ?id= query string) rather than the dead ?id= link this chart replaces.
+          onClick: (_event, elements) => {
+            if (elements.length) onBarClick(elements[0].index);
+          },
+          scales: {
+            y: {
+              ticks: { callback: (v) => `₹${Number(v).toLocaleString("en-IN")}` },
+            },
+          },
+        },
+      });
+    }
+
+    if (window.Chart) {
+      render();
+    } else {
+      poll = setInterval(() => {
+        if (window.Chart) {
+          clearInterval(poll);
+          render();
+        }
+      }, 150);
+    }
+
+    return () => {
+      cancelled = true;
+      if (poll) clearInterval(poll);
+      chartRef.current?.destroy();
+    };
+  }, [districts, onBarClick]);
+
+  return (
+    <div className="relative h-72 w-full">
       <canvas ref={canvasRef} />
     </div>
   );
@@ -127,9 +217,8 @@ function KpiCard({
   return href ? <Link href={href}>{content}</Link> : content;
 }
 
-// ponytail: top-5 list and lock-ratio bar stay plain CSS divs — only the one chart the user
-// asked to see (locked vs unlocked, LockStatusDonut above) pulls in Chart.js via CDN.
 export default function AdminDashboard({ rows }: { rows: Row[] }) {
+  const router = useRouter();
   const totalDistricts = rows.length;
   const locked = rows.filter((r) => r.lockStatus === 1).length;
   const unlocked = totalDistricts - locked;
@@ -150,69 +239,61 @@ export default function AdminDashboard({ rows }: { rows: Row[] }) {
     }))
     .sort((a, b) => b.dues - a.dues)
     .slice(0, 5);
-  const maxDues = Math.max(1, ...topDues.map((d) => d.dues));
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <KpiCard label="Districts" value={String(totalDistricts)} icon="ti-map-pin" color="blue" href="/admin/districts" />
-        <KpiCard label="Locked" value={String(locked)} icon="ti-lock" color="red" href="/admin/districts?status=locked" />
+        {/* Green = Locked, red = Unlocked — see LOCKED_COLOR/UNLOCKED_COLOR above for why this
+            is inverted from the usual "red is bad" reading. */}
+        <KpiCard label="Locked" value={String(locked)} icon="ti-lock" color="emerald" href="/admin/districts?status=locked" />
         <KpiCard
           label="Unlocked"
           value={String(unlocked)}
           icon="ti-lock-open"
-          color="emerald"
+          color="red"
           href="/admin/districts?status=unlocked"
         />
         <KpiCard label="Gross Arrears" value={formatMoney(sums.grossArrears)} icon="ti-report-money" color="amber" href="/admin/districts" />
         <KpiCard label="Net Recoverable" value={formatMoney(netRecoverableTotal)} icon="ti-cash" color="violet" href="/admin/districts" />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      {/* Two full-width rows (not a side-by-side lg:grid-cols-2) — both the bar chart and the
+          donut needed more room than a half-width column gave them. */}
+      <div className="space-y-4">
         <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
           <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
             Top 5 districts by Net Recoverable — Total ({PERIOD_LABEL})
           </h3>
-          <div className="space-y-2.5">
-            {topDues.map((d) => (
-              <Link
-                key={d.id}
-                href={`/admin/districts/detail?id=${d.id}`}
-                className="-mx-2 block rounded-md px-2 py-1 transition-colors hover:bg-blue-50 dark:hover:bg-blue-950/40"
-              >
-                <div className="mb-1 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
-                  <span>{d.name}</span>
-                  <span className="tabular-nums">{formatMoney(d.dues)}</span>
-                </div>
-                <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800">
-                  <div
-                    className="h-2 rounded-full bg-blue-600"
-                    style={{ width: `${Math.max(2, (d.dues / maxDues) * 100)}%` }}
-                  />
-                </div>
-              </Link>
-            ))}
-          </div>
+          <TopDistrictsBarChart
+            districts={topDues}
+            onBarClick={(index) => {
+              const d = topDues[index];
+              if (!d) return;
+              setNavDistrictId(d.id);
+              router.push("/admin/districts/detail");
+            }}
+          />
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
           <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Lock status</h3>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-6">
             <LockStatusDonut locked={locked} unlocked={unlocked} />
             <div className="flex-1">
               <div className="flex h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                <div className="bg-red-500" style={{ width: `${(locked / Math.max(1, totalDistricts)) * 100}%` }} />
+                <div className="bg-emerald-500" style={{ width: `${(locked / Math.max(1, totalDistricts)) * 100}%` }} />
                 <div
-                  className="bg-emerald-500"
+                  className="bg-red-500"
                   style={{ width: `${(unlocked / Math.max(1, totalDistricts)) * 100}%` }}
                 />
               </div>
               <div className="mt-3 flex gap-5 text-xs text-slate-600 dark:text-slate-400">
                 <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-red-500" /> Locked ({locked})
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" /> Locked ({locked})
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500" /> Unlocked ({unlocked})
+                  <span className="h-2 w-2 rounded-full bg-red-500" /> Unlocked ({unlocked})
                 </span>
               </div>
             </div>
@@ -221,11 +302,14 @@ export default function AdminDashboard({ rows }: { rows: Row[] }) {
           <h3 className="mb-3 mt-5 text-sm font-semibold text-slate-700 dark:text-slate-300">
             All fields — Total ({PERIOD_LABEL})
           </h3>
+          {/* plainLabel(), not englishLabel() — this is a summary list, not laid out to mirror
+              the government form's field order/grouping, so the form's own numbering
+              ("1.", "2. (i)") is just noise here. */}
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
             {PAC_FIELD_ORDER.map((field) => (
               <div key={field} className="flex items-center justify-between gap-2">
-                <dt className="truncate text-slate-500 dark:text-slate-400" title={englishLabel(PAC_FIELD_LABELS[field])}>
-                  {englishLabel(PAC_FIELD_LABELS[field])}
+                <dt className="truncate text-slate-500 dark:text-slate-400" title={plainLabel(PAC_FIELD_LABELS[field])}>
+                  {plainLabel(PAC_FIELD_LABELS[field])}
                 </dt>
                 <dd className="tabular-nums font-medium text-slate-900 dark:text-slate-100">
                   {isMoneyField(field) ? formatMoney(sums[field]) : sums[field].toLocaleString("en-IN")}

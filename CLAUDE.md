@@ -436,6 +436,18 @@ condition, give it this same three-way treatment rather than a plain active/inac
   `getComputedStyle`) before and after removing those two `color` declarations. If you need a
   pre-Tailwind fallback color again, wrap it in `@layer base { ... }` instead of a bare rule —
   don't add a plain unlayered `color` rule back.
+- **The same unlayered-rule bug also hit `padding`, not just `color`.** `globals.css` had a bare
+  (unlayered) `input, select { padding: 0.5rem 0.75rem; border: ...; border-radius: ...; }` rule.
+  `components/ui/Select.tsx`'s `size` prop sets vertical padding via a Tailwind `py-*` className
+  specifically so the FY filter's digit-heavy options ("FY 2021-22") don't get cropped at the
+  top — but that utility class was always losing to this bare rule's `padding: 0.5rem 0.75rem`,
+  for the exact same cascade-layers reason as the `color` bug above, so repeatedly bumping the
+  `py-*` value in `Select.tsx` (`py-2`, then `py-2.5`) had *zero* visible effect and the crop
+  never actually went away. Fixed by wrapping that whole `input, select { ... }` rule in
+  `@layer base { ... }` so Tailwind's own padding utilities can win as intended. If a component's
+  Tailwind spacing/sizing utility appears to have no effect on an `input`/`select`/`button`,
+  check `globals.css` for an unlayered rule on the same property before assuming the utility
+  class itself is wrong.
 
 ## UI conventions
 
@@ -658,19 +670,40 @@ the single-page toolbar (Sync, DEO Template, Upload, Export, year select, all in
 visually cramped as features were added:
 
 - **`/admin`** (`components/AdminDashboard.tsx`) — colorful, clickable KPI cards (Districts/
-  Locked/Unlocked/Gross Arrears/Net Recoverable — each its own accent color: blue/red/emerald/
-  amber/violet, via `KpiCard`'s `color` prop, not five identical white cards), a top-5-districts
-  bar list, and a lock-status card. Every card links somewhere useful: Districts/Gross
-  Arrears/Net Recoverable go to `/admin/districts`; Locked/Unlocked go there too but pre-filter
-  by status (see sessionStorage nav below); each top-5 list row links straight to that
-  district's detail page. Most of the lock-status card is still plain CSS divs/percentages
-  (ladder rung 4/5 — no dependency for a bar list), but the locked-vs-unlocked ratio also gets
-  an actual **Chart.js donut** (`LockStatusDonut` inside `AdminDashboard.tsx`) loaded from a CDN
-  `<script lazyOnload>` in `layout.tsx` — the one chart the user actually asked to see, added
-  alongside the existing bars rather than replacing them. Chart.js is a `devDependency` purely
-  for its TS types (`window.Chart` in `lib/globals.d.ts`), same pattern as `xlsx`/`sweetalert2`
-  — the real runtime script is CDN-only. Since the script loads lazily, `LockStatusDonut` polls
-  for `window.Chart` every 150ms until it appears rather than assuming it's ready on mount.
+  Locked/Unlocked/Gross Arrears/Net Recoverable — each its own accent color via `KpiCard`'s
+  `color` prop, not five identical white cards), a top-5-districts chart, and a lock-status card,
+  stacked as **two full-width rows**, not a side-by-side `lg:grid-cols-2` — both charts below
+  needed more horizontal room than a half-width column gave them. Every card links somewhere
+  useful: Districts/Gross Arrears/Net Recoverable go to `/admin/districts`; Locked/Unlocked go
+  there too but pre-filter by status (see sessionStorage nav below); clicking a bar in the top-5
+  chart navigates straight to that district's detail page (`setNavDistrictId()` +
+  `router.push()`, the same sessionStorage-based navigation as everywhere else in admin — an
+  earlier version used a `<Link href="/admin/districts/detail?id=...">` per row, which was
+  already dead: the detail page only ever reads the district id from sessionStorage, never a
+  `?id=` query string, see below). **Locked is green, Unlocked is red** — `LOCKED_COLOR`/
+  `UNLOCKED_COLOR` constants in `AdminDashboard.tsx`, matched by `KpiCard`'s `color` prop on
+  those two cards and the lock-ratio bar/legend — inverted from the usual "red is bad, green is
+  good" reading most dashboards use for a binary status, because this portal's whole purpose is
+  getting every district to 100% *locked* (submission complete); an unlocked district is the one
+  still needing attention, so red belongs there, not on Locked. Both the locked-vs-unlocked
+  ratio and the top-5-by-Net-Recoverable list are real **Chart.js** charts (`LockStatusDonut` and
+  `TopDistrictsBarChart` in `AdminDashboard.tsx`) loaded from a CDN `<script lazyOnload>` in
+  `layout.tsx` — the top-5 list used to be a plain-CSS horizontal progress-bar list (ladder rung
+  4/5, no dependency needed for something that simple), but was upgraded to a real vertical bar
+  chart (Chart.js's default `type: "bar"` orientation) once the donut set the precedent that this
+  dashboard's headline stats get real charts, not hand-rolled ones sitting next to them looking
+  like a lesser version. `LockStatusDonut`'s canvas grew from `h-28 w-28` to `h-44 w-44` and the
+  bar chart gets its own `h-72` container — both bigger than the numbers alone strictly need,
+  since this is the one page an Admin actually looks at for an at-a-glance read. Chart.js is a
+  `devDependency` purely for its TS types (`window.Chart` in `lib/globals.d.ts`), same pattern as
+  `xlsx`/`sweetalert2` — the real runtime script is CDN-only. Since the script loads lazily, both
+  chart components poll for `window.Chart` every 150ms until it appears rather than assuming it's
+  ready on mount. The dashboard's "All fields" total list uses `plainLabel()` (`lib/pac-fields.ts`)
+  rather than `englishLabel()` — it strips the government form's own numbering ("1.", "2. (i)")
+  on top of the Hindi half, since this list isn't laid out to mirror the form's field
+  order/grouping the way `YearStepForm`/`MasterView`/the Districts table headers are, so the
+  numbering there was just noise. `englishLabel()` (Hindi stripped, numbering kept) is still the
+  right helper for the Districts table headers and the Excel export.
   **Every number on this page is a total across all 5 financial years, never one FY at a
   time** — `admin/page.tsx` used to have its own FY `<select>` that filtered every stat down to
   one year, which was actively wrong for lock status: a district's PAC submission and lock are
