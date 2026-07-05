@@ -88,7 +88,20 @@ export default function AuditLogPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
 
-  if (!ready) return null;
+  if (!ready) {
+    return (
+      <div className="flex min-h-full flex-1 flex-col bg-slate-50 dark:bg-slate-950">
+        <AppHeader title="Audit Log" role="admin" profile={profile} navLinks={NAV_LINKS} onSync={sync} syncing={syncing} lastSyncedAt={lastSyncedAt} districts={districts} />
+        <div className="w-full flex-1 px-4 py-6 sm:px-6 lg:px-[10%] xl:px-[5%] 2xl:px-[3%]">
+          <div className="mb-4 flex flex-wrap items-center justify-end gap-1.5">
+            <div className="h-8 w-32 animate-pulse rounded-md bg-slate-200 dark:bg-slate-800" />
+            <div className="h-8 w-32 animate-pulse rounded-md bg-slate-200 dark:bg-slate-800" />
+          </div>
+          <div className="h-[500px] w-full animate-pulse rounded-lg bg-slate-200 dark:bg-slate-800" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-full flex-1 flex-col bg-slate-50 dark:bg-slate-950">
@@ -166,7 +179,7 @@ export default function AuditLogPage() {
                 </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody key={eventFilter + sortDir + page} className="animate-in fade-in duration-300">
               {visibleRows.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-3 py-6 text-center text-slate-500 dark:text-slate-400">

@@ -347,32 +347,25 @@ export default function DistrictsPage() {
               <option value="locked">Locked</option>
               <option value="unlocked">Unlocked</option>
             </select>
-            <div className="relative">
-              <select
-                value={selectedYear}
-                disabled={isChangingFY}
-                onChange={(e) => {
-                  const val = e.target.value as (typeof FINANCIAL_YEARS)[number];
-                  setIsChangingFY(true);
-                  setTimeout(() => {
-                    setSelectedYear(val);
-                    setIsChangingFY(false);
-                  }, 400);
-                }}
-                className="appearance-none rounded-md shadow-sm border border-slate-300 bg-white py-1.5 pl-3 pr-8 text-sm font-medium text-slate-700 outline-none hover:bg-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-              >
-                {FINANCIAL_YEARS.map((y) => (
-                  <option key={y} value={y}>
-                    FY {y}
-                  </option>
-                ))}
-              </select>
-              {isChangingFY ? (
-                <i className="ti ti-loader animate-spin absolute right-2.5 top-1/2 -translate-y-1/2 text-sm text-slate-400" />
-              ) : (
-                <i className="ti ti-chevron-down pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-sm text-slate-400" />
-              )}
-            </div>
+            <select
+              value={selectedYear}
+              disabled={isChangingFY}
+              onChange={(e) => {
+                const val = e.target.value as (typeof FINANCIAL_YEARS)[number];
+                setIsChangingFY(true);
+                setTimeout(() => {
+                  setSelectedYear(val);
+                  setIsChangingFY(false);
+                }, 400);
+              }}
+              className="rounded-md shadow-sm border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 outline-none hover:bg-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              {FINANCIAL_YEARS.map((y) => (
+                <option key={y} value={y}>
+                  FY {y}
+                </option>
+              ))}
+            </select>
             <Button variant="blue" size="xs" onClick={() => downloadDeoTemplate(districts)}>
               <i className="ti ti-download text-sm" />
               DEO Template
@@ -419,7 +412,16 @@ export default function DistrictsPage() {
         </div>
 
         <div className="min-h-[50vh] flex-1 overflow-auto rounded-lg border border-slate-200 bg-white shadow-sm [scrollbar-width:thin] scroll-smooth dark:border-slate-800 dark:bg-slate-900">
-          <table className="w-full border-collapse text-sm">
+          {isChangingFY ? (
+            <div className="p-6">
+              <div className="mb-6 h-8 w-full animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+              <div className="mb-4 h-12 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800/50" />
+              <div className="mb-4 h-12 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800/50" />
+              <div className="mb-4 h-12 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800/50" />
+              <div className="h-12 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800/50" />
+            </div>
+          ) : (
+            <table className="w-full border-collapse text-sm">
             <thead>
               {table.getHeaderGroups().map((hg) => (
                 <tr key={hg.id} className="bg-slate-50 dark:bg-slate-800">
@@ -480,6 +482,7 @@ export default function DistrictsPage() {
               </tr>
             </tfoot>
           </table>
+          )}
         </div>
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600 dark:text-slate-400">

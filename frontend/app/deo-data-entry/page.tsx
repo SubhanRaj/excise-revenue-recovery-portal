@@ -233,7 +233,18 @@ export default function EntryPage() {
     }
   }
 
-  if (!ready) return null;
+  if (!ready) {
+    return (
+      <div className="flex min-h-full flex-1 flex-col bg-slate-50 dark:bg-slate-950">
+        <AppHeader title="DEO Data Entry" role="deo" profile={profile} />
+        <div className="mx-auto w-full max-w-4xl flex-1 px-4 pt-8 pb-24 sm:pb-8">
+          <div className="mb-4 h-24 w-full animate-pulse rounded-lg bg-blue-50/50 dark:bg-blue-950/20" />
+          <div className="mb-6 h-12 w-full animate-pulse rounded-lg bg-slate-200 dark:bg-slate-800" />
+          <div className="h-[400px] w-full animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
+        </div>
+      </div>
+    );
+  }
 
   if (submitted) {
     return (
@@ -377,7 +388,7 @@ export default function EntryPage() {
           </div>
         </nav>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div key={step} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 animate-in fade-in slide-in-from-right-2 duration-300">
           {step < 5 ? (
             <YearStepForm
               key={`${years[step].financialYear}-${clearVersion}`}
