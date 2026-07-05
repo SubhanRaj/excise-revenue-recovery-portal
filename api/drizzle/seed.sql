@@ -9,7 +9,7 @@ INSERT INTO districts (district_name) VALUES
 ('Ghaziabad'), ('Ghazipur'), ('Gonda'), ('Gorakhpur'), ('Hamirpur'),
 ('Hapur'), ('Hardoi'), ('Hathras'), ('Jalaun'), ('Jaunpur'),
 ('Jhansi'), ('Kannauj'), ('Kanpur Dehat'), ('Kanpur Nagar'), ('Kasganj'),
-('Kaushambi'), ('Kheri'), ('Kushinagar'), ('Lalitpur'), ('Lucknow'),
+('Kaushambi'), ('Lakhimpur Kheri'), ('Kushinagar'), ('Lalitpur'), ('Lucknow'),
 ('Maharajganj'), ('Mahoba'), ('Mainpuri'), ('Mathura'), ('Mau'),
 ('Meerut'), ('Mirzapur'), ('Moradabad'), ('Muzaffarnagar'), ('Pilibhit'),
 ('Pratapgarh'), ('Raebareli'), ('Rampur'), ('Saharanpur'), ('Sambhal'),
