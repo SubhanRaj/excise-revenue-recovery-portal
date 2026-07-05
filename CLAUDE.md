@@ -707,9 +707,17 @@ visually cramped as features were added:
   doesn't scale with the rest of the toolbar's `Button.tsx` icons, both of which read as "very
   padded"/mismatched. `Select` fixes both: one `text-sm` size for every instance, and
   `appearance-none` plus its own small `ti-chevron-down` (sized/positioned to match the rest of
-  the toolbar's icons) instead of the browser default. If you add another dropdown anywhere in
-  admin, use `Select`, not a bare `<select>`. The pagination Prev/Next icon buttons are a
-  separate, unrelated `rounded-full` case — untouched by this fix.
+  the toolbar's icons) instead of the browser default. `Select` also carries a `min-w-[8rem]`
+  floor — with `appearance-none` plus Tailwind preflight's `border-box`, a bare `<select>`'s
+  shrink-to-fit width isn't reliable across browsers about leaving room for its own `pr-9`
+  padding, so a narrow selected value (e.g. "All events") could render its option text right
+  under the chevron icon instead of the box growing to fit both. Selects whose longest option
+  doesn't comfortably fit `8rem` (`/admin/districts`' status filter, `/admin/audit`'s event
+  filter) pass a wider `className="min-w-[...]"` override — if you add an option list with a
+  long label, check the rendered width rather than assuming the `8rem` default covers it. If
+  you add another dropdown anywhere in admin, use `Select`, not a bare `<select>`. The
+  pagination Prev/Next icon buttons are a separate, unrelated `rounded-full` case — untouched
+  by this fix.
   **Export as Excel Workbook** and **Export as SQL** both re-sync first (so the export reflects
   the live server state, not a possibly-stale cache), then build their respective file; both show
   a disabled, `animate-pulse` "Exporting..." state on their own button while running (mirroring

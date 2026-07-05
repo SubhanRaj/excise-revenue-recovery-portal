@@ -339,7 +339,11 @@ export default function DistrictsPage() {
           />
 
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-            <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "all" | "locked" | "unlocked")}>
+            <Select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as "all" | "locked" | "unlocked")}
+              className="min-w-[9.5rem]"
+            >
               <option value="all">All statuses</option>
               <option value="locked">Locked</option>
               <option value="unlocked">Unlocked</option>

@@ -148,6 +148,7 @@ export default function AuditLogPage() {
                 setIsChangingFilter(false);
               }, 400);
             }}
+            className="min-w-[11rem]"
           >
             <option value="all">All events</option>
             {Object.entries(EVENT_LABELS).map(([value, label]) => (
