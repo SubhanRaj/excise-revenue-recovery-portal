@@ -57,6 +57,7 @@ export default function AuditLogPage() {
   const [error, setError] = useState<string | null>(null);
   const [eventFilter, setEventFilter] = useState<string>("all");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
+  const [isChangingFilter, setIsChangingFilter] = useState(false);
 
   // Filters + re-sorts only the currently-loaded page's rows — the log itself is already
   // newest-first from the server and server-paginated, so a true global filter/sort would need
@@ -137,8 +138,16 @@ export default function AuditLogPage() {
         <div className="mb-4 flex flex-wrap items-center justify-end gap-1.5">
           <select
             value={eventFilter}
-            onChange={(e) => setEventFilter(e.target.value)}
-            className="rounded-md shadow-sm border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 outline-none hover:bg-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+            disabled={isChangingFilter}
+            onChange={(e) => {
+              const val = e.target.value;
+              setIsChangingFilter(true);
+              setTimeout(() => {
+                setEventFilter(val);
+                setIsChangingFilter(false);
+              }, 400);
+            }}
+            className="rounded-md shadow-sm border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 outline-none hover:bg-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <option value="all">All events</option>
             {Object.entries(EVENT_LABELS).map(([value, label]) => (
@@ -149,9 +158,16 @@ export default function AuditLogPage() {
           </select>
           <button
             type="button"
-            onClick={() => setSortDir((d) => (d === "desc" ? "asc" : "desc"))}
+            disabled={isChangingFilter}
+            onClick={() => {
+              setIsChangingFilter(true);
+              setTimeout(() => {
+                setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+                setIsChangingFilter(false);
+              }, 400);
+            }}
             title={sortDir === "desc" ? "Newest first — click for oldest first" : "Oldest first — click for newest first"}
-            className="flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <i className={`ti ${sortDir === "desc" ? "ti-sort-descending" : "ti-sort-ascending"} text-sm`} />
             {sortDir === "desc" ? "Newest first" : "Oldest first"}
@@ -159,7 +175,16 @@ export default function AuditLogPage() {
         </div>
 
         <div className="max-h-[65vh] overflow-auto rounded-lg border border-slate-200 bg-white shadow-sm [scrollbar-width:thin] scroll-smooth dark:border-slate-800 dark:bg-slate-900">
-          <table className="w-full border-collapse text-sm">
+          {isChangingFilter ? (
+            <div className="p-6">
+              <div className="mb-6 h-8 w-full animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+              <div className="mb-4 h-12 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800/50" />
+              <div className="mb-4 h-12 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800/50" />
+              <div className="mb-4 h-12 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800/50" />
+              <div className="h-12 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800/50" />
+            </div>
+          ) : (
+            <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800">
                 <th className="sticky top-0 z-10 whitespace-nowrap bg-slate-50 px-3 py-2.5 text-left font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">
@@ -206,7 +231,8 @@ export default function AuditLogPage() {
                 ))
               )}
             </tbody>
-          </table>
+            </table>
+          )}
         </div>
 
         <div className="mt-3 flex items-center justify-between text-sm text-slate-600 dark:text-slate-400">
