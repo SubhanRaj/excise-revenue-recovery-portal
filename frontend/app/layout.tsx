@@ -87,9 +87,13 @@ export default function RootLayout({
           src="https://cdn.jsdelivr.net/npm/sweetalert2@11"
           strategy="beforeInteractive"
         />
-        {/* SheetJS / xlsx (CDN) — used on DEO submit + Admin export/sync */}
+        {/* xlsx-js-style (CDN) — used on DEO submit + Admin export/sync. Not the stock SheetJS
+            "xlsx" package: this is the same SheetJS Community core plus real cell-style (`.s`)
+            write support (fills/fonts/alignment) that the stock free build silently drops on
+            write — confirmed by inspecting xl/styles.xml from each build's output. Same global
+            `window.XLSX` API either way, so this is a drop-in swap. */}
         <Script
-          src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"
+          src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"
           strategy="lazyOnload"
         />
         {/* Chart.js (CDN) — only consumer today is AdminDashboard's locked/unlocked donut. */}

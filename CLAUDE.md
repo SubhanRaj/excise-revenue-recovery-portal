@@ -219,14 +219,17 @@ above), not a cookie-flag workaround.
 
 `SITE_TITLE_EN`/`SITE_TITLE_HI` ("Recovery Certificates (RCs) Issued for Recovery of Excise
 Revenue Arrears" / its Hindi translation) and `DATA_PERIOD_EN`/`DATA_PERIOD_HI` ("Data Period:
-1 April 2021 to 31 March 2026") live in this one file specifically so the four places that show
-them can't drift out of sync: the browser tab's meta description (`app/layout.tsx`), the login
-page's subtitle block, the DEO data-entry title bar (below, and see the FY nav-pill labeling
-convention above), and the Excel export's per-sheet title/data-period banner rows
-(`export.ts`). Deliberately **not** merged into `pac-fields.ts` — that file is the one
-duplicated byte-for-byte against `api/db/schema.ts` (see top of this document), and this text
-has no server-side equivalent to stay in sync with. `DATA_PERIOD_*` is written out by hand
-rather than derived from `FINANCIAL_YEARS`' first/last entries — if the 5-year window in
+1 April 2021 to 31 March 2026") live in this one file specifically so the places that show them
+can't drift out of sync: the browser tab's meta description (`app/layout.tsx`), the login page's
+subtitle block, and the DEO data-entry title bar (below, and see the FY nav-pill labeling
+convention above) — all three are portal-wide chrome shown once, so the whole 5-year span is the
+right text there. The Excel export's per-sheet title banner (`export.ts`) uses `SITE_TITLE_EN`
+too, but **not** `DATA_PERIOD_EN` for its second banner row — each exported sheet is a single
+FY, so it computes that FY's own one-year period via `dataPeriodForFY()` in `export.ts` instead
+(see the Excel export section below). Deliberately **not** merged into `pac-fields.ts` — that
+file is the one duplicated byte-for-byte against `api/db/schema.ts` (see top of this document),
+and this text has no server-side equivalent to stay in sync with. `DATA_PERIOD_*` is written out
+by hand rather than derived from `FINANCIAL_YEARS`' first/last entries — if the 5-year window in
 `FINANCIAL_YEARS` ever shifts, update both `site.ts` strings by hand at the same time, same as
 every other place that duplicates something derived from `FINANCIAL_YEARS`.
 
@@ -610,9 +613,21 @@ condition, give it this same three-way treatment rather than a plain active/inac
   `bg-slate-50` — not `bg-slate-50/50` — for the alternating stripe); `bg-inherit` on the
   pinned cell then correctly resolves to something opaque. If you add another sticky
   header/column, give its scrolling ancestor rows an opaque background from the start.
-- SheetJS exports use the free/Community CDN build, which **cannot write frozen panes**
-  (that's a SheetJS Pro feature) — see the `ponytail:` comment in `frontend/lib/export.ts`
-  if you're asked to make the exported header row actually freeze.
+- The Excel export CDN script (`app/layout.tsx`) is **`xlsx-js-style`, not the stock SheetJS
+  `xlsx` package** — same SheetJS Community core (same `window.XLSX` global, same API, genuine
+  drop-in), plus real cell-style (`.s`: fill/font/alignment) write support that stock `xlsx`
+  silently drops on write. Switched to after finding the sibling `excise-bakaya-record`
+  project's own admin export (`frontend/admin.html`) already using it for its colored
+  header/footer rows. Confirmed both ways by writing the same style object with each build and
+  inspecting the output `xl/styles.xml` directly: stock `xlsx@0.18.5` wrote an empty style
+  table, `xlsx-js-style@1.2.0` wrote the real fill/font/alignment entries. **Frozen panes are
+  still a no-op either way** — that's not a stock-vs-fork difference, neither build's writer
+  emits the `<pane>` XML Excel needs (confirmed by inspecting `xl/worksheets/sheet1.xml`: no
+  `<pane>` element even in a file with real styles elsewhere) — see the `ponytail:` comment in
+  `frontend/lib/export.ts` if asked to make the exported header row actually freeze; that still
+  needs SheetJS Pro. `types/index.d.ts` ships inside the `xlsx-js-style` npm package itself
+  (`lib/globals.d.ts` imports types from `"xlsx-js-style"`, not `"xlsx"`), so no separate
+  `@types` package is needed.
 - Magic-link emails use a styled table-based HTML template (`api/lib/email.ts`,
   `magicLinkHtml()`) — indigo header band, CTA button, plain-link fallback, footer — not a
   couple of bare `<p>` tags. Modeled on the sibling `up-excise-spatial-revenue-optimizer`
@@ -837,11 +852,34 @@ sheets** — one per financial year, each sheet districts × the 6 PAC fields fo
 — not one sheet with all 5 years' columns side by side like the original version. Sheets are
 named `FY 2021-22`, etc (see the FY-labeling convention above). Each sheet also carries two
 merged banner rows above the district/field header row — `SITE_TITLE_EN` (see Portal identity
-strings above) and `DATA_PERIOD_EN` — so the exported file is self-describing if it's opened
-outside the portal (e.g. emailed to Excise HQ). `TITLE_ROWS` in `export.ts` is the single
-source of truth for how many rows that pushes the header/data/money-formatting/freeze-pane math
-down by — update it, not the individual row-offset call sites, if another banner row is ever
-added.
+strings above) and, since this file is read by auditors/senior officers/commissioners rather
+than a single DEO, that sheet's own `dataPeriodForFY(fy)` (e.g. "Data Period: 1 April 2021 to
+31 March 2022" on the FY 2021-22 sheet) rather than the portal-wide `DATA_PERIOD_EN` — so the
+exported file is self-describing if it's opened outside the portal (e.g. emailed to Excise HQ).
+`TITLE_ROWS` in `export.ts` is the single source of truth for how many rows that pushes the
+header/data/money-formatting/freeze-pane math down by — update it, not the individual
+row-offset call sites, if another banner row is ever added. **Every column header in this
+export is English-only** (`englishLabel()` strips the ` / <Hindi>` half off `PAC_FIELD_LABELS`
+before it reaches a sheet, and the trailing Net Recoverable column is the bare English string) —
+unlike the DEO-facing UI, where the bilingual labels mirror the government form DEOs actually
+fill out, this file's audience already knows the domain and has no Hindi requirement. Each
+sheet also registers a per-sheet `_xlnm.Print_Titles` defined name on `wb.Workbook.Names`
+covering rows 1–`TITLE_ROWS + 1` (title + data period + header), so those three rows repeat on
+every printed page — unlike frozen panes (`!freeze`, just below), this is a plain OOXML
+workbook-level feature both SheetJS builds genuinely write and Excel genuinely reads, confirmed
+by inspecting `xl/workbook.xml` in a real build's output; don't assume it needs Pro just because
+the adjacent freeze-pane line does. **Cell styling is real** (see the `xlsx-js-style` note under
+"Sober blue" above for why, unlike the stock `xlsx` package): the title (`A1`) and data-period
+(`A2`) cells are bold/italic and centered — since a merge is really just centering the merge's
+top-left cell and hiding the rest underneath it, only that one cell per row needs the alignment
+style, not every column across the merge — the header row (`r: TITLE_ROWS`) is white-on-`HEADER_FILL`
+(the same brand blue used elsewhere, see "Visual language" below) bold and centered, and the
+TOTAL row (`totalRowIndex`) is bold on a soft `TOTAL_FILL` blue tint. Frozen panes remain the
+one exception: confirmed by inspecting `xl/worksheets/sheet1.xml` from a real `xlsx-js-style`
+build that it still emits no `<pane>` element even in a file with real styles elsewhere — that
+fork only patches in style writing, not pane writing, so the existing `!freeze` line stays a
+documented no-op regardless of which build is loaded; true on-screen frozen rows still need
+SheetJS Pro.
 
 ## Bulk DEO provisioning (Admin dashboard)
 

@@ -1,5 +1,7 @@
 import type SwalType from "sweetalert2";
-import type * as XLSXType from "xlsx";
+// xlsx-js-style, not the stock "xlsx" package — see export.ts for why (it's the same SheetJS
+// Community core plus real cell-style/`.s` write support the stock free build silently drops).
+import type * as XLSXType from "xlsx-js-style";
 import type { Chart as ChartType } from "chart.js";
 
 declare global {

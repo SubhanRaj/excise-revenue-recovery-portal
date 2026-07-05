@@ -1,11 +1,34 @@
 import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable } from "./pac-fields";
-import { SITE_TITLE_EN, DATA_PERIOD_EN } from "./site";
+import { SITE_TITLE_EN } from "./site";
 import type { CachedDistrict, CachedPacData } from "./db";
 
 const RUPEE_FORMAT = '"₹"#,##0.00';
 // Two extra rows (title + data period) sit above the header row on every sheet — everything
 // below (header row, money-cell formatting, totals) shifts down by this many rows accordingly.
 const TITLE_ROWS = 2;
+
+// Same brand blue as the rest of the app (see "Visual language" in CLAUDE.md — blue-700/blue-600,
+// the hex equivalents already used for the magic-link email) and a soft blue-100 tint for the
+// total row, so this file reads as this portal's own rather than a bare, unstyled data dump.
+const HEADER_FILL = "1D4ED8";
+const TOTAL_FILL = "DBEAFE";
+
+// This export is read by auditors/senior officers/commissioners, not DEOs — unlike the rest of
+// the app, PAC_FIELD_LABELS' Hindi half (there for the government form DEOs fill out) isn't
+// needed here, so every label is trimmed to its English half before it reaches a sheet.
+function englishLabel(bilingual: string): string {
+  return bilingual.split(" / ")[0];
+}
+
+// FINANCIAL_YEARS entries are "YYYY-YY" (e.g. "2021-22" runs 1 April 2021 – 31 March 2022) —
+// unlike DATA_PERIOD_EN (site.ts), which spans the whole 5-year window for UI chrome shown once,
+// each exported sheet is a single FY, so its own banner should name that FY's own period, not the
+// portal-wide one.
+function dataPeriodForFY(fy: string): string {
+  const [startYear, endSuffix] = fy.split("-");
+  const endYear = startYear.slice(0, 2) + endSuffix;
+  return `Data Period: 1 April ${startYear} to 31 March ${endYear}`;
+}
 
 // One workbook, one sheet per financial year (5 sheets) — each sheet is districts × the 6 PAC
 // fields for just that year, rather than one sheet with all 5 years' columns side by side.
@@ -14,7 +37,7 @@ export function exportDistrictsToXlsx(districts: CachedDistrict[], pacData: Cach
   // Net Recoverable is a derived, never-persisted value (see pac-fields.ts) — appended as its
   // own trailing column here rather than looped in via PAC_FIELD_ORDER, same as it's rendered
   // as its own extra row (not a 7th PAC_FIELD_ORDER entry) everywhere else it's shown.
-  const header = ["District", ...PAC_FIELD_ORDER.map((f) => PAC_FIELD_LABELS[f]), "Net Recoverable / शुद्ध वसूली योग्य धनराशि"];
+  const header = ["District", ...PAC_FIELD_ORDER.map((f) => englishLabel(PAC_FIELD_LABELS[f])), "Net Recoverable"];
   const netRecoverableCol = header.length - 1;
   const moneyColumns = [
     ...PAC_FIELD_ORDER.map((field, i) => (isMoneyField(field) ? i + 1 : -1)).filter((c) => c >= 0),
@@ -22,6 +45,11 @@ export function exportDistrictsToXlsx(districts: CachedDistrict[], pacData: Cach
   ];
 
   const wb = window.XLSX.utils.book_new();
+  // _xlnm.Print_Titles is a plain OOXML defined name — unlike frozen panes (view-only, Pro-only
+  // in the free SheetJS Community build we're on, see the !freeze no-op below), it's part of
+  // the base workbook format and does get written/read by the free build, so "repeat these rows
+  // on every printed page" is genuinely achievable here even though "freeze them on screen" isn't.
+  const printTitleNames: { Name: string; Sheet: number; Ref: string }[] = [];
 
   for (const fy of FINANCIAL_YEARS) {
     const rows: (string | number)[][] = sortedDistricts.map((d) => {
@@ -37,18 +65,32 @@ export function exportDistrictsToXlsx(districts: CachedDistrict[], pacData: Cach
 
     const ws = window.XLSX.utils.aoa_to_sheet([
       [`${SITE_TITLE_EN} — FY ${fy}`],
-      [DATA_PERIOD_EN],
+      [dataPeriodForFY(fy)],
       header,
       ...rows,
       totalRow,
     ]);
     ws["!cols"] = [{ wch: 22 }, ...PAC_FIELD_ORDER.map(() => ({ wch: 18 })), { wch: 18 }];
     // Title/data-period rows only occupy column A; merge them across the full table width so
-    // they read as a banner instead of a truncated cell next to empty ones.
+    // they read as a banner instead of a truncated cell next to empty ones. "Merge & center" in
+    // Excel is really just centering the top-left cell of the merge — the other cells in the
+    // range are hidden underneath it — so only that one cell needs the alignment style below.
     ws["!merges"] = [
       { s: { r: 0, c: 0 }, e: { r: 0, c: header.length - 1 } },
       { s: { r: 1, c: 0 }, e: { r: 1, c: header.length - 1 } },
     ];
+    ws["A1"].s = { font: { bold: true, sz: 14 }, alignment: { horizontal: "center", vertical: "center" } };
+    ws["A2"].s = { font: { italic: true, sz: 11 }, alignment: { horizontal: "center", vertical: "center" } };
+
+    // Header row: white-on-blue, bold, centered, wrapping (labels are long enough to need it).
+    for (let c = 0; c < header.length; c++) {
+      const cell = window.XLSX.utils.encode_cell({ r: TITLE_ROWS, c });
+      ws[cell].s = {
+        font: { bold: true, color: { rgb: "FFFFFF" } },
+        fill: { fgColor: { rgb: HEADER_FILL } },
+        alignment: { horizontal: "center", vertical: "center", wrapText: true },
+      };
+    }
 
     const totalDataRows = rows.length + 1; // header row is row 0 pre-shift
     for (let r = 1; r <= totalDataRows; r++) {
@@ -58,15 +100,35 @@ export function exportDistrictsToXlsx(districts: CachedDistrict[], pacData: Cach
       }
     }
 
-    // ponytail: SheetJS Community (the free CDN build) can't write frozen panes — that's a
-    // Pro-only feature. This line is a no-op today; upgrade to SheetJS Pro to make it real.
+    // TOTAL row (footer): bold on a soft blue tint, distinguishing it from the plain data rows
+    // above it without the heavier blue used on the header.
+    const totalRowIndex = TITLE_ROWS + totalDataRows;
+    for (let c = 0; c < header.length; c++) {
+      const cell = window.XLSX.utils.encode_cell({ r: totalRowIndex, c });
+      ws[cell].s = { font: { bold: true }, fill: { fgColor: { rgb: TOTAL_FILL } } };
+    }
+
+    // ponytail: neither the stock SheetJS Community build nor xlsx-js-style (which only patches
+    // in cell-style writing, see HEADER_FILL/TOTAL_FILL above) writes frozen-pane XML — this line
+    // is still a no-op. Confirmed by inspecting xl/worksheets/sheet1.xml from a real build: no
+    // <pane> element, even with styles genuinely present elsewhere in the same file. True frozen
+    // rows/columns need SheetJS Pro; !xlnm.Print_Titles below is the closest free substitute
+    // (repeats these rows on every *printed* page, not on-screen scroll).
     (ws as unknown as Record<string, unknown>)["!freeze"] = { xSplit: 1, ySplit: 1 + TITLE_ROWS };
 
     // Sheet names can't contain "/" — financial years use it (e.g. "2021-22" is fine, but
     // guard generically in case that ever changes).
-    window.XLSX.utils.book_append_sheet(wb, ws, `FY ${fy}`.replace(/\//g, "-"));
+    const sheetName = `FY ${fy}`.replace(/\//g, "-");
+    const sheetIndex = wb.SheetNames.length;
+    window.XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    printTitleNames.push({
+      Name: "_xlnm.Print_Titles",
+      Sheet: sheetIndex,
+      Ref: `'${sheetName}'!$1:$${TITLE_ROWS + 1}`,
+    });
   }
 
+  wb.Workbook = { Names: printTitleNames };
   window.XLSX.writeFile(wb, `excise-revenue-recovery-${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
