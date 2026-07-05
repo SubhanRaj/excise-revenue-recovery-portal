@@ -470,28 +470,16 @@ Export re-syncs first, then builds the `.xlsx` from the freshly-synced cache.
   "Clear" button (`YearStepForm.tsx`) and "Clear All" (`deo-data-entry/page.tsx`'s nav bar) — as
   opposed to `danger`'s solid red, which read as too heavy/thick sitting next to the slim pill
   nav buttons; the blocking confirm popup already carries the "are you sure" weight, so the
-  button itself doesn't need to. Every `size="xs"` button's icon (Clear, Clear All, DEO
-  Template, Upload DEO Data, Export as Excel Workbook, Export as SQL) is `text-sm`, one step
-  larger than the button's own `text-xs` label — this used to be `text-xs` (matched to the
-  label) on the theory that a bigger icon next to smaller text was the "larger buttons only"
-  convention, but at actual `xs` pill size a same-size icon read as visually cramped/compacted
-  next to its label; bumping it one step reads as a deliberate icon, not an alignment
-  afterthought, without the pill growing noticeably taller (the icon's line box is 1 anyway,
-  see below, so a larger icon doesn't inflate the button's own height the way a larger
-  *line-height* would).
-- **`rounded-md`/`shadow-sm`/`font-semibold` are set per-`size` in `Button.tsx`, not in the
-  shared base class string** — `xs`/`sm` (every small toolbar-chip button: Clear, Clear All,
-  DEO Template, Upload DEO Data, Export) instead get `rounded-full font-medium` with no
-  `shadow-sm`, while `md`/`lg` (the real primary-action buttons — Login, Save & Continue,
-  Submit & Lock) keep the original `rounded-md font-semibold shadow-sm`. These toolbar chips
-  sit right next to fully-rounded pill buttons that aren't built from `Button.tsx` at all (the
-  DEO year nav pills, the Master View pill) — at `rounded-md` + a visible border + `shadow-sm`
-  + bold text, they read as a visually "thick"/blocky rectangle next to those thin pills even
-  though the flex layout itself was never actually broken (confirmed by rendering the exact
-  Tailwind CDN classes standalone — icon and label always sat correctly inline via
-  `inline-flex`/`items-center`; the "thick" complaint was about corner radius/shadow/weight,
-  not alignment). If you add a new small utility button, use `size="xs"`/`"sm"` to inherit this
-  — don't hand-roll `rounded-md`/`shadow-sm` on a small button via `className`.
+  button itself doesn't need to. For icons across all button sizes, we now use a global modifier
+  on the button's base class (`[&_i.ti]:!text-[1.25em]`). This forces Tabler icons to always be
+  exactly 25% larger than the button's text size, guaranteeing they are clearly distinguishable
+  and never look cramped, without inflating the button's height.
+- **Sleek, Uniform Styling**: All buttons in `Button.tsx` now uniformly use `rounded-md` with
+  balanced padding (`px-3 py-1.5` for `xs` up to `px-6 py-3` for `lg`). The previous mix of
+  pill shapes (`rounded-full`) and blocky rectangles made the UI feel inconsistent. The dropdowns
+  (`<select>`) across the Admin Dashboard have also been updated from `rounded-full` pills to
+  `rounded-md shadow-sm py-1.5` to perfectly match these sleek toolbar buttons. If you add a
+  new utility button or dropdown, ensure it inherits this `rounded-md` look.
 - **The icon-vs-label vertical misalignment (icon sitting low, extra blank space under the text,
   text nearly touching the button's top border) was a real, separate bug from the "thick"
   corner-radius one above — and the standalone-classes repro that cleared the flex layout

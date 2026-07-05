@@ -34,18 +34,15 @@ const VARIANTS: Record<NonNullable<Props["variant"]>, string> = {
 // since the Tailwind CDN's JIT scans the whole document rather than respecting className
 // prop order. A `size` variant avoids ever having two padding/text-size utilities in play.
 //
-// Radius/shadow/font-weight are set per-size (not in the shared base string below) for the
-// same reason: `xs`/`sm` are small toolbar-chip buttons (Clear, Clear All, DEO Template,
-// Upload, Export) that sit next to fully-rounded pill buttons elsewhere (year nav pills,
-// Master View) — a `rounded-md` corner + `shadow-sm` + bold `font-semibold` text read as a
-// visually "thick"/blocky rectangle next to those thin pills at that small size. `md`/`lg`
-// are the real primary-action buttons (Login, Save & Continue, Submit & Lock) where the
-// original bolder/boxier look is still correct.
+// Radius and shadow are set per-size for specificity but remain consistent across the board.
+// We use a uniform `rounded-md` and balanced padding for a sleek, consistent look that
+// perfectly matches our updated toolbar dropdowns. Icon scaling is globally forced via
+// `[&_i.ti]:!text-[1.25em]` on the button base to ensure crisp, distinguishable icons.
 const SIZES: Record<NonNullable<Props["size"]>, string> = {
-  xs: "px-2.5 py-1 text-xs gap-1 rounded-full font-medium",
-  sm: "px-3 py-1.5 text-xs gap-1.5 rounded-full font-medium",
-  md: "px-4 py-2.5 text-sm gap-2 rounded-md font-semibold shadow-sm",
-  lg: "px-6 py-4 text-base gap-2 rounded-md font-semibold shadow-sm",
+  xs: "px-3 py-1.5 text-xs gap-1.5 rounded-md font-medium shadow-sm",
+  sm: "px-4 py-2 text-sm gap-2 rounded-md font-medium shadow-sm",
+  md: "px-5 py-2.5 text-sm gap-2 rounded-md font-semibold shadow-sm",
+  lg: "px-6 py-3 text-base gap-2 rounded-md font-semibold shadow-sm",
 };
 
 export default function Button({ variant = "primary", size = "md", className = "", disabled, ...props }: Props) {
@@ -59,7 +56,8 @@ export default function Button({ variant = "primary", size = "md", className = "
       style={disabled ? { cursor: "not-allowed" } : undefined}
       // flex-row + whitespace-nowrap spelled out explicitly (not left to inline-flex's
       // default) so icon+label can never wrap onto separate lines regardless of button width.
-      className={`inline-flex flex-row flex-nowrap items-center justify-center whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 ${SIZES[size]} ${VARIANTS[variant]} ${className}`}
+      // [&_i.ti]:!text-[1.25em] forces Tabler icons to always be 25% larger than the button's text size.
+      className={`inline-flex flex-row flex-nowrap items-center justify-center whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 [&_i.ti]:!text-[1.25em] ${SIZES[size]} ${VARIANTS[variant]} ${className}`}
     />
   );
 }
