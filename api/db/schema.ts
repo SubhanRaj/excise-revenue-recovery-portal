@@ -38,17 +38,22 @@ export const pacData = sqliteTable("pac_data", {
   districtId: integer("district_id").notNull().references(() => districts.id),
   financialYear: text("financial_year").notNull(), // "2021-22" .. "2025-26"
 
-  // 1. सकल बकाया धनराशि (मूल धन + ब्याज) — Gross Arrears (Principal + Interest)
+  // Numbered 2-5, not 1-4: Opening Balance (openingBalance below) is "1." since it leads every
+  // per-FY view, so these six DEO-entered fields shift down one to match frontend/lib/pac-fields.ts.
+  // 2. सकल बकाया धनराशि (मूल धन + ब्याज) — Gross Arrears (Principal + Interest)
   grossArrears: real("gross_arrears").notNull(),
-  // 2. (i) जारी आर.सी. (R.C.) की संख्या — No. of RCs Issued
+  // 3. (i) जारी आर.सी. (R.C.) की संख्या — No. of RCs Issued
   rcCount: integer("rc_count").notNull(),
-  // 2. (ii) आर.सी. में निहित धनराशि
+  // 3. (ii) आर.सी. में निहित धनराशि
   rcAmount: real("rc_amount").notNull(),
-  // 3. वसूल की गयी धनराशि — independent of rc_amount, no parity requirement (see CLAUDE.md)
+  // 4. वसूल की गयी धनराशि — independent of rc_amount, no parity requirement (see CLAUDE.md).
+  // Capped server-side (submit route) at openingBalance + grossArrears for that same FY — can't
+  // recover more than was ever owed within this 5-year window (opening carry-forward + this
+  // year's fresh dues); see CLAUDE.md's Validation rules section.
   recoveredAmount: real("recovered_amount").notNull(),
-  // 4. (i) स्थगन आदेशों की संख्या — No. of Stay Orders
+  // 5. (i) स्थगन आदेशों की संख्या — No. of Stay Orders
   stayCount: integer("stay_count").notNull(),
-  // 4. (ii) सक्षम न्यायालय द्वारा स्थगित धनराशि
+  // 5. (ii) सक्षम न्यायालय द्वारा स्थगित धनराशि
   stayAmount: real("stay_amount").notNull(),
 
   // Cumulative running balance, not one of the DEO-entered six fields above — computed

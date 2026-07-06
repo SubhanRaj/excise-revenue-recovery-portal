@@ -1,7 +1,7 @@
 "use client";
 
 import PacFieldInput from "./PacFieldInput";
-import { PAC_FIELD_LABELS, netRecoverableForYear } from "@/lib/pac-fields";
+import { PAC_FIELD_LABELS, OPENING_BALANCE_LABEL, netRecoverableForYear } from "@/lib/pac-fields";
 import type { DraftYear } from "@/lib/db";
 import Button from "./ui/Button";
 
@@ -38,9 +38,7 @@ export default function YearStepForm({ year, openingBalance, onFieldChange, onSa
       </div>
 
       <div className="flex items-center justify-between rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm dark:border-blue-900 dark:bg-blue-950/40">
-        <span className="text-blue-800 dark:text-blue-300">
-          Opening Balance / प्रारंभिक शेष धनराशि
-        </span>
+        <span className="text-blue-800 dark:text-blue-300">{OPENING_BALANCE_LABEL}</span>
         <span className="tabular-nums text-blue-700 dark:text-blue-300">
           ₹{openingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
         </span>

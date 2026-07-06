@@ -27,6 +27,12 @@ const BLANK_FIELD_TEXT =
   "Please do not leave any field blank. Enter 0 if there is no due amount or recovery. / " +
   "कृपया कोई भी फ़ील्ड खाली न छोड़ें। यदि कोई धनराशि या वसूली नहीं है तो 0 दर्ज करें।";
 
+const RECOVERED_CAP_TITLE = "Recovered Amount too high / वसूल की गयी धनराशि अधिक है";
+const RECOVERED_CAP_TEXT =
+  "Recovered Amount cannot exceed Opening Balance + Gross Arrears for this year — you cannot " +
+  "recover more than was owed. / वसूल की गयी धनराशि इस वर्ष की प्रारंभिक शेष धनराशि + सकल बकाया " +
+  "धनराशि से अधिक नहीं हो सकती — जितना बकाया था उससे अधिक वसूली संभव नहीं है।";
+
 // Shape of a row returned by GET /api/pac-data/mine — the raw pac_data table row (numbers),
 // as opposed to DraftYear's raw-string fields (see db.ts for why those stay strings).
 type RemoteYearRow = {
@@ -141,6 +147,18 @@ export default function EntryPage() {
     const year = years[index];
     const blank = PAC_FIELD_ORDER.some((field) => year[field].trim() === "");
     if (blank) return notifyToast({ icon: "error", title: BLANK_FIELD_TITLE, text: BLANK_FIELD_TEXT });
+
+    // Can't recover more than was ever owed within this 5-year window — this FY's fresh
+    // grossArrears plus whatever carried forward as openingBalance. Mirrored server-side in
+    // the submit route (zero-trust). netRecoverableSeries is computed further down this
+    // component body, but by the time this handler actually runs (a later click, after a full
+    // render already happened) it's initialized — see the comment there.
+    const openingBalance = netRecoverableSeries[year.financialYear].openingBalance;
+    const gross = Number(year.grossArrears) || 0;
+    const recovered = Number(year.recoveredAmount) || 0;
+    if (recovered > openingBalance + gross) {
+      return notifyToast({ icon: "error", title: RECOVERED_CAP_TITLE, text: RECOVERED_CAP_TEXT });
+    }
 
     const updated = { ...year, completed: true };
     setYears((prev) => {
@@ -316,13 +334,14 @@ export default function EntryPage() {
           is genuinely no amount, so a blank never gets silently treated as zero.
         </p>
         <p>
-          <strong>Recovered Amount</strong> must exactly match <strong>RC Amount</strong> — it
-          auto-fills from RC Amount until you edit it directly, and &quot;Save &amp;
-          Continue&quot; stays disabled until the two match.
+          <strong>Recovered Amount</strong> and <strong>RC Amount</strong> are independent
+          figures — enter each one as its own real number, no auto-fill between them. Recovered
+          Amount cannot exceed Opening Balance + Gross Arrears for that year.
         </p>
         <p>
-          <strong>Net Recoverable</strong> updates live as you type; it is calculated for
-          display only and is not stored separately.
+          <strong>Opening Balance</strong> carries forward from the previous year&apos;s Net
+          Recoverable, and <strong>Net Recoverable</strong> updates live as you type — both are
+          saved to your submission once you lock it.
         </p>
         <p>
           Each financial year unlocks only once the previous one is saved.
@@ -344,6 +363,16 @@ export default function EntryPage() {
             {SITE_TITLE_HI}
           </p>
           <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">{DATA_PERIOD_EN}</p>
+          <p className="mt-2 text-xs font-medium text-blue-700 dark:text-blue-300">
+            Enter only dues/recoveries that fall within each financial year&apos;s own scope —
+            do not include arrears from before 1 April 2021 or after 31 March 2026, and do not
+            enter recovery of dues from years outside this period.
+          </p>
+          <p className="mt-1 text-xs font-medium text-blue-700 dark:text-blue-300" lang="hi">
+            कृपया केवल उसी वित्तीय वर्ष के दायरे में आने वाली बकाया/वसूली दर्ज करें — 1 अप्रैल 2021
+            से पूर्व या 31 मार्च 2026 के बाद की बकाया राशि दर्ज न करें, और न ही इस अवधि से बाहर के
+            वर्षों की बकाया की वसूली यहाँ दर्ज करें।
+          </p>
         </div>
         <nav className="sticky top-16 z-10 mb-6 flex flex-col items-stretch gap-2 border-b border-slate-100 bg-slate-50/95 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:flex-row sm:items-center">
           <div className="flex items-center gap-1 sm:flex-wrap sm:gap-2">

@@ -1,5 +1,5 @@
 import type { Workbook, Cell } from "exceljs";
-import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, englishLabel } from "./pac-fields";
+import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, OPENING_BALANCE_LABEL, isMoneyField, englishLabel } from "./pac-fields";
 import { SITE_TITLE_EN, DATA_PERIOD_EN } from "./site";
 import { formatIST } from "./format";
 import type { CachedDistrict, CachedPacData } from "./db";
@@ -111,7 +111,7 @@ export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData
   // Net Recoverable stays a trailing column, the running result after all 6 fields.
   const header = [
     "District",
-    "Opening Balance",
+    englishLabel(OPENING_BALANCE_LABEL),
     ...PAC_FIELD_ORDER.map((f) => englishLabel(PAC_FIELD_LABELS[f])),
     "Net Recoverable",
   ];

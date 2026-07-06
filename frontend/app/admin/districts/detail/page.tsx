@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField } from "@/lib/pac-fields";
+import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, OPENING_BALANCE_LABEL, englishLabel, isMoneyField } from "@/lib/pac-fields";
 import { formatIST } from "@/lib/format";
 import { getNavDistrictId } from "@/lib/adminNav";
 import { ApiError } from "@/lib/api";
@@ -195,7 +195,7 @@ export default function DistrictDetailPage() {
                 <tbody>
                   {!q && (
                     <tr className="border-t border-slate-100 bg-slate-50 font-medium text-slate-800 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-200">
-                      <td className="whitespace-nowrap px-3 py-2.5">Opening Balance</td>
+                      <td className="whitespace-nowrap px-3 py-2.5">{englishLabel(OPENING_BALANCE_LABEL)}</td>
                       {yearRows.map((row, i) => (
                         <td key={FINANCIAL_YEARS[i]} className="whitespace-nowrap px-3 py-2.5">
                           ₹{(row?.openingBalance ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}

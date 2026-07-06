@@ -28,14 +28,24 @@ export const PAC_FIELD_ORDER: PacField[] = [
 
 // Bilingual by design — these are the only labels in the UI required to carry Hindi
 // (the government PAC/RC form's field names). Everything else (buttons, nav, alerts) is English.
+// Numbered 2-5 because Opening Balance (OPENING_BALANCE_LABEL below) leads as "1." — it displays
+// first in every view (YearStepForm, MasterView, admin district detail, admin districts table,
+// Excel export), so it takes the first number and everything else shifts down one.
 export const PAC_FIELD_LABELS: Record<PacField, string> = {
-  grossArrears: "1. Gross Arrears (Principal + Interest) / सकल बकाया धनराशि (मूल धन + ब्याज)",
-  rcCount: "2. (i) No. of RCs Issued / जारी आर.सी. (R.C.) की संख्या",
-  rcAmount: "2. (ii) RC Amount / आर.सी. में निहित धनराशि",
-  recoveredAmount: "3. Recovered Amount / वसूल की गयी धनराशि",
-  stayCount: "4. (i) No. of Stay Orders / स्थगन आदेशों की संख्या",
-  stayAmount: "4. (ii) Stayed Amount / सक्षम न्यायालय द्वारा स्थगित धनराशि",
+  grossArrears: "2. Gross Arrears (Principal + Interest) / सकल बकाया धनराशि (मूल धन + ब्याज)",
+  rcCount: "3. (i) No. of RCs Issued / जारी आर.सी. (R.C.) की संख्या",
+  rcAmount: "3. (ii) RC Amount / आर.सी. में निहित धनराशि",
+  recoveredAmount: "4. Recovered Amount / वसूल की गयी धनराशि",
+  stayCount: "5. (i) No. of Stay Orders / स्थगन आदेशों की संख्या",
+  stayAmount: "5. (ii) Stayed Amount / सक्षम न्यायालय द्वारा स्थगित धनराशि",
 };
+
+// Opening Balance isn't one of the six DEO-entered PAC_FIELD_ORDER fields (it's a computed
+// running balance — see NetRecoverableEntry below), so it lives outside PAC_FIELD_LABELS, but it
+// still needs the same "N. Label / Hindi" numbering since it displays first, ahead of Gross
+// Arrears, everywhere a district's per-FY figures are shown. Net Recoverable stays unnumbered —
+// it's the trailing computed result, not a position in this numbered sequence.
+export const OPENING_BALANCE_LABEL = "1. Opening Balance / प्रारंभिक शेष धनराशि";
 
 export function isMoneyField(field: PacField): field is MoneyField {
   return (MONEY_FIELDS as string[]).includes(field);

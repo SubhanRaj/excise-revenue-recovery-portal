@@ -97,6 +97,21 @@ export async function POST(req: NextRequest) {
   ) as Record<FinancialYear, { grossArrears: number; recoveredAmount: number; stayAmount: number }>;
   const netRecoverableSeries = computeNetRecoverableSeries(fieldsByFy);
 
+  // Zero-trust cap, mirrored client-side in YearStepForm: a DEO can't recover more than was ever
+  // owed within this 5-year window — this year's fresh grossArrears plus whatever carried forward
+  // as openingBalance. Checked here (not inside validateRow) since it needs the just-computed
+  // per-FY openingBalance, not just the raw payload.
+  for (const fy of FINANCIAL_YEARS) {
+    const { openingBalance } = netRecoverableSeries[fy];
+    const f = fieldsByFy[fy];
+    if (f.recoveredAmount > openingBalance + f.grossArrears) {
+      return NextResponse.json(
+        { error: `Recovered Amount for ${fy} cannot exceed Opening Balance + Gross Arrears for that year` },
+        { status: 400 }
+      );
+    }
+  }
+
   // D1 batch = atomic: wipe any prior rows for this district + all 5 new year rows + lock flip
   // + user audit fields, or nothing. The delete makes this idempotent for the re-submit-after-
   // Admin-unlock case — an Admin unlock never removes pac_data (see CLAUDE.md), so without it a

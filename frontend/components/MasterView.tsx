@@ -1,6 +1,6 @@
 "use client";
 
-import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, computeNetRecoverableSeries } from "@/lib/pac-fields";
+import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, OPENING_BALANCE_LABEL, isMoneyField, computeNetRecoverableSeries } from "@/lib/pac-fields";
 import type { DraftYear } from "@/lib/db";
 import Button from "./ui/Button";
 import Banner from "./ui/Banner";
@@ -69,7 +69,7 @@ export default function MasterView({ years, districtName, onSubmit, busy, error 
           </thead>
           <tbody>
             <tr className="border-t border-slate-100 bg-slate-50 font-medium text-slate-800 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-200">
-              <td className="sticky left-0 bg-inherit px-4 py-3">Opening Balance / प्रारंभिक शेष धनराशि</td>
+              <td className="sticky left-0 bg-inherit px-4 py-3">{OPENING_BALANCE_LABEL}</td>
               {years.map((year) => (
                 <td key={year.financialYear} className="whitespace-nowrap px-4 py-3 text-right tabular-nums">
                   ₹{netRecoverableSeries[year.financialYear].openingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}

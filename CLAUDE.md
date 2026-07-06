@@ -44,16 +44,18 @@ They communicate only over HTTP, cross-origin, with credentials (cookies) includ
   row. `GET /api/pac-data/mine` (role `deo`) is the read-side counterpart, letting the DEO
   frontend re-fetch its own district's rows after a login that follows an Admin unlock — see
   "Frontend offline flow" below. Six fields per year, in this fixed order (matches the Hindi
-  form the DEOs see):
+  form the DEOs see). Numbered 2-5, not 1-4: Opening Balance (see below) is "1." since it's a
+  computed field that displays first, ahead of these six, everywhere a district's per-FY figures
+  are shown:
 
   | Field              | Hindi label                                      | Type    |
   | ------------------ | ------------------------------------------------- | ------- |
-  | `grossArrears`      | 1. सकल बकाया धनराशि (मूल धन + ब्याज) — Gross Arrears (Principal + Interest) | money   |
-  | `rcCount`            | 2. (i) जारी आर.सी. (R.C.) की संख्या — No. of RCs Issued | integer |
-  | `rcAmount`           | 2. (ii) आर.सी. में निहित धनराशि                       | money   |
-  | `recoveredAmount`    | 3. वसूल की गयी धनराशि                               | money   |
-  | `stayCount`          | 4. (i) स्थगन आदेशों की संख्या — No. of Stay Orders   | integer |
-  | `stayAmount`         | 4. (ii) सक्षम न्यायालय द्वारा स्थगित धनराशि            | money   |
+  | `grossArrears`      | 2. सकल बकाया धनराशि (मूल धन + ब्याज) — Gross Arrears (Principal + Interest) | money   |
+  | `rcCount`            | 3. (i) जारी आर.सी. (R.C.) की संख्या — No. of RCs Issued | integer |
+  | `rcAmount`           | 3. (ii) आर.सी. में निहित धनराशि                       | money   |
+  | `recoveredAmount`    | 4. वसूल की गयी धनराशि                               | money   |
+  | `stayCount`          | 5. (i) स्थगन आदेशों की संख्या — No. of Stay Orders   | integer |
+  | `stayAmount`         | 5. (ii) सक्षम न्यायालय द्वारा स्थगित धनराशि            | money   |
 
   `financial_year` is one of `"2021-22" .. "2025-26"` (`FINANCIAL_YEARS` in both apps).
   `grossArrears` is the DEO's **total** outstanding figure — principal plus interest already
@@ -160,6 +162,26 @@ They communicate only over HTTP, cross-origin, with credentials (cookies) includ
 3. **Zero-trust on submit**: the submit endpoint re-validates every field itself — it does
    not assume the frontend's validation ran. If you add a new client-side rule, mirror it
    in `validateRow()` in the submit route.
+4. **Recovered Amount is capped at Opening Balance + Gross Arrears for that same FY** — a DEO
+   can't recover more than was ever owed within this 5-year window (whatever carried forward as
+   Opening Balance, plus that year's own fresh Gross Arrears). Checked client-side in
+   `deo-data-entry/page.tsx`'s `saveAndContinue()` (blocks advancing past the year, toast) and
+   server-side in the submit route — but *not* inside `validateRow()`, since this check needs the
+   just-computed per-FY `openingBalance` from `computeNetRecoverableSeries()`, which only exists
+   after every row has already passed `validateRow()`'s own numeric checks; it's a separate loop
+   over `FINANCIAL_YEARS` placed right after that computation, before the `db.batch()`. This is
+   the one cross-field rule in this schema — deliberately not a parity/equality check like the
+   removed `rcAmount`/`recoveredAmount` one above, just an upper bound.
+
+Every DEO-facing view of the six PAC fields also carries a **scope-of-data-period** notice (the
+blue banner above the year nav pills in `deo-data-entry/page.tsx`, bilingual, right below
+`DATA_PERIOD_EN`): a DEO must enter only dues/recoveries that arose within that specific
+financial year — never arrears from before 1 April 2021 or after 31 March 2026, and never a
+recovery of a pre-2021-22 due even though that recovery event itself happens to fall inside the
+portal's 5-year window. Nothing in the schema enforces this (there's no way to distinguish
+"this ₹ figure covers an out-of-scope due" from a normal one), so it's a data-entry instruction,
+not a validation rule — the Recovered-Amount cap above is the closest schema-level guard against
+the same class of mistake (recovering more than was ever owed in-scope).
 
 ## Auth (`api/lib/session.ts`, `api/lib/auth-guard.ts`, `api/middleware.ts`)
 

@@ -13,7 +13,7 @@ import {
   type PaginationState,
   type SortingState,
 } from "@tanstack/react-table";
-import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, englishLabel } from "@/lib/pac-fields";
+import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, OPENING_BALANCE_LABEL, isMoneyField, englishLabel } from "@/lib/pac-fields";
 import { formatIST } from "@/lib/format";
 import { ApiError } from "@/lib/api";
 import { notifyToast, promptUnlockReason, confirmTruncateDemo } from "@/lib/alerts";
@@ -225,7 +225,7 @@ export default function DistrictsPage() {
       }),
       columnHelper.display({
         id: "openingBalance",
-        header: "Opening Balance",
+        header: () => englishLabel(OPENING_BALANCE_LABEL),
         cell: ({ row }) => `₹${row.original.openingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
       }),
       columnHelper.accessor("lockStatus", {
