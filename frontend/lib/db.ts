@@ -34,6 +34,8 @@ export type CachedPacData = {
   recoveredAmount: number;
   stayCount: number;
   stayAmount: number;
+  openingBalance: number;
+  netRecoverable: number;
   submittedByName: string | null;
   lockedAt: string | null;
 };

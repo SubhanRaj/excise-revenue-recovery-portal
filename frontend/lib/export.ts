@@ -1,5 +1,5 @@
 import type { Workbook, Cell } from "exceljs";
-import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable, englishLabel } from "./pac-fields";
+import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, englishLabel } from "./pac-fields";
 import { SITE_TITLE_EN, DATA_PERIOD_EN } from "./site";
 import { formatIST } from "./format";
 import type { CachedDistrict, CachedPacData } from "./db";
@@ -104,13 +104,21 @@ async function downloadWorkbook(wb: InstanceType<typeof window.ExcelJS.Workbook>
 // years' columns side by side.
 export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData: CachedPacData[]) {
   const sortedDistricts = [...districts].sort((a, b) => a.districtName.localeCompare(b.districtName));
-  // Net Recoverable is a derived, never-persisted value (see pac-fields.ts) — appended as its
-  // own trailing column here rather than looped in via PAC_FIELD_ORDER, same as it's rendered
-  // as its own extra row (not a 7th PAC_FIELD_ORDER entry) everywhere else it's shown.
-  const header = ["District", ...PAC_FIELD_ORDER.map((f) => englishLabel(PAC_FIELD_LABELS[f])), "Net Recoverable"];
+  // Opening Balance/Net Recoverable are read straight off pac_data (computed server-side at
+  // submit time — see CLAUDE.md's Data model section), not recomputed here — appended as their
+  // own trailing columns rather than looped in via PAC_FIELD_ORDER, same as they're rendered as
+  // extra rows/columns (not PAC_FIELD_ORDER entries) everywhere else they're shown.
+  const header = [
+    "District",
+    ...PAC_FIELD_ORDER.map((f) => englishLabel(PAC_FIELD_LABELS[f])),
+    "Opening Balance",
+    "Net Recoverable",
+  ];
+  const openingBalanceCol = header.length - 2; // 0-based
   const netRecoverableCol = header.length - 1; // 0-based
   const moneyColumns = [
     ...PAC_FIELD_ORDER.map((field, i) => (isMoneyField(field) ? i + 1 : -1)).filter((c) => c >= 0),
+    openingBalanceCol,
     netRecoverableCol,
   ];
 
@@ -122,19 +130,24 @@ export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData
 
   // Summary cover sheet, added first so it's the first thing the reader sees — when the file was
   // generated and a workbook-wide lock/revenue overview — rather than repeating a generated-at
-  // row on all 5 per-FY sheets. Totals here are summed across every district and all 5
-  // FINANCIAL_YEARS, same "whole 5-year window" convention the Admin Dashboard's own KPI cards
-  // already use (see admin/page.tsx).
+  // row on all 5 per-FY sheets. Gross Arrears/Recovered Amount are summed across every district
+  // and all 5 FINANCIAL_YEARS, same "whole 5-year window" convention the Admin Dashboard's own
+  // KPI cards use for these two fields (see admin/page.tsx). Net Recoverable is NOT summed across
+  // years — each FY's value already includes every prior year's carried-forward balance, so
+  // summing all 5 would double-count it (see CLAUDE.md's Data model section); instead this sums
+  // every district's FY 2025-26 (final year) value, "total outstanding as of 31 March 2026."
   let totalGrossArrears = 0;
   let totalRecovered = 0;
   let totalNetRecoverable = 0;
+  const finalFy = FINANCIAL_YEARS[FINANCIAL_YEARS.length - 1];
   for (const d of districts) {
     for (const fy of FINANCIAL_YEARS) {
       const match = pacData.find((p) => p.districtId === d.id && p.financialYear === fy);
       totalGrossArrears += match?.grossArrears ?? 0;
       totalRecovered += match?.recoveredAmount ?? 0;
-      totalNetRecoverable += netRecoverable(match?.grossArrears ?? 0, match?.recoveredAmount ?? 0, match?.stayAmount ?? 0);
     }
+    const finalYearMatch = pacData.find((p) => p.districtId === d.id && p.financialYear === finalFy);
+    totalNetRecoverable += finalYearMatch?.netRecoverable ?? 0;
   }
   const lockedCount = districts.filter((d) => d.lockStatus === 1).length;
 
@@ -150,7 +163,7 @@ export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData
   summaryWs.addRow(["Unlocked Districts", districts.length - lockedCount]);
   const grossRow = summaryWs.addRow(["Total Gross Arrears (all 5 years)", totalGrossArrears]);
   const recoveredRow = summaryWs.addRow(["Total Recovered Amount (all 5 years)", totalRecovered]);
-  const netRow = summaryWs.addRow(["Total Net Recoverable (all 5 years)", totalNetRecoverable]);
+  const netRow = summaryWs.addRow(["Total Net Recoverable (as of 31 March 2026)", totalNetRecoverable]);
   summaryWs.addRow([]);
   summaryWs.addRow(["Sheets in this workbook", FINANCIAL_YEARS.map((fy) => `FY ${fy}`).join(", ")]);
 
@@ -169,8 +182,12 @@ export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData
   for (const fy of FINANCIAL_YEARS) {
     const rows: (string | number)[][] = sortedDistricts.map((d) => {
       const match = pacData.find((p) => p.districtId === d.id && p.financialYear === fy);
-      const net = netRecoverable(match?.grossArrears ?? 0, match?.recoveredAmount ?? 0, match?.stayAmount ?? 0);
-      return [d.districtName, ...PAC_FIELD_ORDER.map((field) => match?.[field] ?? 0), net];
+      return [
+        d.districtName,
+        ...PAC_FIELD_ORDER.map((field) => match?.[field] ?? 0),
+        match?.openingBalance ?? 0,
+        match?.netRecoverable ?? 0,
+      ];
     });
 
     const totalRowValues: (string | number)[] = ["TOTAL"];
@@ -191,7 +208,7 @@ export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData
       // shared A4/landscape/fit-to-width page setup.
       pageSetup: { ...PAGE_SETUP, printTitlesRow: `1:${TITLE_ROWS + 1}` },
     });
-    ws.columns = [{ width: 22 }, ...PAC_FIELD_ORDER.map(() => ({ width: 18 })), { width: 18 }];
+    ws.columns = [{ width: 22 }, ...PAC_FIELD_ORDER.map(() => ({ width: 18 })), { width: 18 }, { width: 18 }];
 
     ws.addRow([`${SITE_TITLE_EN} — FY ${fy}`]);
     ws.addRow([dataPeriodForFY(fy)]);
@@ -276,8 +293,8 @@ export function exportDistrictsToSql(districts: CachedDistrict[], pacData: Cache
 
   for (const p of [...pacData].sort((a, b) => a.id - b.id)) {
     lines.push(
-      `INSERT INTO pac_data (id, district_id, financial_year, gross_arrears, rc_count, rc_amount, recovered_amount, stay_count, stay_amount, submitted_by_name, locked_at) VALUES ` +
-        `(${p.id}, ${p.districtId}, ${sqlLiteral(p.financialYear)}, ${p.grossArrears}, ${p.rcCount}, ${p.rcAmount}, ${p.recoveredAmount}, ${p.stayCount}, ${p.stayAmount}, ${sqlLiteral(p.submittedByName)}, ${sqlLiteral(p.lockedAt)});`
+      `INSERT INTO pac_data (id, district_id, financial_year, gross_arrears, rc_count, rc_amount, recovered_amount, stay_count, stay_amount, opening_balance, net_recoverable, submitted_by_name, locked_at) VALUES ` +
+        `(${p.id}, ${p.districtId}, ${sqlLiteral(p.financialYear)}, ${p.grossArrears}, ${p.rcCount}, ${p.rcAmount}, ${p.recoveredAmount}, ${p.stayCount}, ${p.stayAmount}, ${p.openingBalance}, ${p.netRecoverable}, ${sqlLiteral(p.submittedByName)}, ${sqlLiteral(p.lockedAt)});`
     );
   }
 

@@ -51,6 +51,17 @@ export const pacData = sqliteTable("pac_data", {
   // 4. (ii) सक्षम न्यायालय द्वारा स्थगित धनराशि
   stayAmount: real("stay_amount").notNull(),
 
+  // Cumulative running balance, not one of the DEO-entered six fields above — computed
+  // server-side by POST /api/pac-data/submit (never trusted from the client) via
+  // api/lib/net-recoverable.ts's computeNetRecoverableSeries(), which walks FINANCIAL_YEARS in
+  // order once per submit. openingBalance is the *previous* FY's netRecoverable (0 for the first
+  // FY, 2021-22); netRecoverable = max(0, openingBalance + grossArrears - recoveredAmount -
+  // stayAmount). See CLAUDE.md's Data model section for the full reasoning — this used to be
+  // computed client-side and never persisted; it's now stored per FY so every admin-facing view
+  // reads the same authoritative number instead of recomputing it.
+  openingBalance: real("opening_balance").notNull(),
+  netRecoverable: real("net_recoverable").notNull(),
+
   // Same name the DEO typed in the lock confirmation, duplicated from users.submitted_by_name
   // onto the revenue row itself (keyed by district_id, same as everything else in this table)
   // so Admin can see who submitted a given year's numbers without joining users.

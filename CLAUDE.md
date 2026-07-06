@@ -66,24 +66,48 @@ They communicate only over HTTP, cross-origin, with credentials (cookies) includ
   `grossArrears` to be present/non-zero whenever `recoveredAmount` is; each of the six fields is
   validated independently (Anti-Blank + non-negative, see Validation rules below).
 
-- **Net Recoverable is never persisted.** It's `max(0, grossArrears - recoveredAmount -
-  stayAmount)` — i.e. `1 - (3 + 4.ii)` in the form's own numbering — computed client-side for
-  display only (`netRecoverable()` in `frontend/lib/pac-fields.ts`). It deliberately uses
-  `recoveredAmount`, never `rcAmount`: an RC being issued for an amount (field 2.ii) doesn't
-  mean that amount was actually recovered (field 3) — those two used to always be equal because
-  of the parity rule below, which made the choice of which one fed this formula invisible, but
-  now that the rule is gone, using the wrong one here would materially overstate what's still
-  recoverable. Every place that shows a district's per-financial-year PAC figures shows this
-  computed value alongside them, not just the six raw fields — `YearStepForm.tsx` (live, as the
-  DEO types), `MasterView.tsx`'s summary table (a bolded extra row below the six
-  `PAC_FIELD_ORDER` rows, one value per FY column), the admin district detail page's per-FY
-  table (same bolded-extra-row pattern), the admin districts table (its own column, scoped to
-  the FY currently selected in that page's dropdown), the Admin Dashboard KPI card (summed
-  across all 5 years, per that page's own total-across-years convention), and the Excel export
-  (`exportDistrictsToXlsx()` appends it as a trailing column on every per-FY sheet, computed the
-  same way, not read from a stored field since none exists). If you add another place a
-  district's per-FY PAC figures are rendered, add this same computed row/column too — it's easy
-  to forget since, unlike the six real fields, there's no schema column to remind you it exists.
+- **Net Recoverable is a cumulative running balance, persisted per FY** on `pac_data` as two
+  extra `real` columns — `opening_balance` and `net_recoverable` (migration
+  `0005_married_landau.sql`). They're computed and written **server-side, by `POST
+  /api/pac-data/submit`** — never trusted from the client payload, same zero-trust posture as
+  every other field. For FY 2021-22 (the first FY) `opening_balance` is always `0` and
+  `net_recoverable = max(0, grossArrears - recoveredAmount - stayAmount)` — i.e. `1 - (3 + 4.ii)`
+  in the form's own numbering, the original (pre-cumulative) formula. For every later FY,
+  `opening_balance` is simply the *previous* FY's `net_recoverable` (whatever was still owed
+  carries forward, on top of that year's own fresh `grossArrears` less that year's own
+  `recoveredAmount`/`stayAmount`): `net_recoverable = max(0, opening_balance + grossArrears -
+  recoveredAmount - stayAmount)`. It still deliberately uses `recoveredAmount`, never `rcAmount`,
+  for the reason already documented (an RC issued for an amount doesn't mean that amount was
+  actually recovered). The submit route computes this by walking `FINANCIAL_YEARS` in order once
+  per submit — `api/lib/net-recoverable.ts`'s `computeNetRecoverableSeries()`, mirrored
+  byte-for-byte by `frontend/lib/pac-fields.ts`'s function of the same name, per this repo's usual
+  API/frontend duplication convention (see the top of this document) — which is only possible
+  because all 5 years are always submitted together in one atomic batch (see below); there's
+  never a partial year to carry forward from.
+
+  Every place that shows a district's per-financial-year PAC figures shows both `opening_balance`
+  and `net_recoverable` alongside them — `YearStepForm.tsx` (live, as the DEO types),
+  `MasterView.tsx`'s summary table (two bolded extra rows below the six `PAC_FIELD_ORDER` rows,
+  one value per FY column), the admin district detail page's per-FY table (same pattern), the
+  admin districts table (its own two columns, scoped to the FY currently selected in that page's
+  dropdown), and the Excel export (`exportDistrictsToXlsx()` appends both as trailing columns on
+  every per-FY sheet). **Only the DEO's own not-yet-submitted draft is ever computed live in the
+  browser** (`YearStepForm`/`MasterView` read straight from the in-progress Dexie `draftYears`,
+  since nothing exists in D1 until final submit) — every admin-facing view, once a district has
+  actually been submitted, reads the two values straight off the synced `pac_data` row
+  (`CachedPacData.openingBalance`/`netRecoverable`) instead of recomputing them; the database is
+  the single source of truth for a submitted district. If you add another place a district's
+  per-FY PAC figures are rendered, add both of these too — it's easy to forget since only 6 of
+  the 8 real `pac_data` columns are DEO-entered.
+
+  **The Admin Dashboard KPI card and the Excel Summary sheet's "Net Recoverable" total are NOT a
+  sum across all 5 years.** Since each FY's `net_recoverable` already includes every prior year's
+  carried-forward balance, summing all 5 would double/triple-count it. Both instead sum each
+  district's **FY 2025-26** (the final year) `net_recoverable` across all 75 districts — "total
+  outstanding as of 31 March 2026." `admin/page.tsx` reads this straight off each district's last
+  FY's `pac_data` row rather than summing per-district field-totals the way it still does for
+  Gross Arrears/Recovered Amount (those two remain legitimately "summed across all 5 years," since
+  they're each year's own fresh figures, not a running balance — only Net Recoverable changed).
 - `pac_data.submitted_by_name` duplicates `users.submitted_by_name` onto each revenue row
   itself (migration `0001_nostalgic_stature.sql`) — same value, written at the same time in
   the same submit-route batch, just keyed by `district_id` like the rest of `pac_data` so
@@ -709,10 +733,14 @@ visually cramped as features were added:
   one year, which was actively wrong for lock status: a district's PAC submission and lock are
   one atomic action covering all 5 years at once (see the submit route in Data model above), so
   "locked for FY 2023-24 but not FY 2024-25" can't happen — a per-year lock-status filter had
-  nothing real to filter. `admin/page.tsx`'s `rows` now sums each PAC field across
-  `FINANCIAL_YEARS` per district before handing rows to `AdminDashboard`, so Gross Arrears/Net
-  Recoverable/the top-5 list reflect the district's cumulative position as of 31 March 2026 (the
-  end of FY 2025-26), not a single year snapshot. `AdminDashboard`'s `PERIOD_LABEL` constant
+  nothing real to filter. `admin/page.tsx`'s `rows` sums each of the six raw PAC fields across
+  `FINANCIAL_YEARS` per district before handing rows to `AdminDashboard`, so Gross Arrears
+  reflects the district's cumulative total raised over the whole 5-year window. **Net
+  Recoverable is the one exception** — it's not summed across years (see the Data model section
+  above for why that would double-count); `rows` instead carries each district's FY 2025-26
+  `pac_data.net_recoverable` straight through as `netRecoverable`, and both the KPI card and the
+  top-5-dues list/chart sum or read that field directly rather than applying any per-year formula
+  to the summed fields. `AdminDashboard`'s `PERIOD_LABEL` constant
   (`` `FY ${FINANCIAL_YEARS[0]} – ${FINANCIAL_YEARS[FINANCIAL_YEARS.length - 1]}` ``) is what
   the "Total (...)" headings reference — don't reintroduce a year selector on this page.
   `/admin/districts`' own FY `<select>` is unrelated and correctly kept: viewing one year's
@@ -903,8 +931,9 @@ viewports.
 Excel export (`exportDistrictsToXlsx()` in `frontend/lib/export.ts`, built on ExcelJS — see the
 "Sober blue" note above for why it's ExcelJS and not SheetJS) is **one workbook, six sheets** —
 a **Summary** cover sheet followed by one sheet per financial year, each of those five
-districts × the 6 PAC fields for just that year — not one sheet with all 5 years' columns side
-by side like the original version. The FY sheets are named `FY 2021-22`, etc (see the
+districts × the 6 PAC fields (plus Opening Balance/Net Recoverable, both read straight off the
+synced `pac_data` row — see the Data model section above — not recomputed) for just that year —
+not one sheet with all 5 years' columns side by side like the original version. The FY sheets are named `FY 2021-22`, etc (see the
 FY-labeling convention above). Each FY sheet carries two merged banner rows above the
 district/field header row — `SITE_TITLE_EN` (see Portal identity strings above) and, since this
 file is read by auditors/senior officers/commissioners rather than a single DEO, that sheet's own
@@ -915,10 +944,10 @@ it covers if it's opened outside the portal (e.g. emailed to Excise HQ). `TITLE_
 header/data/money-formatting/freeze-pane/print-titles math down by — update it, not the
 individual row-offset call sites, if another banner row is ever added. **Every column header in
 this export is English-only** (`englishLabel()` strips the ` / <Hindi>` half off
-`PAC_FIELD_LABELS` before it reaches a sheet, and the trailing Net Recoverable column is the bare
-English string) — unlike the DEO-facing UI, where the bilingual labels mirror the government form
-DEOs actually fill out, this file's audience already knows the domain and has no Hindi
-requirement.
+`PAC_FIELD_LABELS` before it reaches a sheet, and the trailing Opening Balance/Net Recoverable
+columns are bare English strings) — unlike the DEO-facing UI, where the bilingual labels mirror
+the government form DEOs actually fill out, this file's audience already knows the domain and
+has no Hindi requirement.
 
 The **Summary** sheet is added first (`wb.addWorksheet("Summary")` before the FY loop) so it's
 the first thing the reader sees, deliberately *not* a `Generated:` row repeated identically on
@@ -926,10 +955,12 @@ all 5 FY sheets — it carries `SITE_TITLE_EN`, the portal-wide `DATA_PERIOD_EN`
 workbook-wide, not per-FY, so the full 5-year span is the right text here, unlike the FY sheets'
 own `dataPeriodForFY()`), a `Generated: <formatIST(...)> IST` line (computed once per download,
 in real IST — see the `formatIST()` note below), and a small `Metric`/`Value` table: total/locked/
-unlocked district counts and Gross Arrears/Recovered Amount/Net Recoverable summed across every
-district and all 5 `FINANCIAL_YEARS` — the same "whole 5-year window" totaling convention the
-Admin Dashboard's own KPI cards already use (see `admin/page.tsx` below), reused here rather than
-inventing a different one for the export. `exportExcel()`/`exportSql()` in
+unlocked district counts, Gross Arrears/Recovered Amount summed across every district and all 5
+`FINANCIAL_YEARS` (the same "whole 5-year window" convention the Admin Dashboard's own KPI cards
+use for these two fields), and Net Recoverable summed across every district's **FY 2025-26**
+`pac_data.net_recoverable` only — not across years, for the same double-counting reason documented
+in the Data model section above; the row label spells out "(as of 31 March 2026)", not "(all 5
+years)", to avoid implying the same convention as the other two rows. `exportExcel()`/`exportSql()` in
 `admin/districts/page.tsx` show the admin a matching pre-download confirmation ("Generated at:
 ... IST") using this same `formatIST()` — that dialog used to read
 `new Date().toLocaleString("en-IN")` with no explicit `timeZone`, which (per the `formatIST()`

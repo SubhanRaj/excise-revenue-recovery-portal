@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable } from "@/lib/pac-fields";
+import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField } from "@/lib/pac-fields";
 import { formatIST } from "@/lib/format";
 import { getNavDistrictId } from "@/lib/adminNav";
 import { ApiError } from "@/lib/api";
@@ -214,19 +214,24 @@ export default function DistrictDetailPage() {
                     ))
                   )}
                   {!q && (
-                    <tr className="border-t-2 border-slate-300 bg-slate-50 font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
-                      <td className="whitespace-nowrap px-3 py-2.5">Net Recoverable</td>
-                      {yearRows.map((row, i) => (
-                        <td key={FINANCIAL_YEARS[i]} className="whitespace-nowrap px-3 py-2.5">
-                          ₹
-                          {netRecoverable(
-                            row?.grossArrears ?? 0,
-                            row?.recoveredAmount ?? 0,
-                            row?.stayAmount ?? 0
-                          ).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                        </td>
-                      ))}
-                    </tr>
+                    <>
+                      <tr className="border-t-2 border-slate-300 bg-slate-50 font-medium text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                        <td className="whitespace-nowrap px-3 py-2.5">Opening Balance</td>
+                        {yearRows.map((row, i) => (
+                          <td key={FINANCIAL_YEARS[i]} className="whitespace-nowrap px-3 py-2.5">
+                            ₹{(row?.openingBalance ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr className="border-t border-slate-200 bg-slate-50 font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                        <td className="whitespace-nowrap px-3 py-2.5">Net Recoverable</td>
+                        {yearRows.map((row, i) => (
+                          <td key={FINANCIAL_YEARS[i]} className="whitespace-nowrap px-3 py-2.5">
+                            ₹{(row?.netRecoverable ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          </td>
+                        ))}
+                      </tr>
+                    </>
                   )}
                 </tbody>
               </table>

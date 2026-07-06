@@ -15,7 +15,7 @@ const NAV_LINKS: NavLink[] = [
   { label: "Audit Log", href: "/admin/audit" },
 ];
 
-type Row = CachedDistrict & Record<(typeof PAC_FIELD_ORDER)[number], number>;
+type Row = CachedDistrict & Record<(typeof PAC_FIELD_ORDER)[number], number> & { netRecoverable: number };
 
 export default function AdminDashboardPage() {
   const { ready, profile, districts, pacData, sync, syncing, lastSyncedAt, error } = useAdminData();
@@ -23,9 +23,9 @@ export default function AdminDashboardPage() {
   // A district's lock/PAC submission is all 5 years at once (one atomic submit — see
   // CLAUDE.md), never partial, so there's no such thing as "locked for FY 2023-24 but not
   // 2024-25" — a per-year filter on this overview page was misleading, not just unnecessary.
-  // Every field here is summed across all 5 years per district instead, i.e. the cumulative
-  // position as of 31 March 2026. Districts/page.tsx keeps its own per-year filter, which is
-  // legitimately useful there for inspecting one year's figures per district.
+  // The six raw PAC fields are summed across all 5 years per district, i.e. the cumulative
+  // total raised/recovered as of 31 March 2026. Districts/page.tsx keeps its own per-year
+  // filter, which is legitimately useful there for inspecting one year's figures per district.
   const rows: Row[] = useMemo(
     () =>
       districts.map((d) => {
@@ -38,7 +38,13 @@ export default function AdminDashboardPage() {
             }, 0),
           ])
         ) as Record<(typeof PAC_FIELD_ORDER)[number], number>;
-        return { ...d, ...values };
+        // Net Recoverable is NOT summed across years like the fields above — it's a cumulative
+        // running balance, so the FY 2025-26 (final year) value already includes everything
+        // carried forward. See CLAUDE.md's Data model section for why summing years here would
+        // double-count it.
+        const finalYear = FINANCIAL_YEARS[FINANCIAL_YEARS.length - 1];
+        const finalYearRow = pacData.find((p) => p.districtId === d.id && p.financialYear === finalYear);
+        return { ...d, ...values, netRecoverable: finalYearRow?.netRecoverable ?? 0 };
       }),
     [districts, pacData]
   );
@@ -50,9 +56,9 @@ export default function AdminDashboardPage() {
       <AppHeader title="Admin Dashboard" role="admin" profile={profile} navLinks={NAV_LINKS} onSync={sync} syncing={syncing} lastSyncedAt={lastSyncedAt} districts={districts} />
       <HelpPanel pageKey="admin-dashboard" title="Using this dashboard">
         <p>
-          Every stat here is a total across all 5 financial years (FY 2021-22 to 2025-26) —
-          districts, locked/unlocked counts, gross arrears, and net recoverable, plus the top 5
-          districts by dues.
+          Districts, locked/unlocked counts, and gross arrears are totals across all 5 financial
+          years (FY 2021-22 to 2025-26). Net Recoverable (and the top 5 districts by dues) is each
+          district&apos;s running balance as of 31 March 2026, not a sum across years.
         </p>
         <p>
           <strong>Sync</strong> (top right) pulls the latest districts and PAC data from the

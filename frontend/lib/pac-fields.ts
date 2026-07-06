@@ -57,10 +57,45 @@ export function plainLabel(bilingual: string): string {
   return englishLabel(bilingual).replace(/^\d+\.\s*(\([ivx]+\)\s*)?/i, "");
 }
 
-// gross_arrears - (recovered_amount + stay_amount), floored at 0. Display-only — never
-// persisted. Uses recovered_amount, not rc_amount — an RC being issued for an amount doesn't
-// mean that amount was actually recovered, so these two fields are independent (no parity
-// requirement between them; see CLAUDE.md's Validation rules).
-export function netRecoverable(grossArrears: number, recoveredAmount: number, stayAmount: number): number {
-  return Math.max(0, grossArrears - recoveredAmount - stayAmount);
+export interface NetRecoverableEntry {
+  openingBalance: number;
+  netRecoverable: number;
+}
+
+// Cumulative running balance, mirrored server-side in api/lib/net-recoverable.ts (see CLAUDE.md's
+// Data model section) — kept duplicated on purpose, same as every other cross-app constant. For
+// the first FY, openingBalance is 0. For every later FY, openingBalance is the previous FY's
+// netRecoverable, and netRecoverable = max(0, openingBalance + grossArrears - recoveredAmount -
+// stayAmount) — uses recoveredAmount, not rcAmount, for the same reason as before: an RC being
+// issued for an amount doesn't mean that amount was actually recovered.
+export function netRecoverableForYear(
+  grossArrears: number,
+  recoveredAmount: number,
+  stayAmount: number,
+  openingBalance: number
+): NetRecoverableEntry {
+  return {
+    openingBalance,
+    netRecoverable: Math.max(0, openingBalance + grossArrears - recoveredAmount - stayAmount),
+  };
+}
+
+// Runs netRecoverableForYear() across every FY in order for one district, carrying each FY's
+// result forward as the next FY's opening balance. Only ever used for the DEO's own
+// not-yet-submitted Dexie draft (YearStepForm/MasterView) — once a district is submitted, every
+// admin-facing view reads openingBalance/netRecoverable straight off the synced pac_data row
+// instead of recomputing (server is the source of truth there). A missing FY is treated as
+// all-zero, same as every other place in this app that reads a possibly-absent pac_data row.
+export function computeNetRecoverableSeries(
+  fieldsByFy: Partial<Record<FinancialYear, { grossArrears: number; recoveredAmount: number; stayAmount: number }>>
+): Record<FinancialYear, NetRecoverableEntry> {
+  const series = {} as Record<FinancialYear, NetRecoverableEntry>;
+  let openingBalance = 0;
+  for (const fy of FINANCIAL_YEARS) {
+    const f = fieldsByFy[fy];
+    const entry = netRecoverableForYear(f?.grossArrears ?? 0, f?.recoveredAmount ?? 0, f?.stayAmount ?? 0, openingBalance);
+    series[fy] = entry;
+    openingBalance = entry.netRecoverable;
+  }
+  return series;
 }

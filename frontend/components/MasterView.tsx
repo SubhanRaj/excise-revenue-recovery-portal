@@ -1,6 +1,6 @@
 "use client";
 
-import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable } from "@/lib/pac-fields";
+import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, computeNetRecoverableSeries } from "@/lib/pac-fields";
 import type { DraftYear } from "@/lib/db";
 import Button from "./ui/Button";
 import Banner from "./ui/Banner";
@@ -17,6 +17,22 @@ type Props = {
 // (lib/alerts.ts's promptDeoNameAndLock), not as a field on this page — keeps it right next
 // to the irreversibility/liability disclaimer instead of a form field easy to skim past.
 export default function MasterView({ years, districtName, onSubmit, busy, error }: Props) {
+  // Computed live from the draft, not yet in D1 until Submit & Lock — see CLAUDE.md's Data
+  // model section. Once submitted, every admin-facing view reads the stored pac_data columns
+  // instead of recomputing this.
+  const netRecoverableSeries = computeNetRecoverableSeries(
+    Object.fromEntries(
+      years.map((y) => [
+        y.financialYear,
+        {
+          grossArrears: Number(y.grossArrears) || 0,
+          recoveredAmount: Number(y.recoveredAmount) || 0,
+          stayAmount: Number(y.stayAmount) || 0,
+        },
+      ])
+    )
+  );
+
   return (
     <div className="space-y-5">
       <div className="border-b border-slate-100 pb-4 text-center dark:border-slate-800">
@@ -74,16 +90,19 @@ export default function MasterView({ years, districtName, onSubmit, busy, error 
                 ))}
               </tr>
             ))}
-            <tr className="border-t-2 border-slate-300 bg-slate-50 font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+            <tr className="border-t-2 border-slate-300 bg-slate-50 font-medium text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+              <td className="sticky left-0 bg-inherit px-4 py-3">Opening Balance / प्रारंभिक शेष धनराशि</td>
+              {years.map((year) => (
+                <td key={year.financialYear} className="whitespace-nowrap px-4 py-3 text-right tabular-nums">
+                  ₹{netRecoverableSeries[year.financialYear].openingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </td>
+              ))}
+            </tr>
+            <tr className="border-t border-slate-200 bg-slate-50 font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
               <td className="sticky left-0 bg-inherit px-4 py-3">Net Recoverable / शुद्ध वसूली योग्य धनराशि</td>
               {years.map((year) => (
                 <td key={year.financialYear} className="whitespace-nowrap px-4 py-3 text-right tabular-nums">
-                  ₹
-                  {netRecoverable(
-                    Number(year.grossArrears) || 0,
-                    Number(year.recoveredAmount) || 0,
-                    Number(year.stayAmount) || 0
-                  ).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                  ₹{netRecoverableSeries[year.financialYear].netRecoverable.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                 </td>
               ))}
             </tr>

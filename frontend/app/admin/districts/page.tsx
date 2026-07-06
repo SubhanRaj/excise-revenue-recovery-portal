@@ -13,7 +13,7 @@ import {
   type PaginationState,
   type SortingState,
 } from "@tanstack/react-table";
-import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable, englishLabel } from "@/lib/pac-fields";
+import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, englishLabel } from "@/lib/pac-fields";
 import { formatIST } from "@/lib/format";
 import { ApiError } from "@/lib/api";
 import { notifyToast, promptUnlockReason, confirmTruncateDemo } from "@/lib/alerts";
@@ -36,7 +36,8 @@ const NAV_LINKS: NavLink[] = [
 
 const PAGE_SIZE_OPTIONS = [25, 50, 75, 100] as const;
 
-type Row = CachedDistrict & Record<(typeof PAC_FIELD_ORDER)[number], number>;
+type Row = CachedDistrict &
+  Record<(typeof PAC_FIELD_ORDER)[number], number> & { openingBalance: number; netRecoverable: number };
 
 const columnHelper = createColumnHelper<Row>();
 
@@ -200,7 +201,7 @@ export default function DistrictsPage() {
           const values = Object.fromEntries(
             PAC_FIELD_ORDER.map((field) => [field, match?.[field] ?? 0])
           ) as Record<(typeof PAC_FIELD_ORDER)[number], number>;
-          return { ...d, ...values };
+          return { ...d, ...values, openingBalance: match?.openingBalance ?? 0, netRecoverable: match?.netRecoverable ?? 0 };
         }),
     [districts, pacData, selectedYear, statusFilter]
   );
@@ -209,11 +210,11 @@ export default function DistrictsPage() {
     const sums = Object.fromEntries(
       PAC_FIELD_ORDER.map((field) => [field, rows.reduce((sum, r) => sum + r[field], 0)])
     ) as Record<(typeof PAC_FIELD_ORDER)[number], number>;
-    const netRecoverableTotal = rows.reduce(
-      (sum, r) => sum + netRecoverable(r.grossArrears, r.recoveredAmount, r.stayAmount),
-      0
-    );
-    return { sums, netRecoverableTotal };
+    // Summing across districts for one FY (not across years, which would double-count the
+    // carried-forward balance) is a legitimate total — see CLAUDE.md's Data model section.
+    const openingBalanceTotal = rows.reduce((sum, r) => sum + r.openingBalance, 0);
+    const netRecoverableTotal = rows.reduce((sum, r) => sum + r.netRecoverable, 0);
+    return { sums, openingBalanceTotal, netRecoverableTotal };
   }, [rows]);
 
   const columns = useMemo(
@@ -246,13 +247,14 @@ export default function DistrictsPage() {
         })
       ),
       columnHelper.display({
+        id: "openingBalance",
+        header: "Opening Balance",
+        cell: ({ row }) => `₹${row.original.openingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+      }),
+      columnHelper.display({
         id: "netRecoverable",
         header: "Net Recoverable",
-        cell: ({ row }) =>
-          `₹${netRecoverable(row.original.grossArrears, row.original.recoveredAmount, row.original.stayAmount).toLocaleString(
-            "en-IN",
-            { minimumFractionDigits: 2 }
-          )}`,
+        cell: ({ row }) => `₹${row.original.netRecoverable.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
       }),
       columnHelper.display({
         id: "actions",
@@ -492,6 +494,9 @@ export default function DistrictsPage() {
                     {formatValue(field, totals.sums[field])}
                   </td>
                 ))}
+                <td className="whitespace-nowrap px-3 py-2.5">
+                  ₹{totals.openingBalanceTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </td>
                 <td className="whitespace-nowrap px-3 py-2.5">
                   ₹{totals.netRecoverableTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                 </td>

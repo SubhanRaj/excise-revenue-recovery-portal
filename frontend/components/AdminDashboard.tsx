@@ -2,11 +2,11 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Chart } from "chart.js";
-import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, netRecoverable, plainLabel } from "@/lib/pac-fields";
+import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, plainLabel } from "@/lib/pac-fields";
 import { setNavDistrictId } from "@/lib/adminNav";
 import type { CachedDistrict } from "@/lib/db";
 
-type Row = CachedDistrict & Record<(typeof PAC_FIELD_ORDER)[number], number>;
+type Row = CachedDistrict & Record<(typeof PAC_FIELD_ORDER)[number], number> & { netRecoverable: number };
 
 // Every KpiCard/chart/list on this dashboard is a total across the full 5-year window, not one
 // FY at a time — see the comment in admin/page.tsx for why a per-year filter didn't make sense
@@ -226,17 +226,13 @@ export default function AdminDashboard({ rows }: { rows: Row[] }) {
   const sums = Object.fromEntries(
     PAC_FIELD_ORDER.map((field) => [field, rows.reduce((sum, r) => sum + r[field], 0)])
   ) as Record<(typeof PAC_FIELD_ORDER)[number], number>;
-  const netRecoverableTotal = rows.reduce(
-    (sum, r) => sum + netRecoverable(r.grossArrears, r.recoveredAmount, r.stayAmount),
-    0
-  );
+  // Not summed across years like the other fields — each district's netRecoverable is already a
+  // FY 2025-26 cumulative figure that includes every prior year's carried-forward balance, so
+  // summing years here would double-count it. See CLAUDE.md's Data model section.
+  const netRecoverableTotal = rows.reduce((sum, r) => sum + r.netRecoverable, 0);
 
   const topDues = [...rows]
-    .map((r) => ({
-      id: r.id,
-      name: r.districtName,
-      dues: netRecoverable(r.grossArrears, r.recoveredAmount, r.stayAmount),
-    }))
+    .map((r) => ({ id: r.id, name: r.districtName, dues: r.netRecoverable }))
     .sort((a, b) => b.dues - a.dues)
     .slice(0, 5);
 
@@ -263,7 +259,7 @@ export default function AdminDashboard({ rows }: { rows: Row[] }) {
       <div className="space-y-4">
         <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
           <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
-            Top 5 districts by Net Recoverable — Total ({PERIOD_LABEL})
+            Top 5 districts by Net Recoverable — as of 31 March 2026
           </h3>
           <TopDistrictsBarChart
             districts={topDues}

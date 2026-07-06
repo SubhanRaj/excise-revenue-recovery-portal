@@ -408,6 +408,29 @@
       and updated `TESTING.md`'s manual demo script, which previously exercised the parity-error
       path as its DEO-side validation demo step.
 
+## Milestone 20 — Cumulative Net Recoverable, persisted per FY (done)
+
+- [x] Net Recoverable changed from an isolated per-year figure to a running balance: each FY's
+      `net_recoverable` now carries the previous FY's `net_recoverable` forward as its
+      `opening_balance` before applying that year's own `grossArrears - recoveredAmount -
+      stayAmount`. FY 2021-22 (the first FY) is unchanged — `opening_balance` is always 0.
+- [x] New `pac_data.opening_balance`/`pac_data.net_recoverable` columns (migration
+      `0005_married_landau.sql`), computed and written server-side by `POST
+      /api/pac-data/submit` (never trusted from the client) — a reversal of the previous
+      "Net Recoverable is never persisted" design, now that a per-year value needs to be
+      auditable/queryable directly rather than recomputed from raw fields every time.
+- [x] `frontend/lib/pac-fields.ts` gained `computeNetRecoverableSeries()`, mirrored server-side
+      in `api/lib/net-recoverable.ts` — the one place the carry-forward formula lives on each side.
+- [x] Every admin-facing view that shows a submitted district's PAC figures (districts table,
+      district detail page, Excel export) now reads `openingBalance`/`netRecoverable` straight off
+      the synced `pac_data` row instead of recomputing; only the DEO's own not-yet-submitted
+      Dexie draft is still computed live in the browser (`YearStepForm`, `MasterView`).
+- [x] Admin Dashboard KPI card and the Excel Summary sheet's Net Recoverable total switched from
+      "summed across all 5 years" (which would now double-count carried-forward balances) to
+      "each district's FY 2025-26 value, summed across districts" — the true outstanding balance
+      as of 31 March 2026. Gross Arrears/Recovered Amount totals are unchanged (still legitimately
+      summed across years, since those are each year's own fresh figures).
+
 ## Backlog / not started
 
 - [ ] Real domain + DNS, and (optional) collapse `/frontend` + `/api` onto one zone via a

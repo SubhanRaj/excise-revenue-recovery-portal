@@ -110,7 +110,9 @@ Then:
    Amount and confirm both accept independently with no error (RC Amount and Recovered Amount
    have no parity requirement — see CLAUDE.md's Validation rules), try a year with Gross
    Arrears left at 0 but a non-zero Recovered Amount (also valid — a year can have recoveries
-   with no fresh dues), watch Net Recoverable update live, try "Previous Year" to go back a step,
+   with no fresh dues), watch Net Recoverable update live, and confirm Opening Balance on FY
+   2022-23 onward equals the previous FY's Net Recoverable (FY 2021-22's Opening Balance should
+   always read 0). Try "Previous Year" to go back a step,
    try the per-year
    "Clear" button and the nav bar's "Clear All" (both prompt a confirm first). On FY 2025-26,
    reach Master View (title now shows the district name, English + smaller Hindi line), hit
@@ -126,8 +128,11 @@ Then:
    fine print. Click the card's own **Logout** button — it should log out immediately with no
    confirmation popup (logout is the only thing to do here, unlike the profile menu's Logout
    elsewhere, which does still confirm).
-4. **Back to Admin → Districts** → Sync → the district now shows "Locked" with real numbers.
-   Click the row to open its detail page (who locked it, when, in IST) → **Back to Districts**
+4. **Back to Admin → Districts** → Sync → the district now shows "Locked" with real numbers,
+   including its own Opening Balance/Net Recoverable columns for the currently-selected FY —
+   these are now read straight from `pac_data` (computed server-side at submit time), not
+   recomputed in the browser, so they should exactly match what Master View showed the DEO before
+   locking. Click the row to open its detail page (who locked it, when, in IST) → **Back to Districts**
    → **Unlock** now prompts for a reason (blank is rejected) before reversing it — check the
    detail page again to see "Last unlocked by / on / Reason", and check **Audit Log** (top
    nav) to see the lock and unlock events recorded, newest first — try filtering to just

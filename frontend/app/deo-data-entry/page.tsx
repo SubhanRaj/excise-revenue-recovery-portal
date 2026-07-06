@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { db, type DraftYear } from "@/lib/db";
-import { FINANCIAL_YEARS, PAC_FIELD_ORDER } from "@/lib/pac-fields";
+import { FINANCIAL_YEARS, PAC_FIELD_ORDER, computeNetRecoverableSeries } from "@/lib/pac-fields";
 import { apiFetch, ApiError } from "@/lib/api";
 import { clearClientSession, consumeJustAuthed } from "@/lib/session";
 import { formatIST } from "@/lib/format";
@@ -291,6 +291,22 @@ export default function EntryPage() {
     );
   }
 
+  // Live opening-balance preview for the DEO's in-progress draft — recomputed from the six raw
+  // fields on every render rather than stored, since nothing's in D1 yet until final submit (see
+  // CLAUDE.md's Data model section).
+  const netRecoverableSeries = computeNetRecoverableSeries(
+    Object.fromEntries(
+      years.map((y) => [
+        y.financialYear,
+        {
+          grossArrears: Number(y.grossArrears) || 0,
+          recoveredAmount: Number(y.recoveredAmount) || 0,
+          stayAmount: Number(y.stayAmount) || 0,
+        },
+      ])
+    )
+  );
+
   return (
     <div className="flex min-h-full flex-1 flex-col bg-slate-50 dark:bg-slate-950">
       <AppHeader title="DEO Data Entry" role="deo" profile={profile} />
@@ -394,6 +410,7 @@ export default function EntryPage() {
           {step < 5 ? (
             <YearStepForm
               year={years[step]}
+              openingBalance={netRecoverableSeries[years[step].financialYear].openingBalance}
               onFieldChange={(field, value) => updateField(step, field, value)}
               onSaveAndContinue={() => saveAndContinue(step)}
               onBack={step > 0 ? () => setStep(step - 1) : undefined}
