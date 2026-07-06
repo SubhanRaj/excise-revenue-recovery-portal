@@ -105,20 +105,21 @@ async function downloadWorkbook(wb: InstanceType<typeof window.ExcelJS.Workbook>
 export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData: CachedPacData[]) {
   const sortedDistricts = [...districts].sort((a, b) => a.districtName.localeCompare(b.districtName));
   // Opening Balance/Net Recoverable are read straight off pac_data (computed server-side at
-  // submit time — see CLAUDE.md's Data model section), not recomputed here — appended as their
-  // own trailing columns rather than looped in via PAC_FIELD_ORDER, same as they're rendered as
-  // extra rows/columns (not PAC_FIELD_ORDER entries) everywhere else they're shown.
+  // submit time — see CLAUDE.md's Data model section), not recomputed here — not looped in via
+  // PAC_FIELD_ORDER since neither is a DEO-entered field. Opening Balance leads (right after
+  // District, matching the admin districts table/Master View convention of showing it first);
+  // Net Recoverable stays a trailing column, the running result after all 6 fields.
   const header = [
     "District",
-    ...PAC_FIELD_ORDER.map((f) => englishLabel(PAC_FIELD_LABELS[f])),
     "Opening Balance",
+    ...PAC_FIELD_ORDER.map((f) => englishLabel(PAC_FIELD_LABELS[f])),
     "Net Recoverable",
   ];
-  const openingBalanceCol = header.length - 2; // 0-based
+  const openingBalanceCol = 1; // 0-based
   const netRecoverableCol = header.length - 1; // 0-based
   const moneyColumns = [
-    ...PAC_FIELD_ORDER.map((field, i) => (isMoneyField(field) ? i + 1 : -1)).filter((c) => c >= 0),
     openingBalanceCol,
+    ...PAC_FIELD_ORDER.map((field, i) => (isMoneyField(field) ? i + 2 : -1)).filter((c) => c >= 0),
     netRecoverableCol,
   ];
 
@@ -184,8 +185,8 @@ export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData
       const match = pacData.find((p) => p.districtId === d.id && p.financialYear === fy);
       return [
         d.districtName,
-        ...PAC_FIELD_ORDER.map((field) => match?.[field] ?? 0),
         match?.openingBalance ?? 0,
+        ...PAC_FIELD_ORDER.map((field) => match?.[field] ?? 0),
         match?.netRecoverable ?? 0,
       ];
     });
@@ -208,7 +209,7 @@ export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData
       // shared A4/landscape/fit-to-width page setup.
       pageSetup: { ...PAGE_SETUP, printTitlesRow: `1:${TITLE_ROWS + 1}` },
     });
-    ws.columns = [{ width: 22 }, ...PAC_FIELD_ORDER.map(() => ({ width: 18 })), { width: 18 }, { width: 18 }];
+    ws.columns = [{ width: 22 }, { width: 18 }, ...PAC_FIELD_ORDER.map(() => ({ width: 18 })), { width: 18 }];
 
     ws.addRow([`${SITE_TITLE_EN} — FY ${fy}`]);
     ws.addRow([dataPeriodForFY(fy)]);

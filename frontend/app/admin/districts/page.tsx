@@ -223,6 +223,11 @@ export default function DistrictsPage() {
         header: "District",
         cell: (info) => info.getValue(),
       }),
+      columnHelper.display({
+        id: "openingBalance",
+        header: "Opening Balance",
+        cell: ({ row }) => `₹${row.original.openingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+      }),
       columnHelper.accessor("lockStatus", {
         header: "Status",
         cell: (info) => (
@@ -246,11 +251,6 @@ export default function DistrictsPage() {
           cell: (info) => formatValue(field, info.getValue()),
         })
       ),
-      columnHelper.display({
-        id: "openingBalance",
-        header: "Opening Balance",
-        cell: ({ row }) => `₹${row.original.openingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
-      }),
       columnHelper.display({
         id: "netRecoverable",
         header: "Net Recoverable",
@@ -488,15 +488,15 @@ export default function DistrictsPage() {
             <tfoot>
               <tr className="sticky bottom-0 z-20 border-t-2 border-slate-300 bg-slate-100 font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
                 <td className="sticky left-0 z-30 whitespace-nowrap bg-slate-100 px-3 py-2.5 dark:bg-slate-800">Total</td>
+                <td className="whitespace-nowrap px-3 py-2.5">
+                  ₹{totals.openingBalanceTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </td>
                 <td className="whitespace-nowrap px-3 py-2.5" />
                 {PAC_FIELD_ORDER.map((field) => (
                   <td key={field} className="whitespace-nowrap px-3 py-2.5">
                     {formatValue(field, totals.sums[field])}
                   </td>
                 ))}
-                <td className="whitespace-nowrap px-3 py-2.5">
-                  ₹{totals.openingBalanceTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                </td>
                 <td className="whitespace-nowrap px-3 py-2.5">
                   ₹{totals.netRecoverableTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                 </td>

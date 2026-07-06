@@ -68,6 +68,14 @@ export default function MasterView({ years, districtName, onSubmit, busy, error 
             </tr>
           </thead>
           <tbody>
+            <tr className="border-t border-slate-100 bg-slate-50 font-medium text-slate-800 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-200">
+              <td className="sticky left-0 bg-inherit px-4 py-3">Opening Balance / प्रारंभिक शेष धनराशि</td>
+              {years.map((year) => (
+                <td key={year.financialYear} className="whitespace-nowrap px-4 py-3 text-right tabular-nums">
+                  ₹{netRecoverableSeries[year.financialYear].openingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </td>
+              ))}
+            </tr>
             {PAC_FIELD_ORDER.map((field, i) => (
               <tr
                 key={field}
@@ -90,15 +98,7 @@ export default function MasterView({ years, districtName, onSubmit, busy, error 
                 ))}
               </tr>
             ))}
-            <tr className="border-t-2 border-slate-300 bg-slate-50 font-medium text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
-              <td className="sticky left-0 bg-inherit px-4 py-3">Opening Balance / प्रारंभिक शेष धनराशि</td>
-              {years.map((year) => (
-                <td key={year.financialYear} className="whitespace-nowrap px-4 py-3 text-right tabular-nums">
-                  ₹{netRecoverableSeries[year.financialYear].openingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                </td>
-              ))}
-            </tr>
-            <tr className="border-t border-slate-200 bg-slate-50 font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+            <tr className="border-t-2 border-slate-300 bg-slate-50 font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
               <td className="sticky left-0 bg-inherit px-4 py-3">Net Recoverable / शुद्ध वसूली योग्य धनराशि</td>
               {years.map((year) => (
                 <td key={year.financialYear} className="whitespace-nowrap px-4 py-3 text-right tabular-nums">

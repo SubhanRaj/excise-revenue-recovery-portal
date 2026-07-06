@@ -37,6 +37,15 @@ export default function YearStepForm({ year, openingBalance, onFieldChange, onSa
         </Button>
       </div>
 
+      <div className="flex items-center justify-between rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm dark:border-blue-900 dark:bg-blue-950/40">
+        <span className="text-blue-800 dark:text-blue-300">
+          Opening Balance / प्रारंभिक शेष धनराशि
+        </span>
+        <span className="tabular-nums text-blue-700 dark:text-blue-300">
+          ₹{openingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+        </span>
+      </div>
+
       <div className="grid grid-cols-1 gap-4">
         <PacFieldInput
           label={PAC_FIELD_LABELS.grossArrears}
@@ -83,23 +92,13 @@ export default function YearStepForm({ year, openingBalance, onFieldChange, onSa
         </div>
       </div>
 
-      <div className="space-y-2 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm dark:border-blue-900 dark:bg-blue-950/40">
-        <div className="flex items-center justify-between">
-          <span className="text-blue-800 dark:text-blue-300">
-            Opening Balance / प्रारंभिक शेष धनराशि
-          </span>
-          <span className="tabular-nums text-blue-700 dark:text-blue-300">
-            ₹{openingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-          </span>
-        </div>
-        <div className="flex items-center justify-between border-t border-blue-100 pt-2 dark:border-blue-900">
-          <span className="font-medium text-blue-900 dark:text-blue-200">
-            Net Recoverable / शुद्ध वसूली योग्य धनराशि
-          </span>
-          <span className="text-base font-semibold text-blue-700 dark:text-blue-300">
-            ₹{netRecoverable.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-          </span>
-        </div>
+      <div className="flex items-center justify-between rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm dark:border-blue-900 dark:bg-blue-950/40">
+        <span className="font-medium text-blue-900 dark:text-blue-200">
+          Net Recoverable / शुद्ध वसूली योग्य धनराशि
+        </span>
+        <span className="text-base font-semibold text-blue-700 dark:text-blue-300">
+          ₹{netRecoverable.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+        </span>
       </div>
 
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
