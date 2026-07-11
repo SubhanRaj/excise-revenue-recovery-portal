@@ -1,4 +1,77 @@
-# Roadmap
+# Excise Revenue Recovery Portal — Roadmap
+
+| Field | Value |
+|---|---|
+| **Prepared By** | Subhan Raj |
+| **Consulting For** | Department of Excise, Government of Uttar Pradesh |
+| **Status** | Live in production — 75 districts onboarded, DEO submissions ongoing |
+
+> **Authority note:** This document is the project's plan and business context — objectives,
+> constraints, and the milestone-by-milestone progress log. For the authoritative **current
+> implementation state** — schema, app flow, and exact conventions — see
+> [README.md](./README.md) (reference) and [CLAUDE.md](./CLAUDE.md) (AI-agent instructions),
+> both updated on every change. This file explains *what the department needs and why*; those
+> two explain *how the system currently meets it*.
+
+## 1. Objectives
+
+The Department of Excise, Government of Uttar Pradesh, needs a single authoritative record of
+Recovery Certificate (RC) arrears — money owed by defaulters that the department has pursued
+via PAC (Public Accounts Committee) recovery certificates — across all 75 districts, for the
+5-year window FY 2021-22 through FY 2025-26. Before this portal, that data lived in scattered
+district-level spreadsheets with no consolidated view, no audit trail, and no way for HQ to see
+which districts had actually reported.
+
+| # | Objective | Success criterion |
+|---|---|---|
+| O-1 | **Universal coverage** | All 75 districts submit complete, locked 5-year PAC/RC data. |
+| O-2 | **Financial accuracy** | Six figures per district-year (Gross Arrears, RC count/amount, Recovered Amount, Stay count/amount), each independently validated — no field silently defaults to zero. |
+| O-3 | **Auditability** | Every submission is locked and attributed to a named DEO; every unlock requires a stated reason and is logged. HQ can always answer "who submitted this, when, and who touched it since." |
+| O-4 | **Zero infrastructure cost** | Runs entirely on Cloudflare's free tier (Pages + Workers + D1) — no server provisioning, no paid plan, for a portal used by ~90 people (75 DEOs + a handful of admins). |
+| O-5 | **Field-safe data entry** | A DEO's in-progress entry survives connectivity loss, accidental refresh, or tab closure — nothing is sent to the server (and nothing can be lost) until the DEO explicitly reviews and locks. |
+| O-6 | **HQ-usable output** | An Admin can view, filter, and export (Excel or SQL) the full dataset without needing database access. |
+
+## 2. Business rules (department-facing)
+
+These are operational requirements from the department, not implementation choices — see
+CLAUDE.md's "Validation rules" and "Data model" sections for how each is enforced in code.
+
+- **One submission per district is final.** A DEO locks their district's 5-year data in a
+  single atomic action; it cannot be edited afterward without an Admin unlock. This mirrors the
+  department's own sign-off process — a DEO's submission is treated as an official record, not a
+  draft that can be silently revised.
+- **No field is ever assumed to be zero.** A due or recovery a DEO hasn't entered yet must stay
+  visibly blank, never silently treated as ₹0 — a blank Gross Arrears figure and a confirmed-₹0
+  Gross Arrears figure mean different things to an auditor.
+- **A recovery can never exceed what was ever owed.** Recovered Amount for a given year is
+  capped at that year's Opening Balance (carried forward) plus that year's fresh Gross Arrears —
+  the schema-level backstop against overstating recovery.
+- **Data must stay within its financial year.** A DEO enters only dues/recoveries that arose
+  within that specific FY (1 April–31 March) — never pre-2021-22 arrears, never post-2025-26
+  activity, and never a recovery of a pre-window due even if the recovery itself happens inside
+  the window. This is a data-entry instruction to DEOs (see the in-app scope banner), not a
+  system-enforced rule, since the system has no way to distinguish an in-scope figure from an
+  out-of-scope one.
+- **Unlock requires a reason.** An Admin can reverse a district's lock, but only after entering a
+  reason, which is stored and shown on that district's detail page — an unlock is a deviation
+  from the normal one-shot submission flow and must be accountable.
+- **Every login, lock, and unlock is audited.** 30-day rolling retention is sufficient — this is
+  an operational trail for catching mistakes shortly after they happen, not a permanent legal
+  record.
+
+## 3. Scope
+
+**In scope:** the six PAC/RC fields per district per financial year (Gross Arrears, RC
+count/amount, Recovered Amount, Stay count/amount), for FY 2021-22 through FY 2025-26, across
+all 75 UP districts, plus the derived Opening Balance/Net Recoverable running balance.
+
+**Out of scope:** anything the six fields don't cover — there is no separate interest field
+(Gross Arrears is already principal + interest combined), no per-vend or sub-district
+breakdown, and no data outside the 1 April 2021 – 31 March 2026 window. A future phase could
+extend the window or add fields, but that would need new migrations on both apps (see
+CLAUDE.md's Repo shape section) — not an in-place repurposing of an existing field.
+
+## 4. Milestones
 
 ## Milestone 1 — Foundation (done)
 

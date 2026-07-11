@@ -2,7 +2,9 @@
 
 Two independent Cloudflare deployments — an API Worker (`/api`, via OpenNext) and a Pages
 static site (`/frontend`) — plus one D1 database. This doc is the source of truth for
-current production state and the exact commands to redeploy or rebuild from scratch.
+current production state and the exact commands to redeploy or rebuild from scratch. See
+[ROADMAP.md](./ROADMAP.md) for what's shipped (each deploy-affecting milestone is logged
+there) and [CLAUDE.md](./CLAUDE.md) for how the system itself works.
 
 ## Current production deployment
 
