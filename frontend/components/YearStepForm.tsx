@@ -1,9 +1,25 @@
 "use client";
 
+import { useState } from "react";
 import PacFieldInput from "./PacFieldInput";
 import { PAC_FIELD_LABELS, OPENING_BALANCE_LABEL, netRecoverableForYear } from "@/lib/pac-fields";
 import type { DraftYear } from "@/lib/db";
 import Button from "./ui/Button";
+
+const RC_COUNT_ERROR =
+  "No. of RCs Issued cannot be 0 when RC Amount is entered / यदि आर.सी. में निहित धनराशि दर्ज " +
+  "की गई है तो जारी आर.सी. की संख्या 0 नहीं हो सकती";
+const STAY_COUNT_ERROR =
+  "No. of Stay Orders cannot be 0 when Stayed Amount is entered / यदि स्थगित धनराशि दर्ज की गई " +
+  "है तो स्थगन आदेशों की संख्या 0 नहीं हो सकती";
+
+// Exported so deo-data-entry/page.tsx's saveAndContinue() can block on the same rule.
+export function countAmountErrors(year: DraftYear): string[] {
+  const errors: string[] = [];
+  if ((Number(year.rcAmount) || 0) > 0 && (Number(year.rcCount) || 0) === 0) errors.push(RC_COUNT_ERROR);
+  if ((Number(year.stayAmount) || 0) > 0 && (Number(year.stayCount) || 0) === 0) errors.push(STAY_COUNT_ERROR);
+  return errors;
+}
 
 type Props = {
   year: DraftYear;
@@ -21,6 +37,11 @@ export default function YearStepForm({ year, openingBalance, onFieldChange, onSa
   const recovered = Number(year.recoveredAmount) || 0;
   const stay = Number(year.stayAmount) || 0;
   const { netRecoverable } = netRecoverableForYear(gross, recovered, stay, openingBalance);
+
+  const [rcTouched, setRcTouched] = useState(false);
+  const [stayTouched, setStayTouched] = useState(false);
+  const rcCountInvalid = (Number(year.rcAmount) || 0) > 0 && (Number(year.rcCount) || 0) === 0;
+  const stayCountInvalid = (Number(year.stayAmount) || 0) > 0 && (Number(year.stayCount) || 0) === 0;
 
   return (
     <div className="space-y-5">
@@ -58,12 +79,15 @@ export default function YearStepForm({ year, openingBalance, onFieldChange, onSa
             value={year.rcCount}
             money={false}
             onChange={(raw) => onFieldChange("rcCount", raw)}
+            onBlur={() => setRcTouched(true)}
+            error={rcTouched && rcCountInvalid ? RC_COUNT_ERROR : undefined}
           />
           <PacFieldInput
             label={PAC_FIELD_LABELS.rcAmount}
             value={year.rcAmount}
             money
             onChange={(raw) => onFieldChange("rcAmount", raw)}
+            onBlur={() => setRcTouched(true)}
           />
         </div>
 
@@ -80,12 +104,15 @@ export default function YearStepForm({ year, openingBalance, onFieldChange, onSa
             value={year.stayCount}
             money={false}
             onChange={(raw) => onFieldChange("stayCount", raw)}
+            onBlur={() => setStayTouched(true)}
+            error={stayTouched && stayCountInvalid ? STAY_COUNT_ERROR : undefined}
           />
           <PacFieldInput
             label={PAC_FIELD_LABELS.stayAmount}
             value={year.stayAmount}
             money
             onChange={(raw) => onFieldChange("stayAmount", raw)}
+            onBlur={() => setStayTouched(true)}
           />
         </div>
       </div>

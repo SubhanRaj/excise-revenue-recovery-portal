@@ -63,6 +63,13 @@ reference. Rules an agent must preserve when touching `pac_data` or its computed
    `deo-data-entry/page.tsx`'s `saveAndContinue()` and server-side in the submit route, as a
    separate loop after `computeNetRecoverableSeries()` (it needs the computed `openingBalance`,
    which only exists once every row has passed `validateRow()`), placed before the `db.batch()`.
+5. **A non-zero `rcAmount`/`stayAmount` requires a non-zero `rcCount`/`stayCount`** — an RC
+   issued or a stay order granted for money implies at least one RC/order exists; a DEO can't
+   enter an amount against a count of 0. Enforced in `api/lib/net-recoverable.ts`'s sibling
+   `validateRow()` (`api/app/api/pac-data/submit/route.ts`) and mirrored client-side as an
+   inline, bold, bilingual, blur-triggered field error under the count field
+   (`YearStepForm.tsx`'s `countAmountErrors()`, also blocking `saveAndContinue()` in
+   `deo-data-entry/page.tsx` for the case a DEO never blurs the offending field).
 
 Every DEO-facing view of the six PAC fields carries a scope-of-data-period notice: a DEO must
 enter only dues/recoveries that arose within that specific financial year — never arrears from

@@ -14,7 +14,7 @@ import {
   confirmClearAll,
   notifyToast,
 } from "@/lib/alerts";
-import YearStepForm from "@/components/YearStepForm";
+import YearStepForm, { countAmountErrors } from "@/components/YearStepForm";
 import MasterView from "@/components/MasterView";
 import Button from "@/components/ui/Button";
 import AppHeader from "@/components/ui/AppHeader";
@@ -26,6 +26,8 @@ const BLANK_FIELD_TITLE = "Field left blank / फ़ील्ड खाली �
 const BLANK_FIELD_TEXT =
   "Please do not leave any field blank. Enter 0 if there is no due amount or recovery. / " +
   "कृपया कोई भी फ़ील्ड खाली न छोड़ें। यदि कोई धनराशि या वसूली नहीं है तो 0 दर्ज करें।";
+
+const COUNT_MISMATCH_TITLE = "Count cannot be 0 / संख्या 0 नहीं हो सकती";
 
 const RECOVERED_CAP_TITLE = "Recovered Amount too high / वसूल की गयी धनराशि अधिक है";
 const RECOVERED_CAP_TEXT =
@@ -147,6 +149,14 @@ export default function EntryPage() {
     const year = years[index];
     const blank = PAC_FIELD_ORDER.some((field) => year[field].trim() === "");
     if (blank) return notifyToast({ icon: "error", title: BLANK_FIELD_TITLE, text: BLANK_FIELD_TEXT });
+
+    // A non-zero RC/Stay Amount with a 0 count is a data-entry oversight — the inline field
+    // error in YearStepForm already shows this once the field is blurred, but a DEO could still
+    // click Save & Continue without ever blurring the offending field, so block here too.
+    const countErrors = countAmountErrors(year);
+    if (countErrors.length > 0) {
+      return notifyToast({ icon: "error", title: COUNT_MISMATCH_TITLE, text: countErrors.join(" ") });
+    }
 
     // Can't recover more than was ever owed within this 5-year window — this FY's fresh
     // grossArrears plus whatever carried forward as openingBalance. Mirrored server-side in

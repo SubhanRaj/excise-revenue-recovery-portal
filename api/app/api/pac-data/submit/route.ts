@@ -41,6 +41,15 @@ function validateRow(row: YearRow): string | null {
   // rc_amount and recovered_amount are independent by design — an RC issued for an amount
   // doesn't mean that amount was actually recovered, and dues can be recovered without a
   // matching RC in the same year (e.g. clearing a prior year's arrears). No parity requirement.
+
+  // A non-zero amount implies at least one matter/order actually happened — mirrored client-side
+  // in YearStepForm's inline field error (countAmountErrors()).
+  if (row.rcAmount > 0 && row.rcCount === 0) {
+    return `No. of RCs Issued cannot be 0 for ${row.financialYear} when RC Amount is entered`;
+  }
+  if (row.stayAmount > 0 && row.stayCount === 0) {
+    return `No. of Stay Orders cannot be 0 for ${row.financialYear} when Stayed Amount is entered`;
+  }
   return null;
 }
 
