@@ -648,6 +648,20 @@ The existing rule "`rcAmount > 0` requires `rcCount > 0`" is unaffected and stil
   `rc_details` column.
 - The admin districts table stays summary-only, unchanged, as planned.
 
+### Follow-up UI refinements (done)
+
+- RC Details entry table: RC Number/RC Amount columns switched to equal width (`table-fixed`,
+  see CLAUDE.md's UI conventions for why that's safe here specifically) instead of RC Number
+  eating all the leftover space under the default auto-layout.
+- The "Stayed?" checkbox column relabeled to a bilingual "Stayed by Court? / सक्षम न्यायालय
+  द्वारा स्थगित?" — mirrors the existing Stay Amount field's Hindi phrasing exactly, since it's
+  the same underlying concept (a competent court staying something) applied per-RC instead of
+  in aggregate.
+- `HelpPanel.tsx` gained an optional `childrenHi` prop: an English/हिंदी toggle appears above
+  the help content when passed, switching which language renders. Only the DEO entry page's
+  instance uses it (a full Hindi translation of its help text, including a new paragraph
+  explaining the RC Details section) — Admin pages' instances are unaffected, no toggle shown.
+
 ## Backlog / not started
 
 - [ ] Real domain + DNS, and (optional) collapse `/frontend` + `/api` onto one zone via a

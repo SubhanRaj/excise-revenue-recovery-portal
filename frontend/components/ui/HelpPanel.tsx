@@ -6,6 +6,11 @@ type Props = {
   pageKey: string;
   title: string;
   children: React.ReactNode;
+  // Optional Hindi translation of `children` — when provided, a small English/हिंदी toggle
+  // appears next to the title and switches which one renders. Omit to keep a page's help
+  // English-only (e.g. the Admin pages, which stay English-only chrome) — the toggle itself
+  // only shows up where a translation actually exists.
+  childrenHi?: React.ReactNode;
 };
 
 // A fixed round help button pinned bottom-right on every gated page (stays in place while
@@ -14,12 +19,13 @@ type Props = {
 // balloon for now (the button stays, reopenable any time); "Don't show this again"
 // additionally persists a per-page localStorage flag that clears the unread dot — it never
 // hides or disables the button itself, so help stays reachable.
-export default function HelpPanel({ pageKey, title, children }: Props) {
+export default function HelpPanel({ pageKey, title, children, childrenHi }: Props) {
   const storageKey = `help_done_${pageKey}`;
   const [open, setOpen] = useState(false);
   const [done, setDone] = useState(false);
   const [panelWidth, setPanelWidth] = useState(384);
   const [panelMaxHeight, setPanelMaxHeight] = useState(320);
+  const [lang, setLang] = useState<"en" | "hi">("en");
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -103,8 +109,36 @@ export default function HelpPanel({ pageKey, title, children }: Props) {
             </button>
           </div>
 
+          {childrenHi && (
+            <div className="flex shrink-0 rounded-md bg-slate-100 p-0.5 text-xs dark:bg-slate-800">
+              <button
+                type="button"
+                onClick={() => setLang("en")}
+                className={`flex-1 rounded px-2 py-1 font-medium transition-colors ${
+                  lang === "en"
+                    ? "bg-white text-blue-700 shadow-sm dark:bg-slate-950 dark:text-blue-400"
+                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                }`}
+              >
+                English
+              </button>
+              <button
+                type="button"
+                onClick={() => setLang("hi")}
+                lang="hi"
+                className={`flex-1 rounded px-2 py-1 font-medium transition-colors ${
+                  lang === "hi"
+                    ? "bg-white text-blue-700 shadow-sm dark:bg-slate-950 dark:text-blue-400"
+                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                }`}
+              >
+                हिंदी
+              </button>
+            </div>
+          )}
+
           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 text-sm text-slate-700 dark:text-slate-300">
-            {children}
+            {childrenHi && lang === "hi" ? <div lang="hi">{childrenHi}</div> : children}
           </div>
 
           {!done && (

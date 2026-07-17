@@ -163,14 +163,24 @@ export default function YearStepForm({
             </button>
             {rcDetailsOpen && (
               <div className="border-t border-slate-200 p-4 dark:border-slate-800">
+                {/* table-fixed (not the auto-layout CLAUDE.md otherwise requires for money
+                    tables) is fine here: every cell holds an input, not raw money text, so
+                    there's nothing for a crore-scale value to clip — the input just scrolls
+                    its own content if needed. RC Number/RC Amount get equal width instead of
+                    RC Number eating all the leftover space under auto-layout. */}
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-sm">
+                  <table className="w-full table-fixed border-collapse text-sm">
                     <thead>
                       <tr className="text-left text-xs font-medium text-slate-500 dark:text-slate-400">
                         <th className="w-8 py-1.5 pr-2">#</th>
-                        <th className="py-1.5 pr-2">RC Number</th>
-                        <th className="w-40 py-1.5 pr-2">RC Amount</th>
-                        <th className="w-24 py-1.5 text-center">Stayed?</th>
+                        <th className="w-[38%] py-1.5 pr-2">RC Number</th>
+                        <th className="w-[38%] py-1.5 pr-2">RC Amount</th>
+                        <th className="w-28 py-1.5 text-center leading-tight">
+                          <span className="block">Stayed by Court?</span>
+                          <span className="block text-[10px] font-normal normal-case text-slate-400 dark:text-slate-500" lang="hi">
+                            सक्षम न्यायालय द्वारा स्थगित?
+                          </span>
+                        </th>
                       </tr>
                     </thead>
                     <tbody>

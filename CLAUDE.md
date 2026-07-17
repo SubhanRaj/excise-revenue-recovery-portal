@@ -269,8 +269,12 @@ financial year appears: DEO nav pills, `YearStepForm` headings, Admin selectors/
 
 ## UI conventions
 
-- **Language**: UI chrome is English only. The only Hindi is the 6 PAC field labels and the
-  department name, because they mirror the actual government form. Don't add Hindi elsewhere.
+- **Language**: UI chrome is English only. The only Hindi is the 6 PAC field labels, the
+  department name, the RC Details section's "Stayed by Court?" column (mirrors the existing
+  Stay Amount field's Hindi phrasing, since it's the same concept applied per-RC), and the
+  DEO entry page's Help panel (see below) — because all of these mirror the actual government
+  form or exist specifically to help a DEO who reads Hindi more comfortably. Don't add Hindi
+  elsewhere without a similarly concrete reason.
 - **Feedback**: a field-specific error renders inline under the field (bold, bilingual, only
   after blur). A generic error not tied to one field uses `notifyToast()`. Page-level
   success/failure (sync, submit) uses `components/ui/Banner.tsx`. `window.Swal` (SweetAlert2) is
@@ -286,7 +290,12 @@ financial year appears: DEO nav pills, `YearStepForm` headings, Admin selectors/
   right-6`, one instance per gated page (not per sub-view). Opens upward-left on click only,
   sized against actual available space before paint. The balloon's `×` closes it for that
   session; "Don't show this again" persists a per-`pageKey` `localStorage` flag that only clears
-  the button's unread dot — never hide the button itself.
+  the button's unread dot — never hide the button itself. Optional `childrenHi` prop: when
+  passed, an English/हिंदी toggle appears above the content and switches which one renders
+  (local `useState`, not persisted — resets to English on next open). Only the DEO entry page's
+  instance passes it; Admin pages' instances don't, so they stay English-only chrome with no
+  toggle shown at all. Add a Hindi translation here only for a page where the audience
+  genuinely benefits (i.e. DEO-facing), not reflexively on every `HelpPanel` usage.
 - No emojis in the UI — use Tabler Icons (webfont). Never place a Tabler `<i>` icon inside/
   overlapping live input text (the glyph loads async and can flash a fallback box over the text).
 - **Size/padding utilities**: never pass two conflicting size utilities (e.g. a component's base
@@ -301,7 +310,11 @@ financial year appears: DEO nav pills, `YearStepForm` headings, Admin selectors/
 - **Tables holding money values must stay auto-layout** (never `table-fixed`) — a Gross Arrears
   value can be crore-scale (`₹10,00,00,000.00`); a fixed column can't grow to fit it. Pair with
   `whitespace-nowrap` on money cells and `overflow-x-auto` on the wrapper as the narrow-viewport
-  fallback.
+  fallback. **Exception**: `YearStepForm.tsx`'s RC Details entry table uses `table-fixed`
+  deliberately — every cell holds an `<input>`, not raw money text, so there's nothing for a
+  large value to clip (the input scrolls its own content instead); `table-fixed` there is what
+  makes the RC Number/RC Amount columns share width equally instead of RC Number eating all the
+  leftover space under auto-layout. Don't extend this exception to a read-only money table.
 - **Sticky/pinned table rows and columns need an opaque background** (`bg-white`, alternating
   stripe `bg-slate-50`, not `/50` alpha) on every `tbody tr` — a `sticky left-0` pinned cell using
   `bg-inherit` needs an opaque ancestor to resolve to, or scrolled content bleeds through it.

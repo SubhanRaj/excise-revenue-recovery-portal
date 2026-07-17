@@ -403,7 +403,40 @@ export default function EntryPage() {
   return (
     <div className="flex min-h-full flex-1 flex-col bg-slate-50 dark:bg-slate-950">
       <AppHeader title="DEO Data Entry" role="deo" profile={profile} />
-      <HelpPanel pageKey="deo-entry" title="Filling this form">
+      <HelpPanel
+        pageKey="deo-entry"
+        title="Filling this form"
+        childrenHi={
+          <>
+            <p>
+              प्रत्येक वर्ष के लिए सभी छह पीएसी/आरसी फ़ील्ड भरें। कोई भी फ़ील्ड खाली नहीं छोड़ी
+              जानी चाहिए — यदि वास्तव में कोई राशि नहीं है तो 0 दर्ज करें, ताकि खाली फ़ील्ड को कभी
+              भी शून्य न माना जाए।
+            </p>
+            <p>
+              <strong>वसूल की गयी धनराशि</strong> और <strong>आर.सी. राशि</strong> स्वतंत्र आंकड़े
+              हैं — प्रत्येक को अपनी वास्तविक संख्या के रूप में दर्ज करें, दोनों के बीच कोई
+              ऑटो-फिल नहीं है। वसूल की गयी धनराशि उस वर्ष की प्रारंभिक शेष धनराशि + सकल बकाया
+              धनराशि से अधिक नहीं हो सकती।
+            </p>
+            <p>
+              यदि <strong>आर.सी. की संख्या</strong> 0 से अधिक है, तो एक{" "}
+              <strong>आर.सी. विवरण</strong> अनुभाग दिखाई देगा — प्रत्येक आर.सी. की अपनी संख्या और
+              राशि दर्ज करें, और यह चिह्नित करें कि क्या वह किसी सक्षम न्यायालय द्वारा स्थगित है।
+              सभी आर.सी. राशियों का योग ऊपर दर्ज आर.सी. राशि के बराबर होना चाहिए।
+            </p>
+            <p>
+              <strong>प्रारंभिक शेष धनराशि</strong> पिछले वर्ष की शुद्ध वसूली योग्य धनराशि से आगे
+              बढ़ती है, और टाइप करते समय <strong>शुद्ध वसूली योग्य धनराशि</strong> तुरंत अपडेट
+              होती है — लॉक करने पर दोनों आपकी सबमिशन में सहेजी जाती हैं।
+            </p>
+            <p>
+              प्रत्येक वित्तीय वर्ष तभी अनलॉक होता है जब पिछला वर्ष सहेजा जा चुका हो।
+              मास्टर व्यू पर &quot;फाइनल सबमिट एंड लॉक&quot; एडमिन अनलॉक के बिना अपरिवर्तनीय है।
+            </p>
+          </>
+        }
+      >
         <p>
           Enter all six PAC/RC fields for each year. None may be left blank — type 0 if there
           is genuinely no amount, so a blank never gets silently treated as zero.
@@ -412,6 +445,12 @@ export default function EntryPage() {
           <strong>Recovered Amount</strong> and <strong>RC Amount</strong> are independent
           figures — enter each one as its own real number, no auto-fill between them. Recovered
           Amount cannot exceed Opening Balance + Gross Arrears for that year.
+        </p>
+        <p>
+          If <strong>RC Count</strong> is more than 0, an <strong>RC Details</strong> section
+          appears — enter each RC&apos;s own Number and Amount, and mark whether it has been
+          stayed by a competent court. Every RC Amount must add up to the RC Amount entered
+          above.
         </p>
         <p>
           <strong>Opening Balance</strong> carries forward from the previous year&apos;s Net
