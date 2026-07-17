@@ -16,8 +16,8 @@ there) and [CLAUDE.md](./CLAUDE.md) for how the system itself works.
 | D1 database        | `excise-revenue-recovery-db` (id `4f3e37fd-006a-4bce-b2d3-4bfb8bb16248`), region APAC |
 | Superadmin         | `shubhanraj2002@gmail.com` (role `admin`, signs in via Magic Link)   |
 
-Auth to Cloudflare: `npx wrangler whoami` (already logged in via OAuth on this machine).
-Re-auth elsewhere with `npx wrangler login`.
+Auth to Cloudflare: `pnpm exec wrangler whoami` (already logged in via OAuth on this machine).
+Re-auth elsewhere with `pnpm exec wrangler login`.
 
 ## CI/CD — GitHub Actions is the primary deploy path
 
@@ -45,22 +45,22 @@ competing deploy path before re-diagnosing the app (see TESTING.md).
 
 ```bash
 cd api
-npx wrangler d1 create excise-revenue-recovery-db
+pnpm exec wrangler d1 create excise-revenue-recovery-db
 # → paste the printed database_id into api/wrangler.jsonc's d1_databases[0].database_id
 
-npm run db:generate           # drizzle-kit generate, only needed after schema.ts changes
-npm run db:migrate:remote     # applies drizzle/[0-9]*.sql to remote D1
-npm run db:seed:remote        # inserts 75 districts + bootstrap admin (drizzle/seed.sql)
+pnpm run db:generate           # drizzle-kit generate, only needed after schema.ts changes
+pnpm run db:migrate:remote     # applies drizzle/[0-9]*.sql to remote D1
+pnpm run db:seed:remote        # inserts 75 districts + bootstrap admin (drizzle/seed.sql)
 
 cd ../frontend
-npx wrangler pages project create excise-revenue-recovery-portal --production-branch main
+pnpm exec wrangler pages project create excise-revenue-recovery-portal --production-branch main
 ```
 
 If you ever need to point the bootstrap admin at a different email, either edit
 `api/drizzle/seed.sql` before a fresh seed, or patch it live:
 
 ```bash
-npx wrangler d1 execute excise-revenue-recovery-db --remote \
+pnpm exec wrangler d1 execute excise-revenue-recovery-db --remote \
   --command "UPDATE users SET email = 'someone@example.com' WHERE role = 'admin';"
 ```
 
@@ -71,9 +71,9 @@ don't type it into a prompt that ends up in shell history):
 
 ```bash
 cd api
-openssl rand -base64 48 | npx wrangler secret put JWT_SECRET
-echo "re_xxxxxxxxxxxxxxxxxxxxxxxxxxxx" | npx wrangler secret put RESEND_API_KEY
-echo "https://excise-revenue-recovery-portal.pages.dev" | npx wrangler secret put FRONTEND_URL
+openssl rand -base64 48 | pnpm exec wrangler secret put JWT_SECRET
+echo "re_xxxxxxxxxxxxxxxxxxxxxxxxxxxx" | pnpm exec wrangler secret put RESEND_API_KEY
+echo "https://excise-revenue-recovery-portal.pages.dev" | pnpm exec wrangler secret put FRONTEND_URL
 ```
 
 - `JWT_SECRET` — signs both the admin and DEO session tokens (`api/lib/session.ts`), returned in
@@ -84,7 +84,7 @@ echo "https://excise-revenue-recovery-portal.pages.dev" | npx wrangler secret pu
   magic-link redirect target and as the sole allowed CORS origin in `api/middleware.ts` —
   get this wrong and every `/api/*` call from the frontend fails CORS, not just auth.
 
-List what's set (values are never shown) with `npx wrangler secret list`. There is no
+List what's set (values are never shown) with `pnpm exec wrangler secret list`. There is no
 `db:seed`-equivalent "put a secret for every DEO" step — DEO accounts (`cug_hash`, one row
 per district in `users`) are provisioned by hand via `wrangler d1 execute --remote`; see
 CLAUDE.md's "Known gaps" section.
@@ -96,7 +96,7 @@ file; it's gitignored.
 
 ```bash
 cd api
-npm run deploy    # = opennextjs-cloudflare build && opennextjs-cloudflare deploy
+pnpm run deploy    # = opennextjs-cloudflare build && opennextjs-cloudflare deploy
 ```
 
 **Do not rename `api/middleware.ts` to `proxy.ts`.** Next 16 renamed the middleware
@@ -110,16 +110,16 @@ warning) and is what's deployed. Re-check this constraint before upgrading
 If `api/db/schema.ts` changed:
 
 ```bash
-npm run db:generate
-npm run db:migrate:remote   # and db:migrate:local for your local D1 too
+pnpm run db:generate
+pnpm run db:migrate:remote   # and db:migrate:local for your local D1 too
 ```
 
 ## Redeploying the frontend (after code changes)
 
 ```bash
 cd frontend
-NEXT_PUBLIC_API_URL="https://excise-revenue-recovery-api.shubhanraj2002.workers.dev" npm run build
-npm run pages:deploy   # = wrangler pages deploy out --project-name ... --branch master
+NEXT_PUBLIC_API_URL="https://excise-revenue-recovery-api.shubhanraj2002.workers.dev" pnpm run build
+pnpm run pages:deploy   # = wrangler pages deploy out --project-name ... --branch master
 ```
 
 A `--branch` matching the Pages project's production branch is required for a *Production*
@@ -128,10 +128,10 @@ else lands as a *Preview* on a random per-deploy subdomain (harmless to try, but
 users will see). The project was created with `--production-branch main`, but this repo's actual branch is
 `master`, and in practice `--branch master` is what reliably produces a `Production`
 deployment — confirm with
-`npx wrangler pages deployment list --project-name excise-revenue-recovery-portal` after
+`pnpm exec wrangler pages deployment list --project-name excise-revenue-recovery-portal` after
 any deploy rather than trusting the `--branch` value blindly. This is now a direct-upload
 project with no Git integration (see the CI/CD section above for why that matters) — all
-deploys are either the GitHub Actions workflows or a manual `wrangler`/`npm run` command.
+deploys are either the GitHub Actions workflows or a manual `wrangler`/`pnpm run` command.
 
 `NEXT_PUBLIC_API_URL` is baked in at build time (`frontend/lib/config.ts`) since this is a
 static export with no server to read env vars at request time. Changing it means rebuilding
@@ -154,9 +154,9 @@ curl -s -i "$FRONT/login" | head -1                            # expect HTTP/2 2
 
 A `503` with title "Node.JS Compatibility Error" on `$FRONT` means you're looking at a
 stale/broken Pages deployment, not a real code issue — see TESTING.md's Incidents section.
-Redeploy (`npm run pages:deploy` in `frontend/`) and recheck before assuming it's a defect.
+Redeploy (`pnpm run pages:deploy` in `frontend/`) and recheck before assuming it's a defect.
 
-Then in a real browser (or run `npm run e2e` in `frontend/` — see TESTING.md): sign in at
+Then in a real browser (or run `pnpm run e2e` in `frontend/` — see TESTING.md): sign in at
 `$FRONT/login` with the superadmin email, confirm the Magic Link email arrives, click
 through, and confirm `/admin` loads the 75 districts.
 
@@ -185,5 +185,5 @@ through, and confirm `/admin` loads the 75 districts.
   deployments simultaneously tagged `Production` in Cloudflare's history, and different
   edges have been observed serving different (including stale) ones inconsistently until a
   clean redeploy settles it. Always confirm with
-  `npx wrangler pages deployment list --project-name excise-revenue-recovery-portal` and a
+  `pnpm exec wrangler pages deployment list --project-name excise-revenue-recovery-portal` and a
   `curl -i` status-code check after deploying, not just "the command exited 0."

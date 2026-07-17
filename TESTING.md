@@ -10,9 +10,9 @@ between Pages and the Worker) only reproduces against the real deployed origins,
 
 ```bash
 cd frontend
-npm run e2e                    # headless, against production
-HEADED=1 npm run e2e           # watch it run in a real window (needs a display)
-E2E_BASE_URL=http://localhost:3000 E2E_API_URL=http://localhost:8787 npm run e2e   # local
+pnpm run e2e                    # headless, against production
+HEADED=1 pnpm run e2e           # watch it run in a real window (needs a display)
+E2E_BASE_URL=http://localhost:3000 E2E_API_URL=http://localhost:8787 pnpm run e2e   # local
 ```
 
 Config: `frontend/playwright.config.ts`. Runs headless by default because this repo is
@@ -57,7 +57,7 @@ suite from a checkout where `frontend/` and `api/` aren't siblings in the same r
 Only add a Playwright test for something that broke in production and needs a regression
 guard, or a flow genuinely risky enough to warrant automated verification (auth, money
 calculations, the lock/unlock flow). Don't write a full e2e suite for every page — that's
-what `npx tsc --noEmit` and manual review are for on routine UI changes.
+what `pnpm exec tsc --noEmit` and manual review are for on routine UI changes.
 
 ## Manual demo script (DEO + Admin, using the superadmin account)
 
@@ -161,7 +161,7 @@ Then:
 Reset for another pass:
 
 ```bash
-npx wrangler d1 execute excise-revenue-recovery-db --remote --command \
+pnpm exec wrangler d1 execute excise-revenue-recovery-db --remote --command \
   "UPDATE districts SET lock_status = 0 WHERE district_name = 'Lucknow'; \
    DELETE FROM pac_data WHERE district_id = (SELECT id FROM districts WHERE district_name = 'Lucknow');"
 ```
@@ -232,7 +232,7 @@ similar-sounding "thick button" complaint and concluded the flex layout was fine
 second report needed an actual empirical re-check, not another guess.**
 
 Built a temporary route (`frontend/app/debugbuttons/page.tsx`, mounting the real `Button.tsx`)
-and rendered it with `npm run dev` + Playwright — a real render of the actual app, not a
+and rendered it with `pnpm run dev` + Playwright — a real render of the actual app, not a
 synthetic classes-only snippet like the earlier "thick button" check used. Screenshotted with
 and without the fix (`git stash` on just `globals.css`) to compare directly. Root cause:
 `frontend/app/globals.css`'s `input, select, button { font: inherit }` (deliberately unlayered,

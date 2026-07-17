@@ -10,8 +10,9 @@ const API_DIR = path.resolve(__dirname, "../../api");
 // needing a real inbox in CI. Read-only (SELECT), run via the api/ project's wrangler config.
 function latestUnusedToken(): string {
   const out = execFileSync(
-    "npx",
+    "pnpm",
     [
+      "exec",
       "wrangler",
       "d1",
       "execute",

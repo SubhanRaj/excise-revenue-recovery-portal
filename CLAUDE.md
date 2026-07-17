@@ -19,6 +19,15 @@ PAC field order/labels) are duplicated by design: `frontend/lib/pac-fields.ts` m
 `api/db/schema.ts`. When you change field names, units, or validation rules, change both and
 keep them in sync by hand.
 
+**Package manager is pnpm, not npm** (`pnpm-lock.yaml` in each app, no `package-lock.json`) —
+matches every sibling project in this workspace. `pnpm install`/`pnpm run <script>`/`pnpm exec
+<bin>`, and CI (`ci.yml`/`deploy.yml`) uses `pnpm/action-setup@v4` + `pnpm install
+--frozen-lockfile`. Each app's `pnpm-workspace.yaml` sets `allowBuilds` for the native
+postinstall scripts pnpm blocks by default (`esbuild`, `sharp`, `unrs-resolver`, `workerd` —
+all needed by `wrangler`/`opennextjs-cloudflare`/Next itself); if `pnpm install` ever reports
+`ERR_PNPM_IGNORED_BUILDS` again after adding a new dependency, add its name to that file's
+list rather than running `pnpm approve-builds` interactively (that doesn't persist for CI).
+
 The two apps talk only over cross-origin HTTP; session auth is a Bearer token, not a cookie —
 see Auth below for why.
 

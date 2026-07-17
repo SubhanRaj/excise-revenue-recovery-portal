@@ -577,7 +577,7 @@ type RcDetail = {
 
 Stored as a JSON string in one column (per the department's ask) rather than a child table —
 consistent with `audit_log.metadata`'s existing JSON-string-column precedent in this schema.
-Applied to local D1; **not yet applied to remote/production D1** (`npm run db:migrate:remote`) —
+Applied to local D1; **not yet applied to remote/production D1** (`pnpm run db:migrate:remote`) —
 that's a deliberate hold pending a final go-ahead, since the API worker cannot deploy ahead of
 this migration without breaking every live DEO submission (`pac_data` insert would reference a
 column remote D1 doesn't have yet).
@@ -689,6 +689,31 @@ response instead of this app's own `{ error: "..." }` JSON shape.
   instead of one route doing it its own way.
 - Transactions were already correct going into this (see Milestone 22's audit note) — `db.batch()`
   is used everywhere a multi-write genuinely needs atomicity; nothing changed there.
+
+## Milestone 24 — Switched to pnpm (done)
+
+Every other project in this workspace (`excise-bakaya-record`, `up-excise-spatial-revenue-
+optimizer`) already uses pnpm; this repo was the odd one out on npm. No functional change —
+tooling only.
+
+- `api/package-lock.json` and `frontend/package-lock.json` replaced with `pnpm-lock.yaml`
+  (`pnpm import` from the existing npm lockfile, so resolved versions carried over exactly,
+  then a clean `rm -rf node_modules && pnpm install` in each app).
+- Each app gained a `pnpm-workspace.yaml` with `allowBuilds: { esbuild, sharp, unrs-resolver,
+  workerd }` — pnpm blocks native postinstall scripts by default
+  (`ERR_PNPM_IGNORED_BUILDS`), and these four are needed by `wrangler`/`opennextjs-cloudflare`/
+  Next itself. See CLAUDE.md's Repo shape section for what to do if a new dependency needs this
+  too.
+- `.github/workflows/ci.yml` and `deploy.yml`: `actions/setup-node@v4`'s npm cache replaced
+  with `pnpm/action-setup@v4` + `cache: pnpm`; every `npm ci` → `pnpm install
+  --frozen-lockfile`; every `npm run <script>` → `pnpm run <script>`.
+- `frontend/e2e/login.spec.ts`'s `execFileSync("npx", ["wrangler", ...])` → `execFileSync("pnpm",
+  ["exec", "wrangler", ...])`, and every `npx wrangler`/`npx tsc` command across README.md,
+  DEPLOY.md, and TESTING.md updated to `pnpm exec`.
+- Verified before pushing: both apps typecheck and build clean under pnpm (`pnpm exec tsc
+  --noEmit`, `pnpm run build`, plus `opennextjs-cloudflare build` for the API), confirming
+  pnpm's stricter (non-flat, symlinked) `node_modules` didn't surface a phantom-dependency bug
+  that npm's flat hoisting had been silently papering over.
 
 ## Backlog / not started
 

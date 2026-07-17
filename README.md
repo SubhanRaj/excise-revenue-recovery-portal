@@ -209,17 +209,17 @@ flowchart TD
 ```bash
 # Frontend
 cd frontend
-npm install
-npm run dev          # http://localhost:3000
+pnpm install
+pnpm run dev          # http://localhost:3000
 
 # API
 cd api
-npm install
+pnpm install
 cp .dev.vars.example .dev.vars   # fill in JWT_SECRET, RESEND_API_KEY, FRONTEND_URL
-npm run db:generate               # regenerate drizzle/*.sql after schema.ts changes
-npm run db:migrate:local          # apply migrations to the local D1 (miniflare) instance
-npm run db:seed:local             # seed the 75 UP districts + bootstrap admin
-npm run dev                       # http://localhost:8787 (default Next dev port; adjust as needed)
+pnpm run db:generate               # regenerate drizzle/*.sql after schema.ts changes
+pnpm run db:migrate:local          # apply migrations to the local D1 (miniflare) instance
+pnpm run db:seed:local             # seed the 75 UP districts + bootstrap admin
+pnpm run dev                       # http://localhost:8787 (default Next dev port; adjust as needed)
 ```
 
 ## Deploying
