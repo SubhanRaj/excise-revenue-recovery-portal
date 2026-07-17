@@ -50,9 +50,10 @@ since they need to hook into React render/event cycles rather than run as passiv
   Plus two computed columns, `opening_balance` and `net_recoverable` (see "Net Recoverable"
   below), and `submitted_by_name`/`locked_at`, duplicated from `users` onto the row itself so
   Admin views can show "locked by X on Y" without a join. `financial_year` is one of
-  `"2021-22" .. "2025-26"` (`FINANCIAL_YEARS`).
+  `"2021-22" .. "2025-26"` (`FINANCIAL_YEARS`). Standard `id` primary key and a `created_at`
+  (row-insert timestamp, not shown in any UI — distinct from `locked_at`) round out the table.
 - **`audit_log`** — one row per login/logout, district lock/unlock, or DEO-provisioning batch:
-  `event_type`, `actor_role`, `actor_email`, `district_name`, `metadata` (JSON string),
+  `id`, `event_type`, `actor_role`, `actor_email`, `district_name`, `metadata` (JSON string),
   `created_at`. Pruned to the last 30 days on read.
 
 ### Migrations (`api/drizzle/`)
@@ -127,6 +128,73 @@ Admin downloads an `.xlsx` template pre-filled with all 75 district names, fills
 district's CUG mobile number and email, and re-uploads it — the one flow where a raw CUG number
 does cross the network (from the Admin's browser), since there's no DEO browser involved to hash
 it first. The server hashes it before storing.
+
+## System flow
+
+Auth (both routes), the DEO's five-year entry-to-lock journey, and the Admin surface, down to
+the exact API route and D1 table each step touches. Snapshot as of this build — regenerate by
+hand if the flow changes materially (e.g. the planned per-RC detail breakdown in ROADMAP.md).
+
+```mermaid
+flowchart TD
+    Start(["Visit portal"]) --> Login["/login"]
+
+    Login -->|"CUG Mobile tab"| CugHash["Hash 10-digit CUG number<br/>(Web Crypto, client-side —<br/>raw number never sent)"]
+    CugHash --> VerifyCug["POST /api/auth/verify-cug"]
+
+    Login -->|"Email tab"| ReqLink["POST /api/auth/request-magic-link"]
+    ReqLink --> EmailSent["Resend sends styled<br/>magic-link email"]
+    EmailSent --> VerifyPage["/verify?token=...<br/>(explicit 'Verify &amp; Continue' click)"]
+    VerifyPage --> VerifyMagic["POST /api/auth/verify-magic-link"]
+
+    VerifyCug --> Token["{ role, districtId, token }<br/>Bearer JWT — stored per-role<br/>in localStorage, not a cookie"]
+    VerifyMagic --> Token
+
+    Token --> RoleCheck{"role"}
+    RoleCheck -->|"deo"| DeoMe["GET /api/auth/me?role=deo<br/>Authorization: Bearer …"]
+    RoleCheck -->|"admin"| AdminMe["GET /api/auth/me?role=admin"]
+
+    subgraph DEO["DEO — /deo-data-entry"]
+        direction TD
+        DeoMe --> LockCheck{"lockStatus"}
+        LockCheck -->|"locked"| LockedScreen["Data Already Locked<br/>(read-only, Logout only)"]
+        LockCheck -->|"unlocked, previously submitted"| FetchMine["GET /api/pac-data/mine"]
+        FetchMine --> MasterViewPre["Master View<br/>(prefilled from D1)"]
+        LockCheck -->|"unlocked, never submitted"| DraftResume["Resume local draft<br/>(Dexie draftYears)"]
+        DraftResume --> YearSteps["FY 2021-22 → FY 2025-26<br/>YearStepForm · Save &amp; Continue<br/>(Anti-Blank, count/amount, cap checks)"]
+        YearSteps --> MasterView["Master View<br/>review all 5 years"]
+        MasterViewPre --> MasterView
+        MasterView --> Confirm1["confirmFinalSubmit()"]
+        Confirm1 --> Confirm2["promptDeoNameAndLock()"]
+        Confirm2 --> SubmitApi["POST /api/pac-data/submit"]
+        SubmitApi --> LockedNow["Atomic: delete + insert 5 years,<br/>compute Opening Balance /<br/>Net Recoverable, lock_status = 1,<br/>discard local token"]
+        LockedNow --> BackToLogin(["Redirect to /login"])
+    end
+
+    subgraph ADMIN["Admin"]
+        direction TD
+        AdminMe --> Dashboard["/admin — Dashboard<br/>KPI cards + charts<br/>(summed across all 5 FYs)"]
+        Dashboard --> Districts["/admin/districts<br/>sortable table · FY filter ·<br/>lock-status filter"]
+        Districts --> Detail["/admin/districts/detail<br/>field × year table, one district"]
+        Districts --> UnlockAction["Unlock (reason required)<br/>POST /api/admin/unlock"]
+        Districts --> Provision["Download Template /<br/>Upload DEO Data<br/>POST /api/admin/provision-deos"]
+        Districts --> ExportAction["Export Excel Workbook /<br/>Export SQL backup"]
+        Dashboard --> AuditPage["/admin/audit<br/>login / lock / unlock history"]
+    end
+
+    LockedNow -. "district_locked" .-> AuditLog[("audit_log")]
+    UnlockAction -. "district_unlocked" .-> AuditLog
+    VerifyCug -. "login_cug" .-> AuditLog
+    VerifyMagic -. "login_magic_link" .-> AuditLog
+
+    SubmitApi -. writes .-> PacData[("pac_data")]
+    Detail -. reads .-> PacData
+    Districts -. reads .-> PacData
+    ExportAction -. reads .-> PacData
+    Provision -. writes .-> Users[("users")]
+    UnlockAction -. writes .-> DistrictsTbl[("districts")]
+    Districts -. reads .-> DistrictsTbl
+```
 
 ## Getting started
 
