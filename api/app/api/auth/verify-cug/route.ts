@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { users, districts } from "@/db/schema";
-import { signSession, sessionCookie } from "@/lib/session";
+import { signSession } from "@/lib/session";
 import { auditLogInsert } from "@/lib/audit";
 
 // Frontend hashes the 10-digit CUG mobile number via Web Crypto SHA-256 before sending it here.
@@ -43,7 +43,5 @@ export async function POST(req: NextRequest) {
     districtName: row.districtName,
   });
 
-  const res = NextResponse.json({ ok: true, role: row.role, districtId: row.districtId });
-  res.headers.set("Set-Cookie", sessionCookie(token, row.role as "deo" | "admin"));
-  return res;
+  return NextResponse.json({ ok: true, role: row.role, districtId: row.districtId, token });
 }

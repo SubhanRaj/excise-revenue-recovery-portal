@@ -69,19 +69,22 @@ test.describe("magic-link verify (live D1 round-trip)", () => {
 
     // The actual bug report: silently landing back on /login is a failure, not a pass-through.
     await page.waitForURL(/\/(admin|login)/, { timeout: 10_000 });
-    const cookies = await page.context().cookies();
-    const sessionCookie = cookies.find((c) => c.name === "__admin_session");
+    // Session auth is a Bearer token in localStorage (see frontend/lib/session.ts), not a
+    // cookie — this test used to check for a `__admin_session` cookie, which is exactly the
+    // mechanism that got dropped after cross-site cookie blocking (Safari ITP, and eventually
+    // Chrome too) broke real logins in production.
+    const storedSession = await page.evaluate(() => localStorage.getItem("excise-portal:session:admin"));
 
     if (page.url().includes("/login")) {
       const bannerText = await page.locator("body").innerText();
       throw new Error(
-        `Verify bounced back to /login instead of /admin. __admin_session cookie present: ${Boolean(
-          sessionCookie
+        `Verify bounced back to /login instead of /admin. Stored admin session present: ${Boolean(
+          storedSession
         )}. Page text: ${bannerText.slice(0, 500)}`
       );
     }
 
     expect(page.url()).toContain("/admin");
-    expect(sessionCookie, "__admin_session cookie should be set after a successful verify").toBeTruthy();
+    expect(storedSession, "admin session token should be stored after a successful verify").toBeTruthy();
   });
 });

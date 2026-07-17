@@ -38,9 +38,12 @@ often driven from a sandboxed/non-interactive environment with no window server 
    `/api/auth/request-magic-link` for the real superadmin, reads the freshly issued token
    straight out of production D1 (`wrangler d1 execute --remote`, read-only `SELECT`), then
    drives the browser through `/verify?token=...` → click "Verify & Continue" → asserts
-   the browser actually lands on `/admin` (not bounced back to `/login`) and that the
-   `__admin_session` cookie is present. This test exists because that exact bounce-with-no-error
-   was reported as a live bug — see "Incidents" below for what it actually was.
+   the browser actually lands on `/admin` (not bounced back to `/login`) and that a session
+   token is stored in `localStorage` (`excise-portal:session:admin` — session auth is a Bearer
+   token, not a cookie, see CLAUDE.md's Auth section for why). This test exists because that
+   exact bounce-with-no-error was reported as a live bug — see "Incidents" below for what it
+   actually was, and for the later incident that changed this from a cookie check to a
+   localStorage check.
 
 ### Why this needs `api/` sibling access
 
@@ -230,3 +233,33 @@ the same rule, every dropdown's text is now tightened the same way for free. Del
 route afterward. See CLAUDE.md's `Button.tsx` section for the full writeup — if this is ever
 reported a third time, check `globals.css`'s line-height before touching flex/alignment classes
 again.
+
+**2026-07-17 — a DEO login during a live demo entered a valid CUG number and the app just
+reloaded back to `/login`, in plain Chrome (not Safari, where this class of failure was already
+a documented "open risk").**
+
+The CUG POST (`/api/auth/verify-cug`) succeeded server-side every time — confirmed by re-running
+the exact request with `curl`. The failure was entirely client-side: the session cookie
+(`__deo_session`, `SameSite=None; Secure`) is a third-party cookie between `*.pages.dev` and
+`*.workers.dev`, and Chrome silently drops those under conditions more common than expected
+(Incognito mode blocks third-party cookies by default; some managed/locked-down profiles do
+too) — not just Safari ITP as previously documented. The cookie never got set, so the very next
+page load's `GET /api/auth/me?role=deo` came back 401 and the app correctly (if confusingly)
+bounced back to `/login` — no error banner shown because from the frontend's perspective this
+looked identical to "never logged in."
+
+Fix: migrated session auth off cookies entirely, onto a Bearer token — the verify endpoints now
+return the JWT in the response body, `frontend/lib/session.ts` stores it in `localStorage` keyed
+per role, and `frontend/lib/api.ts`'s `apiFetch` attaches it as `Authorization: Bearer <token>`
+on every call. A Bearer token is not a cookie, so no browser's cross-site-cookie policy — present
+or future, Safari or Chrome or anything else — can block it. `api/middleware.ts`'s CORS
+simplified to `Access-Control-Allow-Origin: *` as a consequence (no credentialed request means
+no wildcard-with-credentials restriction to work around). Full writeup, and the accepted
+XSS-exposure trade-off, in CLAUDE.md's Auth section ("Why not cookies"). `login.spec.ts`'s
+magic-link round-trip test updated to assert a stored `localStorage` token instead of the old
+`__admin_session` cookie.
+
+**Lesson for next time a cross-origin auth bug is dismissed as "Safari-only":** it wasn't. Two
+different origins plus a session cookie is a third-party-cookie problem in general, and browser
+privacy defaults in this space only get stricter over time — treat any `SameSite=None` cookie
+between two separate public-suffix domains as inherently fragile, not just risky in one browser.

@@ -92,8 +92,8 @@ export default function AppHeader({ title, role, profile, navLinks, onSync, sync
 
   async function logout() {
     if (!(await confirmLogout())) return;
-    await apiFetch(`/api/auth/logout?role=${role}`, { method: "POST" }).catch(() => {});
-    clearClientSession();
+    await apiFetch(`/api/auth/logout?role=${role}`, { method: "POST" }, role).catch(() => {});
+    clearClientSession(role);
     notifyToast({ icon: "info", title: "Logged out" });
     router.replace("/login");
   }

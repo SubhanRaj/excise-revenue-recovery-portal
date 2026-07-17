@@ -19,7 +19,8 @@ PAC field order/labels) are duplicated by design: `frontend/lib/pac-fields.ts` m
 `api/db/schema.ts`. When you change field names, units, or validation rules, change both and
 keep them in sync by hand.
 
-The two apps talk only over cross-origin HTTP with credentials (cookies). See Auth below.
+The two apps talk only over cross-origin HTTP; session auth is a Bearer token, not a cookie —
+see Auth below for why.
 
 ## Data model
 
@@ -76,14 +77,24 @@ enter only dues/recoveries that arose within that specific financial year — ne
 before 1 April 2021 or after 31 March 2026, and never a recovery of a pre-2021-22 due. Nothing in
 the schema enforces this; it is a data-entry instruction, not a validation rule.
 
-## Auth (`api/lib/session.ts`, `api/lib/auth-guard.ts`, `api/middleware.ts`)
+## Auth (`api/lib/session.ts`, `api/lib/auth-guard.ts`, `api/middleware.ts`, `frontend/lib/session.ts`)
 
-See [README.md](./README.md)'s App flow → Auth for the CUG/magic-link flow overview. Rules an
-agent must preserve:
+See [README.md](./README.md)'s App flow → Auth for the CUG/magic-link flow overview. Session
+auth is a **Bearer token, not a cookie** — this was a deliberate migration away from cookies
+(see "Why not cookies" below); don't reintroduce `Set-Cookie`/`req.cookies` for session auth
+without re-reading that section first. Rules an agent must preserve:
 
-- **Two separate cookies**, `__admin_session` and `__deo_session` — never merge back into one.
-  Every route that needs a session calls `requireSession(req, "admin" | "deo")`; the frontend
-  passes `?role=admin`/`?role=deo` on `GET /api/auth/me` and `POST /api/auth/logout`.
+- **Two separate token slots**, keyed by role in `frontend/lib/session.ts`'s `localStorage`
+  (`excise-portal:session:admin` / `excise-portal:session:deo`) — never merge back into one.
+  `POST /api/auth/verify-cug` and `POST /api/auth/verify-magic-link` return `{ role,
+  districtId, token }` in the JSON body (not a `Set-Cookie` header); the frontend stores it via
+  `saveClientSession()` and attaches it on every subsequent call via `apiFetch(path, init,
+  role)`'s third argument, which reads `getToken(role)` and sets `Authorization: Bearer
+  <token>`. Every API route that needs a session calls `requireSession(req, "admin" | "deo")`
+  (`api/lib/auth-guard.ts`), which reads that header — **never add `req.cookies` back into
+  `requireSession`**. The frontend still passes `?role=admin`/`?role=deo` on `GET
+  /api/auth/me` and `POST /api/auth/logout` (the query param picks which role's session to
+  check/log; the header carries which role's token actually gets sent).
 - Real CUG numbers start with `94544`; `app/login/page.tsx` gates on this prefix before
   hashing/sending, and the error is the same generic "Invalid user" a real auth failure shows —
   never name the prefix rule in the message. The one demo account is matched against a
@@ -92,27 +103,61 @@ agent must preserve:
 - `frontend/app/verify/page.tsx` requires an explicit button click (POST, not GET) so email
   prefetchers can't burn the magic-link token.
 - `GET /api/auth/me?role=admin|deo` is the source of truth for `{role, districtId}` on every
-  gated page load — call it directly, never gate a page on the cached `localStorage` role hint
-  in `frontend/lib/session.ts` (that hint is shared across the whole browser and goes stale the
-  instant the other role logs in on any tab). Use the hint only for `/`'s first-paint redirect
-  guess. `GET /api/auth/me?role=deo` also returns `lockStatus`/`lockedAt`/`submittedByName`,
-  re-asked on every load (never cached) since an Admin unlock can happen at any time.
-- Submitting a DEO's final payload atomically locks the district and destroys that DEO's session
-  cookie (`destroySessionCookie("deo")`) — an Admin session in the same browser is untouched.
-  This destroys only the cookie, not the CUG login itself; the DEO can log back in later (see
-  Frontend offline flow below for what they see).
+  gated page load — call it directly (with that role's token attached), never gate a page on
+  the `excise-portal:last-role` hint in `frontend/lib/session.ts` (that hint is shared across
+  the whole browser and only exists for `/`'s first-paint redirect guess — it goes stale the
+  instant the other role logs in on any tab, and carries no token of its own). A 401 here means
+  "not logged in as this role," full stop — an expired token and a missing one look identical to
+  the frontend, which is correct: there's no server-side revocation list to consult either way
+  (see below). `GET /api/auth/me?role=deo` also returns `lockStatus`/`lockedAt`/
+  `submittedByName`, re-asked on every load (never cached) since an Admin unlock can happen at
+  any time.
+- Session tokens are **stateless JWTs with no server-side revocation** — logout and "lock kills
+  the session" are both purely client-side now (there is no `denylist`/`revoked_tokens` table,
+  and adding one would be a real feature, not a bug fix — don't add it speculatively). `POST
+  /api/auth/logout?role=` only records an audit-log event; the frontend discards its own stored
+  token immediately after that call (`AppHeader.logout()`, `deo-data-entry/page.tsx`'s
+  `logoutLocked()`). Submitting a DEO's final payload atomically locks the district in D1; the
+  frontend then calls `clearClientSession("deo")` right after a successful submit (an Admin
+  session in the same browser is untouched, since it's a different token slot) — the DEO can
+  still technically use that same token until it expires (7 days) if they somehow kept a copy
+  outside the app, same residual-validity trade-off any stateless-JWT design accepts.
 
-Because `/frontend` (Pages) and `/api` (Worker) are separate origins in production, cookies are
-`SameSite=None; Secure`, and `api/middleware.ts` adds matching CORS headers
-(`Access-Control-Allow-Origin` echoed only when it equals `FRONTEND_URL`, `Allow-Credentials:
-true`, never a wildcard with credentials). If both apps are ever put behind one zone, this
-cross-origin setup becomes unnecessary.
+### Why not cookies
 
-**Open risk**: `SameSite=None` cross-site cookies between two different public-suffix domains
-(`pages.dev`, `workers.dev`) are exactly what Safari ITP and Chrome's third-party-cookie
-deprecation target. If auth silently fails on Safari specifically (verify "succeeds" but every
-`/api/auth/me` 401s), this is the first thing to check; the real fix is collapsing both apps onto
-one zone, not a cookie-flag workaround.
+The original design used two `HttpOnly; Secure; SameSite=None` cookies (`__admin_session`,
+`__deo_session`), which is the standard secure pattern for a session — but only when the
+browser cooperates. `/frontend` (Pages, `*.pages.dev`) and `/api` (Worker, `*.workers.dev`) are
+different public-suffix domains in production, so that cookie is a **third-party cookie** by
+definition, and this repeatedly broke real logins: Safari ITP blocks it outright, and it
+started intermittently failing in plain **Chrome** too (Incognito blocks third-party cookies by
+default; a locked-down/managed profile can too) — reproduced live during a demo as "enter CUG,
+page just reloads back to the login screen" (the CUG POST succeeds, the cookie silently never
+sticks, the next page's `/api/auth/me` 401s, and the app bounces back). No CORS header fixes
+this — it's enforced entirely by the browser's own cookie policy before any response header is
+even read.
+
+A Bearer token isn't a cookie, so no browser's cross-site-cookie policy applies to it at all —
+that's the actual fix, not a workaround. `api/middleware.ts` now sends
+`Access-Control-Allow-Origin: *` (no `Access-Control-Allow-Credentials`, since there's no cookie
+credential to protect) — this is safe specifically *because* there's no ambient credential a
+malicious page could piggyback on; a wildcard origin can't make the browser attach a token that
+was never automatically sent in the first place. Trade-off accepted deliberately: a token in
+`localStorage` is readable by same-origin JS, so an XSS bug in the frontend could steal it
+(unlike an `HttpOnly` cookie). Assessed as acceptable for this app because there is currently no
+path where DEO-entered or admin-entered data is rendered as raw HTML anywhere (checked: the only
+`dangerouslySetInnerHTML` in the frontend is a static, hardcoded dark-mode bootstrap script in
+`app/layout.tsx`, not user data) — if that ever changes (someone adds a `dangerouslySetInnerHTML`
+on user-controlled input), re-assess this trade-off before shipping it.
+
+**If this app ever gets a custom domain — and it doesn't strictly need a separate server for
+that, just a Cloudflare Worker Route or Pages Function on the same zone fronting both
+`/frontend` and `/api` under one registrable domain — switch back to `HttpOnly` cookies
+(`SameSite=Lax` or `Strict` becomes possible once same-site) instead of a Bearer token.**
+Cookies are the more secure option (immune to XSS token theft) whenever same-site is actually
+achievable; the Bearer-token design here is a deliberate concession to the two-separate-origins
+constraint, not a general recommendation. See DEPLOY.md's "Known deployment constraints" and
+ROADMAP.md's Backlog for the standing reminder to revisit this if a domain shows up.
 
 ## Portal identity strings (`frontend/lib/site.ts`)
 
@@ -380,7 +425,8 @@ rules:
 - The seeded demo DEO account is a manual `wrangler d1 execute --remote` insert; it does not
   exist in remote D1 just because it's documented. If demo login fails with "Invalid user," check
   the `users` table remotely before assuming a regression.
-- No real domain/DNS yet; collapsing `/frontend` + `/api` onto one zone (dropping the
-  cross-origin cookie/CORS setup) is deferred until one exists.
+- No real domain/DNS yet; collapsing `/frontend` + `/api` onto one zone (which would let auth
+  switch back from a Bearer token to more-secure `HttpOnly` cookies — see CLAUDE.md's Auth
+  section) is deferred until one exists.
 - `mail.upexciseonline.co` (or the chosen domain) is not yet verified in Resend; `FROM_EMAIL`
   stays on the shared sandbox sender until it is.

@@ -74,7 +74,9 @@ export default function AuditLogPage() {
     setLoading(true);
     try {
       const res = await apiFetch<{ rows: AuditRow[]; page: number; pageSize: number }>(
-        `/api/admin/audit-log?page=${p}`
+        `/api/admin/audit-log?page=${p}`,
+        undefined,
+        "admin"
       );
       setRows(res.rows);
       setPage(res.page);

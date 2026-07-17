@@ -3,7 +3,6 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { pacData, districts, users, FINANCIAL_YEARS, type FinancialYear } from "@/db/schema";
 import { requireSession } from "@/lib/auth-guard";
-import { destroySessionCookie } from "@/lib/session";
 import { auditLogInsert } from "@/lib/audit";
 import { computeNetRecoverableSeries } from "@/lib/net-recoverable";
 
@@ -157,8 +156,8 @@ export async function POST(req: NextRequest) {
     }),
   ] as unknown as Parameters<typeof db.batch>[0]);
 
-  const res = NextResponse.json({ ok: true });
-  // Data is locked — instantly destroy this DEO's session, no further access needed.
-  res.headers.set("Set-Cookie", destroySessionCookie("deo"));
-  return res;
+  // Data is locked. There's no server-side session to revoke (stateless bearer JWT) — the
+  // frontend discards its own stored token right after this call succeeds (deo-data-entry
+  // page's submitAll()).
+  return NextResponse.json({ ok: true });
 }

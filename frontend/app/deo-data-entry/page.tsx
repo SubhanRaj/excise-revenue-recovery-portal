@@ -78,17 +78,17 @@ export default function EntryPage() {
   useEffect(() => {
     (async () => {
       // Ask the server directly rather than pre-checking a local hint — see the matching
-      // comment in lib/useAdminData.ts. This session lives in its own cookie (independent of
-      // any admin session in the same browser), so this always reflects this page's own login.
+      // comment in lib/useAdminData.ts. This session lives in its own token slot (independent
+      // of any admin session in the same browser), so this always reflects this page's own login.
       let p: Profile;
       try {
-        p = await apiFetch<Profile>("/api/auth/me?role=deo");
+        p = await apiFetch<Profile>("/api/auth/me?role=deo", undefined, "deo");
         setProfile(p);
         if (consumeJustAuthed()) {
           notifyToast({ icon: "success", title: `Welcome, DEO ${p.districtName ?? ""}`.trim() });
         }
       } catch {
-        clearClientSession();
+        clearClientSession("deo");
         router.replace("/login");
         return;
       }
@@ -105,7 +105,7 @@ export default function EntryPage() {
       // submit time, so fetch it and let it win over any (stale/blank) local draft per year.
       const remoteByYear = new Map<string, DraftYear>();
       try {
-        const { years: remoteRows } = await apiFetch<{ years: RemoteYearRow[] }>("/api/pac-data/mine");
+        const { years: remoteRows } = await apiFetch<{ years: RemoteYearRow[] }>("/api/pac-data/mine", undefined, "deo");
         for (const row of remoteRows) {
           remoteByYear.set(row.financialYear, {
             financialYear: row.financialYear as (typeof FINANCIAL_YEARS)[number],
@@ -186,8 +186,8 @@ export default function EntryPage() {
   // this locked screen, logging out is the *only* thing left to do, so a blocking "are you sure"
   // would just be an extra click in front of a choice with no other option.
   async function logoutLocked() {
-    await apiFetch(`/api/auth/logout?role=deo`, { method: "POST" }).catch(() => {});
-    clearClientSession();
+    await apiFetch(`/api/auth/logout?role=deo`, { method: "POST" }, "deo").catch(() => {});
+    clearClientSession("deo");
     notifyToast({ icon: "info", title: "Logged out" });
     router.replace("/login");
   }
@@ -230,23 +230,29 @@ export default function EntryPage() {
     setSubmitError(null);
     setSubmitting(true);
     try {
-      await apiFetch("/api/pac-data/submit", {
-        method: "POST",
-        body: JSON.stringify({
-          submittedByName,
-          years: years.map((y) => ({
-            financialYear: y.financialYear,
-            grossArrears: Number(y.grossArrears),
-            rcCount: Number(y.rcCount),
-            rcAmount: Number(y.rcAmount),
-            recoveredAmount: Number(y.recoveredAmount),
-            stayCount: Number(y.stayCount),
-            stayAmount: Number(y.stayAmount),
-          })),
-        }),
-      });
+      await apiFetch(
+        "/api/pac-data/submit",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            submittedByName,
+            years: years.map((y) => ({
+              financialYear: y.financialYear,
+              grossArrears: Number(y.grossArrears),
+              rcCount: Number(y.rcCount),
+              rcAmount: Number(y.rcAmount),
+              recoveredAmount: Number(y.recoveredAmount),
+              stayCount: Number(y.stayCount),
+              stayAmount: Number(y.stayAmount),
+            })),
+          }),
+        },
+        "deo"
+      );
       await db.draftYears.clear();
-      clearClientSession();
+      // Locked — no server-side session to revoke (stateless bearer token), so discard this
+      // DEO's token client-side right away instead.
+      clearClientSession("deo");
       setSubmitted(true);
       setTimeout(() => router.replace("/login"), 1800);
     } catch (err) {

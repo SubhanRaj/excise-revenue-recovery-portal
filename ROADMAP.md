@@ -504,9 +504,48 @@ CLAUDE.md's Repo shape section) — not an in-place repurposing of an existing f
       as of 31 March 2026. Gross Arrears/Recovered Amount totals are unchanged (still legitimately
       summed across years, since those are each year's own fresh figures).
 
+## Milestone 21 — Session auth: cookies → Bearer token (done)
+
+- [x] Real production incident: a DEO login during a live demo entered their CUG number and the
+      app just reloaded back to `/login` — reproduced as the two-cookie session
+      (`__admin_session`/`__deo_session`, `SameSite=None; Secure`) silently getting blocked as a
+      third-party cookie. Previously documented as an "open risk" specific to Safari ITP; this
+      confirmed it also hits plain Chrome (Incognito, or any profile with third-party cookies
+      off) — not a Safari-only edge case.
+- [x] Switched session auth from cookies to a Bearer token: `POST /api/auth/verify-cug` and
+      `POST /api/auth/verify-magic-link` return the JWT in the JSON body instead of a
+      `Set-Cookie` header; `frontend/lib/session.ts` stores it in `localStorage`, keyed per role
+      (`excise-portal:session:admin` / `:deo`) so an Admin and a DEO session still coexist in one
+      browser the same way the two separate cookies used to; `frontend/lib/api.ts`'s
+      `apiFetch(path, init, role)` attaches it as `Authorization: Bearer <token>`.
+      `api/lib/auth-guard.ts`'s `requireSession()` now reads that header instead of
+      `req.cookies`. No cookie in play means no browser cross-site-cookie policy applies, on any
+      browser, in any privacy mode.
+- [x] `api/middleware.ts`'s CORS narrowed to a single-origin echo replaced with
+      `Access-Control-Allow-Origin: *` (no `Access-Control-Allow-Credentials`) — safe now
+      specifically because there's no ambient cookie credential a third-party page could
+      piggyback on.
+- [x] Logout and "lock kills the session" both moved from server-enforced (`Set-Cookie` with
+      `Max-Age=0`) to purely client-side (`clearClientSession(role)` right after the API call
+      succeeds) — a stateless JWT has no server-side revocation list to update either way.
+- [x] Accepted trade-off, assessed rather than assumed: a token in `localStorage` is readable by
+      same-origin JS (unlike an `HttpOnly` cookie), so an XSS bug could steal it. Checked the
+      actual attack surface before accepting this — the only `dangerouslySetInnerHTML` in the
+      frontend is a static, hardcoded dark-mode bootstrap script (`app/layout.tsx`), not
+      user-controlled data; no DEO/admin-entered value is ever rendered as raw HTML anywhere in
+      the app today.
+- [x] `frontend/e2e/login.spec.ts`'s magic-link round-trip test updated to assert a stored
+      `localStorage` session token instead of a `__admin_session` cookie.
+- [x] Documented in CLAUDE.md (new "Why not cookies" subsection under Auth), README.md's Auth
+      section, DEPLOY.md's known constraints, and TESTING.md's Incidents log.
+
 ## Backlog / not started
 
 - [ ] Real domain + DNS, and (optional) collapse `/frontend` + `/api` onto one zone via a
-      Worker route so the cross-origin cookie dance in CLAUDE.md's Auth section can be dropped
+      Worker Route or Pages Function — **at that point, switch auth back from a Bearer token to
+      `HttpOnly` cookies** (`SameSite=Lax`/`Strict` becomes possible once same-site), since
+      cookies are the more secure option whenever same-site is actually achievable. This does
+      not require standing up a separate server — a Worker Route/Pages Function on the same zone
+      as a purchased domain is enough to make both apps same-site.
 - [ ] Verify `mail.upexciseonline.co` (or chosen domain) in Resend and switch `FROM_EMAIL`
       off the shared sandbox sender

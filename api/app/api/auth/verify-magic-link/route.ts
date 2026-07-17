@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, eq, isNull } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { magicLinkTokens, users } from "@/db/schema";
-import { signSession, sessionCookie } from "@/lib/session";
+import { signSession } from "@/lib/session";
 import { auditLogInsert } from "@/lib/audit";
 
 // POST-only by design: the frontend /verify page requires a button click ("Verify & Continue"),
@@ -47,7 +47,5 @@ export async function POST(req: NextRequest) {
     actorEmail: user.email,
   });
 
-  const res = NextResponse.json({ ok: true, role: user.role, districtId: user.districtId });
-  res.headers.set("Set-Cookie", sessionCookie(sessionToken, user.role as "deo" | "admin"));
-  return res;
+  return NextResponse.json({ ok: true, role: user.role, districtId: user.districtId, token: sessionToken });
 }

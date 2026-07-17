@@ -76,8 +76,9 @@ echo "re_xxxxxxxxxxxxxxxxxxxxxxxxxxxx" | npx wrangler secret put RESEND_API_KEY
 echo "https://excise-revenue-recovery-portal.pages.dev" | npx wrangler secret put FRONTEND_URL
 ```
 
-- `JWT_SECRET` — signs both the `__admin_session` and `__deo_session` cookies (`api/lib/session.ts`). Rotating it
-  invalidates every active session.
+- `JWT_SECRET` — signs both the admin and DEO session tokens (`api/lib/session.ts`), returned in
+  the verify response body and sent back as `Authorization: Bearer <token>` (not a cookie — see
+  CLAUDE.md's Auth section for why). Rotating it invalidates every active session.
 - `RESEND_API_KEY` — sends magic-link emails (`api/app/api/auth/request-magic-link/route.ts`).
 - `FRONTEND_URL` — must exactly match the Pages production origin. Used both as the
   magic-link redirect target and as the sole allowed CORS origin in `api/middleware.ts` —
@@ -142,7 +143,7 @@ and redeploying, not just changing a Cloudflare dashboard setting.
 API=https://excise-revenue-recovery-api.shubhanraj2002.workers.dev
 FRONT=https://excise-revenue-recovery-portal.pages.dev
 
-curl -s -o /dev/null -w "%{http_code}\n" "$API/api/auth/me"   # expect 401, no cookie sent
+curl -s -o /dev/null -w "%{http_code}\n" "$API/api/auth/me"   # expect 401, no Authorization header sent
 
 curl -s -i -X OPTIONS "$API/api/auth/request-magic-link" \
   -H "Origin: $FRONT" -H "Access-Control-Request-Method: POST" \
@@ -161,12 +162,19 @@ through, and confirm `/admin` loads the 75 districts.
 
 ## Known deployment constraints
 
-- **Frontend/API are cross-origin in production** (`*.pages.dev` vs `*.workers.dev`), so
-  both the `__admin_session` and `__deo_session` cookies are `SameSite=None; Secure` and every `/api/*` response carries
-  explicit CORS headers gated on `FRONTEND_URL` (`api/middleware.ts`). If you later put a
-  custom domain in front of both under one zone (e.g. a Worker route for
-  `example.com/api/*`), this whole cross-origin setup — and `middleware.ts` — becomes
-  unnecessary. Don't do that migration speculatively; only if a real custom domain shows up.
+- **Frontend/API are cross-origin in production** (`*.pages.dev` vs `*.workers.dev`). Session
+  auth used to be two `SameSite=None; Secure` cookies, which is exactly the shape of cookie
+  Safari ITP blocks and Chrome blocks under common conditions (Incognito, a locked-down
+  profile) — this broke real logins in production (see TESTING.md's Incidents section), so auth
+  was migrated to a Bearer token instead (`api/lib/session.ts`, `frontend/lib/session.ts` — see
+  CLAUDE.md's Auth section for the full writeup). `api/middleware.ts` now sends
+  `Access-Control-Allow-Origin: *` with no credentials mode, since a Bearer token carries no
+  ambient browser credential for a wildcard origin to expose. If you later put a custom domain
+  in front of both under one zone (e.g. a Worker Route or Pages Function for
+  `example.com/api/*` — no separate server needed, just the domain + that routing), **switch
+  auth back to `HttpOnly` cookies** at that point; same-site cookies are the more secure option
+  and the only reason this app is on Bearer tokens is the two-origins constraint. Don't do
+  either migration speculatively; only if a real custom domain shows up.
 - **SheetJS export can't freeze panes** on the free CDN build used in `frontend/app/layout.tsx`
   — that's a SheetJS Pro feature. Not a deployment issue, just don't expect the exported
   `.xlsx` header row to actually freeze; see `frontend/lib/export.ts`.

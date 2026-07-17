@@ -34,7 +34,9 @@ export function useAdminData() {
     setSyncing(true);
     try {
       const res = await apiFetch<{ districts: CachedDistrict[]; pacData: CachedPacData[] }>(
-        "/api/admin/districts"
+        "/api/admin/districts",
+        undefined,
+        "admin"
       );
       await db.transaction("rw", db.adminDistricts, db.adminPacData, async () => {
         await db.adminDistricts.clear();
@@ -59,18 +61,18 @@ export function useAdminData() {
   useEffect(() => {
     (async () => {
       // Ask the server directly rather than pre-checking a local hint: the admin and DEO
-      // sessions now live in two separate cookies (lib/session.ts on the API side), so a
-      // shared localStorage "last role" hint can go stale the moment the *other* role logs in
-      // on a different tab of the same browser — trusting it here was the actual cause of
-      // being bounced to /login when switching between /admin and /deo-data-entry.
+      // sessions now live in two separate token slots (lib/session.ts on the frontend side),
+      // so a shared "last role" hint can go stale the moment the *other* role logs in on a
+      // different tab of the same browser — trusting it here was the actual cause of being
+      // bounced to /login when switching between /admin and /deo-data-entry.
       try {
-        const p = await apiFetch<Profile>("/api/auth/me?role=admin");
+        const p = await apiFetch<Profile>("/api/auth/me?role=admin", undefined, "admin");
         setProfile(p);
         if (consumeJustAuthed()) {
           notifyToast({ icon: "success", title: `Welcome, ${p.email ?? "Admin"}` });
         }
       } catch {
-        clearClientSession();
+        clearClientSession("admin");
         router.replace("/login");
         return;
       }
@@ -91,14 +93,14 @@ export function useAdminData() {
   }, [router]);
 
   async function unlock(districtId: number, reason: string) {
-    await apiFetch("/api/admin/unlock", { method: "POST", body: JSON.stringify({ districtId, reason }) });
+    await apiFetch("/api/admin/unlock", { method: "POST", body: JSON.stringify({ districtId, reason }) }, "admin");
     const patch = { lockStatus: 0, unlockedAt: new Date().toISOString(), unlockReason: reason, unlockedBy: profile?.email ?? null };
     setDistricts((prev) => prev.map((d) => (d.id === districtId ? { ...d, ...patch } : d)));
     await db.adminDistricts.update(districtId, patch);
   }
 
   async function truncateDemo() {
-    await apiFetch("/api/admin/truncate-demo-data", { method: "POST" });
+    await apiFetch("/api/admin/truncate-demo-data", { method: "POST" }, "admin");
     await sync();
   }
 

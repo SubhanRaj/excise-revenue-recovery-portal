@@ -18,7 +18,7 @@ function VerifyForm() {
     setError(null);
     setBusy(true);
     try {
-      const res = await apiFetch<{ role: "deo" | "admin"; districtId: number | null }>(
+      const res = await apiFetch<{ role: "deo" | "admin"; districtId: number | null; token: string }>(
         "/api/auth/verify-magic-link",
         { method: "POST", body: JSON.stringify({ token }) }
       );

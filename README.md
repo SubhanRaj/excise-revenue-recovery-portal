@@ -13,9 +13,10 @@ Two completely decoupled apps, deployed as separate Cloudflare resources:
 | `/frontend` | Next.js App Router, `output: "export"` — behaves as a static SPA        | Cloudflare Pages         |
 | `/api`      | Next.js App Router, native `app/api/**/route.ts` only (no Hono/Express) | Cloudflare Worker (via [OpenNext](https://opennext.js.org/cloudflare)) + D1 |
 
-They talk over plain `fetch`, credentialed cross-origin (see [CLAUDE.md](./CLAUDE.md) for the
-CORS/cookie setup). There is no shared package — types that overlap (financial years, PAC
-field order) are intentionally duplicated in each app.
+They talk over plain `fetch`, cross-origin, authenticated via a Bearer token rather than a
+cookie (see [CLAUDE.md](./CLAUDE.md) for the CORS/auth setup and why). There is no shared
+package — types that overlap (financial years, PAC field order) are intentionally duplicated in
+each app.
 
 Client-side libraries (SweetAlert2, SheetJS, Tabler Icons, Google Fonts, Tailwind CSS v4,
 Chart.js) load from the jsDelivr CDN in `frontend/app/layout.tsx` rather than being bundled —
@@ -82,12 +83,21 @@ for a DEO's own not-yet-submitted draft.
 
 - **DEO (CUG)**: frontend hashes a 10-digit mobile number client-side (Web Crypto), server
   matches it against `users.cug_hash` — the raw number is never sent, except during bulk
-  provisioning (see below). Session: `__deo_session` cookie.
+  provisioning (see below). Session: a Bearer token stored under a `deo`-keyed localStorage slot.
 - **Admin (magic link)**: Admin requests a link by email, clicks through a 15-minute token,
-  server verifies and issues a session. Session: `__admin_session` cookie. The two cookies are
-  independent, so a DEO and an Admin session can coexist in the same browser.
-- Both are 7-day HttpOnly JWT cookies, `SameSite=None; Secure` (the two apps are cross-origin in
-  production).
+  server verifies and issues a session. Session: a Bearer token stored under an `admin`-keyed
+  localStorage slot. The two slots are independent, so a DEO and an Admin session can coexist in
+  the same browser.
+- Both are 7-day JWTs, issued in the verify response body (not a cookie) and sent back as
+  `Authorization: Bearer <token>` on every subsequent request. This was a Bearer-token, not a
+  cookie, by design: the two apps are cross-origin (different public-suffix domains) in
+  production, and a `SameSite=None` session cookie there is a third-party cookie that Safari ITP
+  blocks outright and that Chrome blocks too under common conditions (Incognito, a locked-down
+  profile) — this broke real logins in production. See [CLAUDE.md](./CLAUDE.md)'s Auth section
+  for the full incident and the trade-off accepted (a token in localStorage is XSS-readable,
+  unlike an `HttpOnly` cookie; judged acceptable since no user-entered data is ever rendered as
+  raw HTML anywhere in this app). If a custom domain ever puts both apps on one zone, cookies
+  become the better option again and should replace this.
 
 ### DEO data entry
 

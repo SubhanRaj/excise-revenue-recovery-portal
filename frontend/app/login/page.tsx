@@ -45,7 +45,7 @@ export default function LoginPage() {
         setBusy(false);
         return setError("Invalid user.");
       }
-      const res = await apiFetch<{ role: "deo" | "admin"; districtId: number | null }>(
+      const res = await apiFetch<{ role: "deo" | "admin"; districtId: number | null; token: string }>(
         "/api/auth/verify-cug",
         { method: "POST", body: JSON.stringify({ cugHash }) }
       );

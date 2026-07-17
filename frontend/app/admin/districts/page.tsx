@@ -170,7 +170,7 @@ export default function DistrictsPage() {
 
       const { results } = await apiFetch<{
         results: { districtName: string; status: "inserted" | "updated" | "skipped" | "error"; message?: string }[];
-      }>("/api/admin/provision-deos", { method: "POST", body: JSON.stringify({ rows: templateRows }) });
+      }>("/api/admin/provision-deos", { method: "POST", body: JSON.stringify({ rows: templateRows }) }, "admin");
 
       const inserted = results.filter((r) => r.status === "inserted").length;
       const updated = results.filter((r) => r.status === "updated").length;
