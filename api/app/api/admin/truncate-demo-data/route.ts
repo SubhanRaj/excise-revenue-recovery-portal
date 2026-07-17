@@ -4,6 +4,7 @@ import { getDb } from "@/lib/db";
 import { districts, users, pacData } from "@/db/schema";
 import { requireSession } from "@/lib/auth-guard";
 import { auditLogInsert } from "@/lib/audit";
+import { withErrorHandling } from "@/lib/with-error-handling";
 
 // Matches the district_name inserted for the demo DEO/district (see CLAUDE.md's "Demo
 // district" section) — kept as a name match, not a dedicated column/flag, since this is the
@@ -17,7 +18,7 @@ const DEMO_DISTRICT_NAME = "Demo District";
 // prefix-exemption logic for it (app/login/page.tsx) — those are the *mechanism* for a demo
 // login, reusable if a new Demo District is ever seeded again later; this endpoint only clears
 // the *data* left over from the most recent demo run.
-export async function POST(req: NextRequest) {
+export const POST = withErrorHandling("admin/truncate-demo-data", async (req: NextRequest) => {
   const session = await requireSession(req, "admin");
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -49,4 +50,4 @@ export async function POST(req: NextRequest) {
   ] as unknown as Parameters<typeof db.batch>[0]);
 
   return NextResponse.json({ ok: true });
-}
+});

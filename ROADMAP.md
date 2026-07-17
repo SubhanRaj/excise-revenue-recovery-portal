@@ -662,6 +662,34 @@ The existing rule "`rcAmount > 0` requires `rcCount > 0`" is unaffected and stil
   instance uses it (a full Hindi translation of its help text, including a new paragraph
   explaining the RC Details section) — Admin pages' instances are unaffected, no toggle shown.
 
+## Milestone 23 — try/catch error handling across every API route (done)
+
+Retrofits the item Milestone 22 deliberately deferred: 11 of 12 routes had no try/catch at all
+(only `admin/provision-deos` did, per-row, for expected unique-constraint failures during bulk
+upload) — an unexpected DB error anywhere else bubbled up uncaught to the framework's default
+response instead of this app's own `{ error: "..." }` JSON shape.
+
+- New `api/lib/with-error-handling.ts`: `withErrorHandling(routeName, handler)` — a small
+  higher-order wrapper (not a copy-pasted try/catch in every file) that catches anything a
+  route's own validation didn't anticipate, logs it server-side (`routeName` is just a log
+  label, never shown to the client), and returns a clean `{ error: "Something went wrong —
+  please try again." }` JSON 500. A route's own expected-error responses (400/401/404/409, ...)
+  are ordinary early `return`s from inside the handler and pass through completely untouched —
+  verified locally: a bad CUG hash still 400s, no session still 401s, and only genuinely
+  malformed input (unparseable JSON body) now gets the clean 500 instead of an uncaught
+  exception.
+- Every route's `export async function GET/POST` became `export const GET/POST =
+  withErrorHandling("route/name", async (req) => { ... })` — all 12 routes across
+  `auth/*`, `admin/*`, and `pac-data/*`.
+- `admin/provision-deos`'s existing per-row try/catch is untouched and still does its own,
+  different job (expected unique-constraint hits, one bad row shouldn't abort the other 74) —
+  the outer wrapper only catches what neither that loop nor the route's validation anticipated.
+- `pac-data/submit`'s own bespoke inline try/catch (added in Milestone 22, ahead of this pass)
+  was removed in favor of the shared wrapper, for one consistent pattern across the whole API
+  instead of one route doing it its own way.
+- Transactions were already correct going into this (see Milestone 22's audit note) — `db.batch()`
+  is used everywhere a multi-write genuinely needs atomicity; nothing changed there.
+
 ## Backlog / not started
 
 - [ ] Real domain + DNS, and (optional) collapse `/frontend` + `/api` onto one zone via a
@@ -682,15 +710,3 @@ The existing rule "`rcAmount > 0` requires `rcCount > 0`" is unaffected and stil
       (a) is the stronger login (today's CUG hash is effectively a shared static secret); (b) is
       the smaller diff. Needs its own scoping pass — new migration, vendor API key as a new
       Worker secret, and a rate-limiting story — not a drop-in addition to the current flow.
-- [ ] **Retrofit proper try/catch error handling across existing API routes.** Audited
-      2026-07-17: multi-write operations already use `db.batch()` correctly (Drizzle/D1's
-      equivalent of Laravel's `DB::transaction()` — atomic, all-or-nothing), but 11 of 12 routes
-      have no try/catch at all (only `admin/provision-deos` does, per-row, for expected unique-
-      constraint failures during bulk upload). An unexpected DB error on any other route bubbles
-      up uncaught to the framework's default error response instead of this app's own
-      `{ error: "..." }` JSON shape — `frontend/lib/api.ts`'s `apiFetch` degrades gracefully
-      (falls back to "Unknown error occurred." rather than crashing), so this isn't a live bug,
-      but it means real error detail is lost on any unexpected failure. Deliberately deferred
-      (not bundled into Milestone 22) — do this as its own pass across every route, consistently,
-      rather than piecemeal. New routes written from Milestone 22 onward use proper try/catch
-      going forward; this item is only for the ones that predate that.

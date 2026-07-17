@@ -6,6 +6,7 @@ import { requireSession } from "@/lib/auth-guard";
 import { auditLogInsert } from "@/lib/audit";
 import { computeNetRecoverableSeries } from "@/lib/net-recoverable";
 import { validateRcDetails, type RcDetail } from "@/lib/rc-details";
+import { withErrorHandling } from "@/lib/with-error-handling";
 
 type YearRow = {
   financialYear: string;
@@ -64,7 +65,7 @@ function validateRow(row: YearRow): string | null {
   return null;
 }
 
-export async function POST(req: NextRequest) {
+export const POST = withErrorHandling("pac-data/submit", async (req: NextRequest) => {
   const session = await requireSession(req, "deo");
   if (!session || !session.districtId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -92,95 +93,86 @@ export async function POST(req: NextRequest) {
 
   const db = getDb();
 
-  // From here on, every step is a real DB round-trip — wrapped so an unexpected D1 error (a
-  // blip, a constraint we didn't anticipate) comes back as this app's own { error } JSON shape
-  // instead of bubbling up to the framework's default response (see ROADMAP.md's backlog item
-  // on retrofitting this across the rest of the API — new routes/edits use this going forward).
-  try {
-    const [district] = await db
-      .select()
-      .from(districts)
-      .where(eq(districts.id, session.districtId))
-      .limit(1);
+  const [district] = await db
+    .select()
+    .from(districts)
+    .where(eq(districts.id, session.districtId))
+    .limit(1);
 
-    if (!district) {
-      return NextResponse.json({ error: "District not found" }, { status: 404 });
-    }
-    if (district.lockStatus === 1) {
-      return NextResponse.json({ error: "District data is already locked" }, { status: 409 });
-    }
-
-    const now = new Date().toISOString();
-
-    // Cumulative Net Recoverable (see CLAUDE.md's Data model section): computed here, server-side,
-    // from the validated rows — never trusted from the client. Keyed by FY rather than trusting
-    // payload order, since computeNetRecoverableSeries() must walk FINANCIAL_YEARS in order.
-    const fieldsByFy = Object.fromEntries(
-      years.map((row) => [
-        row.financialYear,
-        { grossArrears: row.grossArrears, recoveredAmount: row.recoveredAmount, stayAmount: row.stayAmount },
-      ])
-    ) as Record<FinancialYear, { grossArrears: number; recoveredAmount: number; stayAmount: number }>;
-    const netRecoverableSeries = computeNetRecoverableSeries(fieldsByFy);
-
-    // Zero-trust cap, mirrored client-side in YearStepForm: a DEO can't recover more than was ever
-    // owed within this 5-year window — this year's fresh grossArrears plus whatever carried forward
-    // as openingBalance. Checked here (not inside validateRow) since it needs the just-computed
-    // per-FY openingBalance, not just the raw payload.
-    for (const fy of FINANCIAL_YEARS) {
-      const { openingBalance } = netRecoverableSeries[fy];
-      const f = fieldsByFy[fy];
-      if (f.recoveredAmount > openingBalance + f.grossArrears) {
-        return NextResponse.json(
-          { error: `Recovered Amount for ${fy} cannot exceed Opening Balance + Gross Arrears for that year` },
-          { status: 400 }
-        );
-      }
-    }
-
-    // D1 batch = atomic: wipe any prior rows for this district + all 5 new year rows + lock flip
-    // + user audit fields, or nothing. The delete makes this idempotent for the re-submit-after-
-    // Admin-unlock case — an Admin unlock never removes pac_data (see CLAUDE.md), so without it a
-    // second submit would hit the (district_id, financial_year) unique index on plain INSERT.
-    await db.batch([
-      db.delete(pacData).where(eq(pacData.districtId, session.districtId!)),
-      ...years.map((row) => {
-        const { openingBalance, netRecoverable } = netRecoverableSeries[row.financialYear as FinancialYear];
-        return db.insert(pacData).values({
-          districtId: session.districtId!,
-          financialYear: row.financialYear,
-          grossArrears: row.grossArrears,
-          rcCount: row.rcCount,
-          rcAmount: row.rcAmount,
-          rcDetails: JSON.stringify(row.rcDetails),
-          recoveredAmount: row.recoveredAmount,
-          stayCount: row.stayCount,
-          stayAmount: row.stayAmount,
-          openingBalance,
-          netRecoverable,
-          submittedByName: submittedByName.trim(),
-          lockedAt: now,
-        });
-      }),
-      db.update(districts).set({ lockStatus: 1 }).where(eq(districts.id, session.districtId!)),
-      db
-        .update(users)
-        .set({ lockedAt: now, submittedByName: submittedByName.trim() })
-        .where(eq(users.id, session.userId)),
-      auditLogInsert(db, {
-        eventType: "district_locked",
-        actorRole: "deo",
-        districtName: district.districtName,
-        metadata: { submittedByName: submittedByName.trim() },
-      }),
-    ] as unknown as Parameters<typeof db.batch>[0]);
-
-    // Data is locked. There's no server-side session to revoke (stateless bearer JWT) — the
-    // frontend discards its own stored token right after this call succeeds (deo-data-entry
-    // page's submitAll()).
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error("pac-data/submit failed:", err);
-    return NextResponse.json({ error: "Submit failed — please try again." }, { status: 500 });
+  if (!district) {
+    return NextResponse.json({ error: "District not found" }, { status: 404 });
   }
-}
+  if (district.lockStatus === 1) {
+    return NextResponse.json({ error: "District data is already locked" }, { status: 409 });
+  }
+
+  const now = new Date().toISOString();
+
+  // Cumulative Net Recoverable (see CLAUDE.md's Data model section): computed here, server-side,
+  // from the validated rows — never trusted from the client. Keyed by FY rather than trusting
+  // payload order, since computeNetRecoverableSeries() must walk FINANCIAL_YEARS in order.
+  const fieldsByFy = Object.fromEntries(
+    years.map((row) => [
+      row.financialYear,
+      { grossArrears: row.grossArrears, recoveredAmount: row.recoveredAmount, stayAmount: row.stayAmount },
+    ])
+  ) as Record<FinancialYear, { grossArrears: number; recoveredAmount: number; stayAmount: number }>;
+  const netRecoverableSeries = computeNetRecoverableSeries(fieldsByFy);
+
+  // Zero-trust cap, mirrored client-side in YearStepForm: a DEO can't recover more than was ever
+  // owed within this 5-year window — this year's fresh grossArrears plus whatever carried forward
+  // as openingBalance. Checked here (not inside validateRow) since it needs the just-computed
+  // per-FY openingBalance, not just the raw payload.
+  for (const fy of FINANCIAL_YEARS) {
+    const { openingBalance } = netRecoverableSeries[fy];
+    const f = fieldsByFy[fy];
+    if (f.recoveredAmount > openingBalance + f.grossArrears) {
+      return NextResponse.json(
+        { error: `Recovered Amount for ${fy} cannot exceed Opening Balance + Gross Arrears for that year` },
+        { status: 400 }
+      );
+    }
+  }
+
+  // D1 batch = atomic: wipe any prior rows for this district + all 5 new year rows + lock flip
+  // + user audit fields, or nothing. The delete makes this idempotent for the re-submit-after-
+  // Admin-unlock case — an Admin unlock never removes pac_data (see CLAUDE.md), so without it a
+  // second submit would hit the (district_id, financial_year) unique index on plain INSERT.
+  await db.batch([
+    db.delete(pacData).where(eq(pacData.districtId, session.districtId!)),
+    ...years.map((row) => {
+      const { openingBalance, netRecoverable } = netRecoverableSeries[row.financialYear as FinancialYear];
+      return db.insert(pacData).values({
+        districtId: session.districtId!,
+        financialYear: row.financialYear,
+        grossArrears: row.grossArrears,
+        rcCount: row.rcCount,
+        rcAmount: row.rcAmount,
+        rcDetails: JSON.stringify(row.rcDetails),
+        recoveredAmount: row.recoveredAmount,
+        stayCount: row.stayCount,
+        stayAmount: row.stayAmount,
+        openingBalance,
+        netRecoverable,
+        submittedByName: submittedByName.trim(),
+        lockedAt: now,
+      });
+    }),
+    db.update(districts).set({ lockStatus: 1 }).where(eq(districts.id, session.districtId!)),
+    db
+      .update(users)
+      .set({ lockedAt: now, submittedByName: submittedByName.trim() })
+      .where(eq(users.id, session.userId)),
+    auditLogInsert(db, {
+      eventType: "district_locked",
+      actorRole: "deo",
+      districtName: district.districtName,
+      metadata: { submittedByName: submittedByName.trim() },
+    }),
+  ] as unknown as Parameters<typeof db.batch>[0]);
+
+  // Data is locked. There's no server-side session to revoke (stateless bearer JWT) — the
+  // frontend discards its own stored token right after this call succeeds (deo-data-entry
+  // page's submitAll()).
+  return NextResponse.json({ ok: true });
+});

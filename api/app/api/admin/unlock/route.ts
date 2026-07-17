@@ -4,8 +4,9 @@ import { getDb } from "@/lib/db";
 import { districts, users } from "@/db/schema";
 import { requireSession } from "@/lib/auth-guard";
 import { auditLogInsert } from "@/lib/audit";
+import { withErrorHandling } from "@/lib/with-error-handling";
 
-export async function POST(req: NextRequest) {
+export const POST = withErrorHandling("admin/unlock", async (req: NextRequest) => {
   const session = await requireSession(req, "admin");
   if (!session || session.role !== "admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -43,4 +44,4 @@ export async function POST(req: NextRequest) {
   ] as unknown as Parameters<typeof db.batch>[0]);
 
   return NextResponse.json({ ok: true });
-}
+});

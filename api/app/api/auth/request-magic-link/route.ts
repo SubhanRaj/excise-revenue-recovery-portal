@@ -4,10 +4,11 @@ import { Resend } from "resend";
 import { getDb } from "@/lib/db";
 import { users, magicLinkTokens } from "@/db/schema";
 import { magicLinkHtml } from "@/lib/email";
+import { withErrorHandling } from "@/lib/with-error-handling";
 
 const TOKEN_TTL_MINUTES = 15;
 
-export async function POST(req: NextRequest) {
+export const POST = withErrorHandling("auth/request-magic-link", async (req: NextRequest) => {
   const { email } = (await req.json()) as { email?: unknown };
 
   if (typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -39,4 +40,4 @@ export async function POST(req: NextRequest) {
   });
 
   return NextResponse.json({ ok: true });
-}
+});

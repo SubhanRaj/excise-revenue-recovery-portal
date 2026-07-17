@@ -93,6 +93,28 @@ enter only dues/recoveries that arose within that specific financial year — ne
 before 1 April 2021 or after 31 March 2026, and never a recovery of a pre-2021-22 due. Nothing in
 the schema enforces this; it is a data-entry instruction, not a validation rule.
 
+## API error handling (`api/lib/with-error-handling.ts`)
+
+**Every route handler must be wrapped in `withErrorHandling(routeName, handler)`** —
+`export const GET = withErrorHandling("admin/districts", async (req) => { ... })`, not
+`export async function GET(req) { ... }`. This is the standard for every route in this repo, no
+exceptions; when adding a new route, wrap it from the start rather than adding this later.
+
+- The wrapper only catches what a route's own validation didn't anticipate (a D1 blip, a thrown
+  exception from a third-party call like Resend) and turns it into a clean `{ error: "..." }`
+  JSON 500. A route's own expected-error responses (400/401/404/409, ...) are ordinary early
+  `return`s from inside the handler and pass through completely untouched — never move that
+  validation logic inside a `try` block expecting the wrapper to handle it; keep returning those
+  directly, same as before this existed.
+- `admin/provision-deos`'s per-row `try/catch` inside its bulk-upload loop is a **different,
+  deliberate** thing, not replaced by the outer wrapper: it exists so one row hitting a unique
+  constraint doesn't abort the other 74 (partial success is the intended behavior there). Don't
+  remove it thinking the outer wrapper makes it redundant — they catch different things.
+- Multi-write atomicity is handled separately, by `db.batch()` (Drizzle/D1's equivalent of
+  Laravel's `DB::transaction()` — all-or-nothing) — see the Data model section's `pac_data`
+  rules for where that's required. `withErrorHandling` is about the *response shape* on failure,
+  not about making writes atomic; use both together where a route does a multi-step write.
+
 ## Auth (`api/lib/session.ts`, `api/lib/auth-guard.ts`, `api/middleware.ts`, `frontend/lib/session.ts`)
 
 See [README.md](./README.md)'s App flow → Auth for the CUG/magic-link flow overview. Session

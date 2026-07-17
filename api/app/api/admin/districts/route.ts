@@ -3,9 +3,10 @@ import { getDb } from "@/lib/db";
 import { districts, pacData, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { requireSession } from "@/lib/auth-guard";
+import { withErrorHandling } from "@/lib/with-error-handling";
 
 // Full dump of all 75 districts + their PAC rows, for the Admin dashboard's Dexie.js cache/sync.
-export async function GET(req: NextRequest) {
+export const GET = withErrorHandling("admin/districts", async (req: NextRequest) => {
   const session = await requireSession(req, "admin");
   if (!session || session.role !== "admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -28,4 +29,4 @@ export async function GET(req: NextRequest) {
   ]);
 
   return NextResponse.json({ districts: allDistricts, pacData: allPacData });
-}
+});

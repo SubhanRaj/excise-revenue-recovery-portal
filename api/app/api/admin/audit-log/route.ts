@@ -3,11 +3,12 @@ import { desc, lt } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { auditLog } from "@/db/schema";
 import { requireSession } from "@/lib/auth-guard";
+import { withErrorHandling } from "@/lib/with-error-handling";
 
 const PAGE_SIZE = 100;
 const RETENTION_DAYS = 30;
 
-export async function GET(req: NextRequest) {
+export const GET = withErrorHandling("admin/audit-log", async (req: NextRequest) => {
   const session = await requireSession(req, "admin");
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -30,4 +31,4 @@ export async function GET(req: NextRequest) {
     .offset((page - 1) * PAGE_SIZE);
 
   return NextResponse.json({ rows, page, pageSize: PAGE_SIZE });
-}
+});

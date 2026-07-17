@@ -4,10 +4,11 @@ import { getDb } from "@/lib/db";
 import { users, districts } from "@/db/schema";
 import { signSession } from "@/lib/session";
 import { auditLogInsert } from "@/lib/audit";
+import { withErrorHandling } from "@/lib/with-error-handling";
 
 // Frontend hashes the 10-digit CUG mobile number via Web Crypto SHA-256 before sending it here.
 // The server never sees or stores the raw mobile number.
-export async function POST(req: NextRequest) {
+export const POST = withErrorHandling("auth/verify-cug", async (req: NextRequest) => {
   const { cugHash } = (await req.json()) as { cugHash?: unknown };
 
   if (typeof cugHash !== "string" || !/^[a-f0-9]{64}$/.test(cugHash)) {
@@ -44,4 +45,4 @@ export async function POST(req: NextRequest) {
   });
 
   return NextResponse.json({ ok: true, role: row.role, districtId: row.districtId, token });
-}
+});

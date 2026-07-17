@@ -4,10 +4,11 @@ import { getDb } from "@/lib/db";
 import { magicLinkTokens, users } from "@/db/schema";
 import { signSession } from "@/lib/session";
 import { auditLogInsert } from "@/lib/audit";
+import { withErrorHandling } from "@/lib/with-error-handling";
 
 // POST-only by design: the frontend /verify page requires a button click ("Verify & Continue"),
 // so link-prefetching email clients/crawlers (which only issue GET) can never consume the token.
-export async function POST(req: NextRequest) {
+export const POST = withErrorHandling("auth/verify-magic-link", async (req: NextRequest) => {
   const { token } = (await req.json()) as { token?: unknown };
 
   if (typeof token !== "string" || token.length < 10) {
@@ -48,4 +49,4 @@ export async function POST(req: NextRequest) {
   });
 
   return NextResponse.json({ ok: true, role: user.role, districtId: user.districtId, token: sessionToken });
-}
+});

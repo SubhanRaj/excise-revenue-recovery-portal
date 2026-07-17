@@ -5,6 +5,7 @@ import { districts, users } from "@/db/schema";
 import { requireSession } from "@/lib/auth-guard";
 import { sha256Hex } from "@/lib/hash";
 import { auditLogInsert } from "@/lib/audit";
+import { withErrorHandling } from "@/lib/with-error-handling";
 
 type InputRow = { districtName?: unknown; cugMobile?: unknown; email?: unknown };
 type RowResult = { districtName: string; status: "inserted" | "updated" | "skipped" | "error"; message?: string };
@@ -16,7 +17,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // admin supplies each DEO's raw 10-digit CUG number from a spreadsheet they filled in
 // themselves — the server hashes it on ingest since there's no client-side DEO in this flow
 // to have done it already.
-export async function POST(req: NextRequest) {
+export const POST = withErrorHandling("admin/provision-deos", async (req: NextRequest) => {
   const session = await requireSession(req, "admin");
   if (!session || session.role !== "admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -52,6 +53,10 @@ export async function POST(req: NextRequest) {
       continue;
     }
 
+    // This inner try/catch is deliberate and distinct from the outer withErrorHandling() wrapper
+    // above: it's expected to fire regularly (a duplicate CUG/email hits the unique constraint)
+    // and its whole point is per-row partial success — one bad row must not abort the other 74.
+    // The outer wrapper only catches what neither this loop nor validation above anticipated.
     try {
       const [district] = await db
         .select()
@@ -98,4 +103,4 @@ export async function POST(req: NextRequest) {
   });
 
   return NextResponse.json({ results });
-}
+});
