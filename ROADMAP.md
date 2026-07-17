@@ -549,3 +549,13 @@ CLAUDE.md's Repo shape section) — not an in-place repurposing of an existing f
       as a purchased domain is enough to make both apps same-site.
 - [ ] Verify `mail.upexciseonline.co` (or chosen domain) in Resend and switch `FROM_EMAIL`
       off the shared sandbox sender
+- [ ] **SMS OTP login for DEOs**, replacing (or added alongside) the current CUG-hash login —
+      the department already has an SMS API procured for other portals; vendor can provide
+      access, and DoT template approval for a simple login-OTP text is described as routine, not
+      a blocker. Two shapes to choose between when this is scoped: (a) real OTP-based auth —
+      send OTP → verify OTP → issue the same JWT, needs a new `otp`/`otp_expires_at` column plus
+      per-number rate-limiting, closer to the existing magic-link flow than the CUG flow; or (b)
+      keep CUG-hash as the identity check and use SMS only for notifications, no new auth flow.
+      (a) is the stronger login (today's CUG hash is effectively a shared static secret); (b) is
+      the smaller diff. Needs its own scoping pass — new migration, vendor API key as a new
+      Worker secret, and a rate-limiting story — not a drop-in addition to the current flow.
