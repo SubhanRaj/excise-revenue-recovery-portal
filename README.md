@@ -169,7 +169,7 @@ flowchart TD
         LockCheck -->|"unlocked, previously submitted"| FetchMine["GET /api/pac-data/mine"]
         FetchMine --> MasterViewPre["Master View<br/>(prefilled from D1)"]
         LockCheck -->|"unlocked, never submitted"| DraftResume["Resume local draft<br/>(Dexie draftYears)"]
-        DraftResume --> YearSteps["FY 2021-22 → FY 2025-26<br/>YearStepForm · Save &amp; Continue<br/>(Anti-Blank, count/amount, cap checks)"]
+        DraftResume --> YearSteps["FY 2021-22 → FY 2025-26<br/>YearStepForm · Save &amp; Continue<br/>(Anti-Blank, count/amount, cap, RC Details checks)"]
         YearSteps --> MasterView["Master View<br/>review all 5 years"]
         MasterViewPre --> MasterView
         MasterView --> Confirm1["confirmFinalSubmit()"]

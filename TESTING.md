@@ -105,7 +105,7 @@ Then:
    between "Newest first"/"Oldest first"; both should apply instantly with no network request.
 2. **DEO**: `/login` → CUG tab → the demo CUG → lands on `/deo-data-entry`. Note the title bar
    above the year pills (RC title + data period, bilingual) and that the pills read `FY
-   2021-22` etc, not "Year 1". Since this is a *separate* session cookie from the admin one
+   2021-22` etc, not "Year 1". Since this is a *separate* session token slot from the admin one
    above (see CLAUDE.md's Auth section), the admin tab/session stays logged in the whole time
    — no need to re-request a magic link just to switch back and forth. Walk FY 2021-22 → FY
    2025-26: leave a field blank and hit "Save & Continue" (a corner toast, not a popup or
@@ -115,7 +115,14 @@ Then:
    Arrears left at 0 but a non-zero Recovered Amount (also valid — a year can have recoveries
    with no fresh dues), watch Net Recoverable update live, and confirm Opening Balance on FY
    2022-23 onward equals the previous FY's Net Recoverable (FY 2021-22's Opening Balance should
-   always read 0). Try "Previous Year" to go back a step,
+   always read 0). Enter a non-zero RC Count and confirm the **RC Details** section appears
+   with exactly that many numbered rows (RC Number, RC Amount, Stayed checkbox); leave one RC
+   Number blank and hit Save & Continue (blocked, same blank-field toast as any other field);
+   fill every row but make the RC Amounts *not* sum to the RC Amount field above (blocked with
+   the bold bilingual "RC Details incomplete" toast, and the inline total under the section
+   turns red); fix the total to match and confirm Save & Continue proceeds; reduce RC Count
+   afterward and confirm the row count shrinks to match (no confirm dialog — this is a small
+   in-form edit, not Clear/Clear All). Try "Previous Year" to go back a step,
    try the per-year
    "Clear" button and the nav bar's "Clear All" (both prompt a confirm first). On FY 2025-26,
    reach Master View (title now shows the district name, English + smaller Hindi line), hit
@@ -135,11 +142,16 @@ Then:
    including its own Opening Balance/Net Recoverable columns for the currently-selected FY —
    these are now read straight from `pac_data` (computed server-side at submit time), not
    recomputed in the browser, so they should exactly match what Master View showed the DEO before
-   locking. Click the row to open its detail page (who locked it, when, in IST) → **Back to Districts**
-   → **Unlock** now prompts for a reason (blank is rejected) before reversing it — check the
-   detail page again to see "Last unlocked by / on / Reason", and check **Audit Log** (top
-   nav) to see the lock and unlock events recorded, newest first — try filtering to just
-   "District locked"/"District unlocked" with the event dropdown to confirm both show up.
+   locking. Click the row to open its detail page (who locked it, when, in IST) — for the FY
+   where you entered RC Details, confirm an "N RCs" pill appears next to the RC Amount cell and
+   clicking it opens a dropdown listing every RC's number/amount/stayed status, matching what was
+   entered → **Back to Districts** → **Unlock** now prompts for a reason (blank is rejected)
+   before reversing it — check the detail page again to see "Last unlocked by / on / Reason", and
+   check **Audit Log** (top nav) to see the lock and unlock events recorded, newest first — try
+   filtering to just "District locked"/"District unlocked" with the event dropdown to confirm
+   both show up. **Export as Excel Workbook** — open the downloaded file and confirm a trailing
+   **RC Details** sheet exists (District, Financial Year, RC Number, RC Amount, Stayed), one flat
+   sheet across every district/FY, listing the RCs you just entered.
 5. **Re-login as the now-unlocked DEO**: CUG tab → the demo CUG → should land on the Master
    View with the previously submitted figures already filled in (re-fetched from D1, not
    blank), not a fresh empty Year 1. Editing and hitting "Submit & Lock" again should succeed
