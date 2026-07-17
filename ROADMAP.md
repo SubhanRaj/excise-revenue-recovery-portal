@@ -539,6 +539,119 @@ CLAUDE.md's Repo shape section) — not an in-place repurposing of an existing f
 - [x] Documented in CLAUDE.md (new "Why not cookies" subsection under Auth), README.md's Auth
       section, DEPLOY.md's known constraints, and TESTING.md's Incidents log.
 
+## Milestone 22 — Per-RC detail breakdown (planned, pending approval — not yet implemented)
+
+Currently `pac_data` captures only the *aggregate* RC figures per FY: `rcCount` (how many RCs
+issued) and `rcAmount` (their combined value). The department needs the individual RCs behind
+that count/total: RC Number, that specific RC's amount, and whether any court has stayed it.
+
+**Scope boundary (explicitly confirmed with the department):** this is a detail capture only.
+It does not change `recoveredAmount`, `stayAmount`, `openingBalance`, or `netRecoverable` — an
+RC is issued to inform a defaulter what they owe and can be for any amount, independent of what's
+actually recovered (same reasoning as the existing RC Amount/Recovered Amount decoupling from
+Milestone 19). The per-RC "stayed" checkbox is a new, separate signal, **confirmed independent** of the
+existing aggregate Stay Count/Stay Amount fields (order 5.i/5.ii) — the two concepts are
+genuinely different: Stay Count/Stay Amount (order 5) is a court staying *recovery of an
+amount* (subtracted from Net Recoverable); the per-RC "stayed" checkbox is a court staying the
+*RC itself* — i.e. even the demand notice/order to pay is suspended, independent of whether any
+money against it was ever going to be pursued. No cross-check or roll-up between the two.
+
+### Data model
+
+New column, one per `pac_data` row (i.e. per district per FY), migration `0006`:
+
+```
+pac_data.rc_details TEXT NOT NULL DEFAULT '[]'   -- JSON-stringified RcDetail[]
+```
+
+```ts
+// duplicated in api/db/schema.ts and frontend/lib/pac-fields.ts, same as every other
+// cross-app shape in this repo (no shared package — see CLAUDE.md's Repo shape section)
+type RcDetail = {
+  rcNumber: string;  // freeform (letters/digits/punctuation), trimmed, 1–50 chars
+  rcAmount: number;  // this specific RC's amount, >= 0
+  stayed: boolean;   // has any court stayed this specific RC? default false
+};
+```
+
+Stored as a JSON string in one column (per the department's ask) rather than a child table —
+consistent with `audit_log.metadata`'s existing JSON-string-column precedent in this schema, and
+avoids a join for a value that's always read/written as one atomic unit alongside its parent FY
+row.
+
+### Validation (zero-trust, mirrored client + server, extending `validateRow()`)
+
+New `validateRcDetails(rcCount, rcAmount, rcDetails)`, called from both
+`api/app/api/pac-data/submit/route.ts`'s `validateRow()` and a mirrored client-side check in
+`YearStepForm.tsx` (same client/server duplication pattern as every other rule in this file):
+
+1. `rcDetails.length === rcCount` exactly — the section's row count is *driven by* `rcCount`, so
+   a mismatch here means the client failed to keep them in sync (defensive check, not expected
+   to trigger in normal use).
+2. Every entry's `rcNumber`: non-blank after trim, ≤ 50 chars (Anti-Blank Rule extends to this
+   field — an empty RC Number is rejected, not coerced to anything).
+3. Every entry's `rcAmount`: a valid finite number ≥ 0, present (Anti-Blank Rule again — blank
+   is rejected, explicit `0` is allowed).
+4. **`sum(entry.rcAmount for entry in rcDetails) === rcAmount`** (the existing aggregate "3.(ii)"
+   field) — the department's core ask ("if 10 RCs issued totaling ₹10,00,000, each RC should add
+   up to that total"). Compared with a small epsilon (`Math.abs(sum - rcAmount) < 0.01`) rather
+   than strict `===`, since these are floating-point rupee amounts — this repo has no existing
+   money-sum comparison to match precision against, so this tolerance is a new, deliberate choice
+   worth a second look in review.
+5. `entry.stayed` must be boolean (defaults `false`, no other constraint).
+
+The existing rule "`rcAmount > 0` requires `rcCount > 0`" (Milestone from 2026-07-16) is
+unaffected and still enforced first.
+
+### Frontend (`YearStepForm.tsx`, `frontend/lib/db.ts`)
+
+- `DraftYear` gains `rcDetails: { rcNumber: string; rcAmount: string; stayed: boolean }[]` (raw
+  string amount, matching the Anti-Blank Rule's existing string-until-submit pattern for every
+  other money field) — a Dexie schema version bump (`db.version(2).stores(...)`, with Dexie's
+  `.upgrade()` defaulting existing rows to `rcDetails: []`).
+- One collapsible section (English-only label, e.g. "RC Details" — this is a new structural
+  section, not one of the original 6 government-form fields, so it does **not** get a Hindi label
+  under the existing "UI chrome is English only" rule) appears under the RC Amount field
+  whenever parsed `rcCount > 0`, collapsed by default for large counts, expandable/collapsible
+  via a single toggle for the whole section (not per-row).
+- Inside it: exactly `rcCount` numbered rows (1, 2, 3, …), each with an RC Number text input
+  (`maxLength={50}`, placeholder text `"RC Number"`, genuinely freeform — no format hint), an
+  RC Amount money input (Cleave.js, same config as every other money field), and an
+  unchecked-by-default "Stayed by court?" checkbox.
+- Row count stays in sync with `rcCount` automatically as the DEO edits it: growing appends
+  blank rows, shrinking truncates trailing rows — no confirm dialog (this is a small in-form
+  edit, not a top-level destructive action like Clear/Clear All, which do already get one).
+- A bold, bilingual, inline error (matching the existing `countAmountErrors()` /
+  parity-error pattern) shows under the section when the running sum doesn't match RC Amount,
+  shown after blur and blocking `saveAndContinue()` the same way the existing count-vs-amount and
+  recovered-amount-cap checks already do.
+
+### Backend (`api/app/api/pac-data/submit/route.ts`)
+
+- `YearRow` type gains `rcDetails: { rcNumber: string; rcAmount: number; stayed: boolean }[]`.
+- `validateRow()` calls the new `validateRcDetails()` after the existing checks.
+- The insert into `pacData` gains `rcDetails: JSON.stringify(row.rcDetails)`.
+
+### Admin-facing views (confirmed in scope for this milestone)
+
+- **Admin district detail page** — a compact disclosure, not a full always-visible table (the
+  page's field × year layout has no room for `rcCount`-many extra rows per FY): a small
+  dropdown/expandable control (or a clickable "N RCs" bubble/badge) next to that FY's RC Amount
+  cell, opening a list of that FY's `rcNumber` / `rcAmount` / stayed-or-not on demand. Exact
+  component TBD at implementation time (existing `Select`/badge patterns in
+  `components/ui/` vs. a small new disclosure component) — functionally: collapsed by default,
+  one click to see the full per-RC list for that FY.
+- **Excel export** — full detail, not summarized: every RC's `rcNumber`/`rcAmount`/stayed
+  status must appear in the workbook. Likely shape: one additional row per RC underneath (or
+  alongside) each district's FY summary row, or a dedicated per-FY "RC Details" sheet
+  (districts × RCs, since a district can have a different RC count per FY) — exact layout
+  decided at implementation time against `export.ts`'s existing `TITLE_ROWS`/banner-row
+  conventions, but the requirement is: an auditor opening the exported `.xlsx` can see every
+  individual RC's number, amount, and stay status, not just the FY-level total.
+- The admin districts table (the sortable/paginated list) stays summary-only (`rcCount`,
+  `rcAmount` as today) — a per-RC breakdown doesn't fit a table row; that's what the detail
+  page's dropdown/badge and the Excel export are for.
+
 ## Backlog / not started
 
 - [ ] Real domain + DNS, and (optional) collapse `/frontend` + `/api` onto one zone via a
