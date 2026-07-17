@@ -539,7 +539,7 @@ CLAUDE.md's Repo shape section) — not an in-place repurposing of an existing f
 - [x] Documented in CLAUDE.md (new "Why not cookies" subsection under Auth), README.md's Auth
       section, DEPLOY.md's known constraints, and TESTING.md's Incidents log.
 
-## Milestone 22 — Per-RC detail breakdown (planned, pending approval — not yet implemented)
+## Milestone 22 — Per-RC detail breakdown (done)
 
 Currently `pac_data` captures only the *aggregate* RC figures per FY: `rcCount` (how many RCs
 issued) and `rcAmount` (their combined value). The department needs the individual RCs behind
@@ -558,14 +558,15 @@ money against it was ever going to be pursued. No cross-check or roll-up between
 
 ### Data model
 
-New column, one per `pac_data` row (i.e. per district per FY), migration `0006`:
+New column, one per `pac_data` row (i.e. per district per FY), migration
+`0006_numerous_marten_broadcloak`:
 
-```
-pac_data.rc_details TEXT NOT NULL DEFAULT '[]'   -- JSON-stringified RcDetail[]
+```sql
+ALTER TABLE `pac_data` ADD `rc_details` text DEFAULT '[]' NOT NULL;
 ```
 
 ```ts
-// duplicated in api/db/schema.ts and frontend/lib/pac-fields.ts, same as every other
+// duplicated in api/lib/rc-details.ts and frontend/lib/pac-fields.ts, same as every other
 // cross-app shape in this repo (no shared package — see CLAUDE.md's Repo shape section)
 type RcDetail = {
   rcNumber: string;  // freeform (letters/digits/punctuation), trimmed, 1–50 chars
@@ -575,82 +576,77 @@ type RcDetail = {
 ```
 
 Stored as a JSON string in one column (per the department's ask) rather than a child table —
-consistent with `audit_log.metadata`'s existing JSON-string-column precedent in this schema, and
-avoids a join for a value that's always read/written as one atomic unit alongside its parent FY
-row.
+consistent with `audit_log.metadata`'s existing JSON-string-column precedent in this schema.
+Applied to local D1; **not yet applied to remote/production D1** (`npm run db:migrate:remote`) —
+that's a deliberate hold pending a final go-ahead, since the API worker cannot deploy ahead of
+this migration without breaking every live DEO submission (`pac_data` insert would reference a
+column remote D1 doesn't have yet).
 
-### Validation (zero-trust, mirrored client + server, extending `validateRow()`)
+### Validation (zero-trust, mirrored client + server)
 
-New `validateRcDetails(rcCount, rcAmount, rcDetails)`, called from both
-`api/app/api/pac-data/submit/route.ts`'s `validateRow()` and a mirrored client-side check in
-`YearStepForm.tsx` (same client/server duplication pattern as every other rule in this file):
+`validateRcDetails(rcCount, rcAmount, rcDetails)` lives in `api/lib/rc-details.ts` (new file) and
+is mirrored byte-for-byte in `frontend/lib/pac-fields.ts`. Called from
+`api/app/api/pac-data/submit/route.ts`'s `validateRow()` server-side, and from
+`YearStepForm.tsx`'s exported `rcDetailsError()` (client-side, used both for the live inline
+total shown in the form and to block `saveAndContinue()` in `deo-data-entry/page.tsx`):
 
-1. `rcDetails.length === rcCount` exactly — the section's row count is *driven by* `rcCount`, so
-   a mismatch here means the client failed to keep them in sync (defensive check, not expected
-   to trigger in normal use).
-2. Every entry's `rcNumber`: non-blank after trim, ≤ 50 chars (Anti-Blank Rule extends to this
-   field — an empty RC Number is rejected, not coerced to anything).
-3. Every entry's `rcAmount`: a valid finite number ≥ 0, present (Anti-Blank Rule again — blank
-   is rejected, explicit `0` is allowed).
-4. **`sum(entry.rcAmount for entry in rcDetails) === rcAmount`** (the existing aggregate "3.(ii)"
-   field) — the department's core ask ("if 10 RCs issued totaling ₹10,00,000, each RC should add
-   up to that total"). Compared with a small epsilon (`Math.abs(sum - rcAmount) < 0.01`) rather
-   than strict `===`, since these are floating-point rupee amounts — this repo has no existing
-   money-sum comparison to match precision against, so this tolerance is a new, deliberate choice
-   worth a second look in review.
-5. `entry.stayed` must be boolean (defaults `false`, no other constraint).
+1. `rcDetails.length === rcCount` exactly.
+2. Every entry's `rcNumber`: non-blank after trim, ≤ 50 chars (Anti-Blank Rule extends here).
+3. Every entry's `rcAmount`: a valid finite number ≥ 0.
+4. **`sum(entry.rcAmount for entry in rcDetails) === rcAmount`** (the aggregate "3.(ii)" field),
+   compared with a small epsilon (`Math.abs(sum - rcAmount) < 0.01`, not strict `===`) since
+   these are floating-point rupee amounts.
+5. `entry.stayed` must be boolean.
 
-The existing rule "`rcAmount > 0` requires `rcCount > 0`" (Milestone from 2026-07-16) is
-unaffected and still enforced first.
+The existing rule "`rcAmount > 0` requires `rcCount > 0`" is unaffected and still enforced first.
 
-### Frontend (`YearStepForm.tsx`, `frontend/lib/db.ts`)
+### Frontend
 
-- `DraftYear` gains `rcDetails: { rcNumber: string; rcAmount: string; stayed: boolean }[]` (raw
-  string amount, matching the Anti-Blank Rule's existing string-until-submit pattern for every
-  other money field) — a Dexie schema version bump (`db.version(2).stores(...)`, with Dexie's
-  `.upgrade()` defaulting existing rows to `rcDetails: []`).
-- One collapsible section (English-only label, e.g. "RC Details" — this is a new structural
-  section, not one of the original 6 government-form fields, so it does **not** get a Hindi label
-  under the existing "UI chrome is English only" rule) appears under the RC Amount field
-  whenever parsed `rcCount > 0`, collapsed by default for large counts, expandable/collapsible
-  via a single toggle for the whole section (not per-row).
-- Inside it: exactly `rcCount` numbered rows (1, 2, 3, …), each with an RC Number text input
-  (`maxLength={50}`, placeholder text `"RC Number"`, genuinely freeform — no format hint), an
-  RC Amount money input (Cleave.js, same config as every other money field), and an
-  unchecked-by-default "Stayed by court?" checkbox.
-- Row count stays in sync with `rcCount` automatically as the DEO edits it: growing appends
-  blank rows, shrinking truncates trailing rows — no confirm dialog (this is a small in-form
-  edit, not a top-level destructive action like Clear/Clear All, which do already get one).
-- A bold, bilingual, inline error (matching the existing `countAmountErrors()` /
-  parity-error pattern) shows under the section when the running sum doesn't match RC Amount,
-  shown after blur and blocking `saveAndContinue()` the same way the existing count-vs-amount and
-  recovered-amount-cap checks already do.
+- `frontend/lib/db.ts`'s `DraftYear` gains `rcDetails: DraftRcDetail[]` (raw string amount,
+  matching the Anti-Blank Rule's string-until-submit pattern). **No Dexie version bump needed** —
+  Dexie's `.stores()` schema string only declares the primary key/indexes, not every property, so
+  a new non-indexed field needs no migration; a pre-existing IndexedDB row from before this field
+  existed just won't have it, so every read site falls back to `year.rcDetails ?? []`.
+- `YearStepForm.tsx`: a collapsible "RC Details (N)" section (English-only label — not one of the
+  original 6 government-form fields, so no Hindi under the "UI chrome is English only" rule)
+  appears under the RC Amount field whenever `rcCount > 0`, open by default. Inside: exactly
+  `rcCount` numbered rows, each an RC Number text input (`maxLength={50}`, placeholder `"RC
+  Number"`, genuinely freeform), an RC Amount money input (Cleave.js), and an unchecked-by-default
+  "Stayed by court?" checkbox. `syncRcDetailsToCount()` (exported) keeps the row count in sync
+  with `rcCount` as the DEO edits it — growing appends blank rows, shrinking truncates trailing
+  rows, no confirm dialog. A live "Entered: ₹X / Required: ₹Y" line turns bold red (bilingual
+  Hindi line added) once any RC field has been blurred and the total doesn't match.
+- `deo-data-entry/page.tsx`: `updateField()` calls `syncRcDetailsToCount()` the moment `rcCount`
+  changes; new `updateRcDetail()` handles per-row edits; `saveAndContinue()`'s blank check now
+  also covers every RC Detail row, plus a new `rcDetailsError()` check (bilingual toast) mirroring
+  the recovered-amount-cap pattern; `submitAll()`'s payload includes each year's `rcDetails`
+  (trimmed, numeric); the `GET /api/pac-data/mine` remote-merge path parses the stored JSON string
+  back into the draft shape for a re-editing DEO (`parseRemoteRcDetails()`, lenient — this is a
+  re-fetch of the DEO's own already-validated data, not a fresh zero-trust boundary).
 
-### Backend (`api/app/api/pac-data/submit/route.ts`)
+### Backend
 
-- `YearRow` type gains `rcDetails: { rcNumber: string; rcAmount: number; stayed: boolean }[]`.
-- `validateRow()` calls the new `validateRcDetails()` after the existing checks.
-- The insert into `pacData` gains `rcDetails: JSON.stringify(row.rcDetails)`.
+- `api/app/api/pac-data/submit/route.ts`: `YearRow.rcDetails: RcDetail[]`; `validateRow()` calls
+  `validateRcDetails()`; the insert stores `JSON.stringify(row.rcDetails)`. The whole DB-touching
+  portion of the handler is now wrapped in `try/catch` (this app's first — see the Backlog item
+  below on retrofitting the rest of the API the same way) returning a clean `{ error }` JSON 500
+  instead of an uncaught throw.
+- `GET /api/pac-data/mine` and `GET /api/admin/districts` needed **no code changes** — both
+  already do a bare `db.select().from(pacData)`, so the new column flows through automatically as
+  a raw JSON-string field; consumers parse it on demand.
 
-### Admin-facing views (confirmed in scope for this milestone)
+### Admin-facing views (shipped)
 
-- **Admin district detail page** — a compact disclosure, not a full always-visible table (the
-  page's field × year layout has no room for `rcCount`-many extra rows per FY): a small
-  dropdown/expandable control (or a clickable "N RCs" bubble/badge) next to that FY's RC Amount
-  cell, opening a list of that FY's `rcNumber` / `rcAmount` / stayed-or-not on demand. Exact
-  component TBD at implementation time (existing `Select`/badge patterns in
-  `components/ui/` vs. a small new disclosure component) — functionally: collapsed by default,
-  one click to see the full per-RC list for that FY.
-- **Excel export** — full detail, not summarized: every RC's `rcNumber`/`rcAmount`/stayed
-  status must appear in the workbook. Likely shape: one additional row per RC underneath (or
-  alongside) each district's FY summary row, or a dedicated per-FY "RC Details" sheet
-  (districts × RCs, since a district can have a different RC count per FY) — exact layout
-  decided at implementation time against `export.ts`'s existing `TITLE_ROWS`/banner-row
-  conventions, but the requirement is: an auditor opening the exported `.xlsx` can see every
-  individual RC's number, amount, and stay status, not just the FY-level total.
-- The admin districts table (the sortable/paginated list) stays summary-only (`rcCount`,
-  `rcAmount` as today) — a per-RC breakdown doesn't fit a table row; that's what the detail
-  page's dropdown/badge and the Excel export are for.
+- **Admin district detail page**: a small "N RCs" pill next to that FY's RC Amount cell (only
+  when RCs exist), opening a lightweight absolutely-positioned dropdown panel listing every RC's
+  number, amount, and a stayed check/dash — one panel open at a time, toggled by clicking the pill
+  again.
+- **Excel export**: a new **"RC Details"** sheet (not per-FY — one flat sheet across every
+  district/FY, since a district's RC count varies per FY and a flat table sorts/filters better
+  than five sparse per-FY sheets): District, Financial Year, RC Number, RC Amount, Stayed
+  (Yes/No), one row per RC. `exportDistrictsToSql()`'s `pac_data` INSERT also gained the
+  `rc_details` column.
+- The admin districts table stays summary-only, unchanged, as planned.
 
 ## Backlog / not started
 
@@ -672,3 +668,15 @@ unaffected and still enforced first.
       (a) is the stronger login (today's CUG hash is effectively a shared static secret); (b) is
       the smaller diff. Needs its own scoping pass — new migration, vendor API key as a new
       Worker secret, and a rate-limiting story — not a drop-in addition to the current flow.
+- [ ] **Retrofit proper try/catch error handling across existing API routes.** Audited
+      2026-07-17: multi-write operations already use `db.batch()` correctly (Drizzle/D1's
+      equivalent of Laravel's `DB::transaction()` — atomic, all-or-nothing), but 11 of 12 routes
+      have no try/catch at all (only `admin/provision-deos` does, per-row, for expected unique-
+      constraint failures during bulk upload). An unexpected DB error on any other route bubbles
+      up uncaught to the framework's default error response instead of this app's own
+      `{ error: "..." }` JSON shape — `frontend/lib/api.ts`'s `apiFetch` degrades gracefully
+      (falls back to "Unknown error occurred." rather than crashing), so this isn't a live bug,
+      but it means real error detail is lost on any unexpected failure. Deliberately deferred
+      (not bundled into Milestone 22) — do this as its own pass across every route, consistently,
+      rather than piecemeal. New routes written from Milestone 22 onward use proper try/catch
+      going forward; this item is only for the ones that predate that.

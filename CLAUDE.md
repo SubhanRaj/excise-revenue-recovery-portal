@@ -48,6 +48,15 @@ reference. Rules an agent must preserve when touching `pac_data` or its computed
   a SQL `CURRENT_TIMESTAMP` default (SQLite stores that without a timezone marker). `formatIST()`
   (`frontend/lib/format.ts`) is the only place that converts to IST for display; storage stays
   UTC always.
+- `pac_data.rc_details` is a JSON-stringified `RcDetail[]` (per-RC number/amount/stayed
+  breakdown behind the aggregate `rcCount`/`rcAmount` fields), validated by
+  `api/lib/rc-details.ts`'s `validateRcDetails()` (mirrored in `frontend/lib/pac-fields.ts`) —
+  row count must equal `rcCount`, and every entry's `rcAmount` must sum to the aggregate
+  `rcAmount`. It does **not** feed into `recoveredAmount`/`stayAmount`/`openingBalance`/
+  `netRecoverable` — an RC's own detail is independent of what's actually recovered (see
+  Validation rules below). Only the admin district detail page (a small disclosure next to the
+  RC Amount cell) and the Excel export's dedicated "RC Details" sheet surface it; the admin
+  districts table stays summary-only.
 
 ## Validation rules — enforce on both client and server
 
@@ -71,6 +80,13 @@ reference. Rules an agent must preserve when touching `pac_data` or its computed
    inline, bold, bilingual, blur-triggered field error under the count field
    (`YearStepForm.tsx`'s `countAmountErrors()`, also blocking `saveAndContinue()` in
    `deo-data-entry/page.tsx` for the case a DEO never blurs the offending field).
+6. **The per-RC breakdown's own amounts must sum to the aggregate RC Amount field, and its row
+   count must equal RC Count.** Enforced in `api/lib/rc-details.ts`'s `validateRcDetails()`
+   (mirrored in `frontend/lib/pac-fields.ts`), called from the submit route's `validateRow()`
+   and from `YearStepForm.tsx`'s `rcDetailsError()` (blocks `saveAndContinue()`, shows a
+   bilingual toast, same pattern as rule 4 above). Each entry's `rcNumber` is subject to the
+   Anti-Blank Rule too (non-blank, ≤ 50 chars) — see the Data model section above for the column
+   itself and why it's independent of Recovered Amount/Stay Amount.
 
 Every DEO-facing view of the six PAC fields carries a scope-of-data-period notice: a DEO must
 enter only dues/recoveries that arose within that specific financial year — never arrears from
@@ -384,14 +400,20 @@ deliberately different from the DEO side, which stays verbose/hand-holding on pu
 
 ### Excel export
 
-`exportDistrictsToXlsx()` (`frontend/lib/export.ts`, ExcelJS) is one workbook, six sheets: a
-**Summary** cover sheet, then one sheet per financial year (districts × the 6 PAC fields plus
-Opening Balance/Net Recoverable, read straight off the synced `pac_data` row). FY sheets are
-named `FY 2021-22`, etc. Each FY sheet carries two merged banner rows (`SITE_TITLE_EN`, that
-sheet's own `dataPeriodForFY(fy)`) above the header row — `TITLE_ROWS` in `export.ts` is the
-single source of truth for how many rows that offsets the header/data/freeze-pane/print-titles
-math; update it, not individual call sites, if another banner row is added. Every column header
-is English-only (`englishLabel()`).
+`exportDistrictsToXlsx()` (`frontend/lib/export.ts`, ExcelJS) is one workbook, **eight** sheets: a
+**Summary** cover sheet, one sheet per financial year (districts × the 6 PAC fields plus
+Opening Balance/Net Recoverable, read straight off the synced `pac_data` row), and a trailing
+**RC Details** sheet. FY sheets are named `FY 2021-22`, etc. Each FY sheet carries two merged
+banner rows (`SITE_TITLE_EN`, that sheet's own `dataPeriodForFY(fy)`) above the header row —
+`TITLE_ROWS` in `export.ts` is the single source of truth for how many rows that offsets the
+header/data/freeze-pane/print-titles math; update it, not individual call sites, if another
+banner row is added. Every column header is English-only (`englishLabel()`).
+
+**RC Details** is one flat sheet across every district/FY (not per-FY, unlike the 5 sheets
+above) — District, Financial Year, RC Number, RC Amount, Stayed (Yes/No), one row per RC, parsed
+from each `pac_data` row's `rc_details` JSON string. Flat rather than split per-FY because a
+district's RC count varies per FY, so a flat table sorts/filters more usefully than five sparse
+per-FY sheets would. Same `TITLE_ROWS`/frozen-header/print-titles treatment as the FY sheets.
 
 The Summary sheet is added first (`SITE_TITLE_EN`, portal-wide `DATA_PERIOD_EN`, a `Generated:
 <formatIST(...)> IST` line, and a Metric/Value table: district counts, Gross Arrears/Recovered

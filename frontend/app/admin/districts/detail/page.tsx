@@ -23,6 +23,20 @@ function formatValue(field: (typeof PAC_FIELD_ORDER)[number], value: number) {
     : value.toLocaleString("en-IN");
 }
 
+type RcDetail = { rcNumber: string; rcAmount: number; stayed: boolean };
+
+// Lenient — this is a read-only admin display of a value the server already validated at
+// submit time (see api/lib/rc-details.ts), not a fresh zero-trust boundary.
+function parseRcDetails(raw: string | undefined): RcDetail[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 // Which district to show comes from sessionStorage (lib/adminNav.ts), set by whatever link
 // sent the admin here (a table row, the header's district search, the dashboard's top-5 list)
 // — not a ?id= URL query string. This app is a fully static export (next.config.ts:
@@ -33,6 +47,9 @@ export default function DistrictDetailPage() {
   const [districtId, setDistrictId] = useState<number | null>(null);
   const { ready, profile, districts, pacData, sync, syncing, lastSyncedAt, unlock, error, setError } = useAdminData();
   const [query, setQuery] = useState("");
+  // Which FY's RC Details disclosure is open, keyed by financial year — only one open at a
+  // time, toggled by clicking the "N RCs" badge next to that FY's RC Amount cell.
+  const [openRcFy, setOpenRcFy] = useState<string | null>(null);
 
   useEffect(() => {
     setDistrictId(getNavDistrictId());
@@ -215,11 +232,64 @@ export default function DistrictDetailPage() {
                         <td className="whitespace-nowrap px-3 py-2.5 font-medium text-slate-700 dark:text-slate-300">
                           {PAC_FIELD_LABELS[field]}
                         </td>
-                        {yearRows.map((row, i) => (
-                          <td key={FINANCIAL_YEARS[i]} className="whitespace-nowrap px-3 py-2.5 text-slate-800 dark:text-slate-200">
-                            {formatValue(field, row?.[field] ?? 0)}
-                          </td>
-                        ))}
+                        {yearRows.map((row, i) => {
+                          const fy = FINANCIAL_YEARS[i];
+                          if (field !== "rcAmount") {
+                            return (
+                              <td key={fy} className="whitespace-nowrap px-3 py-2.5 text-slate-800 dark:text-slate-200">
+                                {formatValue(field, row?.[field] ?? 0)}
+                              </td>
+                            );
+                          }
+                          const rcDetails = parseRcDetails(row?.rcDetails);
+                          return (
+                            <td key={fy} className="relative whitespace-nowrap px-3 py-2.5 text-slate-800 dark:text-slate-200">
+                              <div className="flex items-center gap-2">
+                                {formatValue(field, row?.[field] ?? 0)}
+                                {rcDetails.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setOpenRcFy((v) => (v === fy ? null : fy))}
+                                    className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900"
+                                  >
+                                    {rcDetails.length} RC{rcDetails.length === 1 ? "" : "s"}
+                                    <i className={`ti text-sm ${openRcFy === fy ? "ti-chevron-up" : "ti-chevron-down"}`} />
+                                  </button>
+                                )}
+                              </div>
+                              {openRcFy === fy && (
+                                <div className="absolute left-0 top-full z-20 mt-1 w-72 rounded-lg border border-slate-200 bg-white p-2 text-left shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                                  <table className="w-full border-collapse text-xs">
+                                    <thead>
+                                      <tr className="text-left font-medium text-slate-500 dark:text-slate-400">
+                                        <th className="py-1 pr-2">RC Number</th>
+                                        <th className="py-1 pr-2 text-right">Amount</th>
+                                        <th className="py-1 text-center">Stayed</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {rcDetails.map((d, di) => (
+                                        <tr key={di} className="border-t border-slate-100 dark:border-slate-800">
+                                          <td className="max-w-[9rem] truncate py-1 pr-2 font-normal">{d.rcNumber}</td>
+                                          <td className="py-1 pr-2 text-right tabular-nums font-normal">
+                                            ₹{d.rcAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                                          </td>
+                                          <td className="py-1 text-center">
+                                            {d.stayed ? (
+                                              <i className="ti ti-check text-sm text-amber-600 dark:text-amber-400" />
+                                            ) : (
+                                              <span className="text-slate-300 dark:text-slate-700">—</span>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </td>
+                          );
+                        })}
                       </tr>
                     ))
                   )}

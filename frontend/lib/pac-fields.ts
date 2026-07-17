@@ -51,6 +51,47 @@ export function isMoneyField(field: PacField): field is MoneyField {
   return (MONEY_FIELDS as string[]).includes(field);
 }
 
+// Per-RC breakdown behind rcCount/rcAmount — mirrored byte-for-byte in api/lib/rc-details.ts
+// (see CLAUDE.md's Data model section). Independent of recoveredAmount/stayAmount/
+// openingBalance/netRecoverable: an RC is issued to inform a defaulter what they owe, for any
+// amount, regardless of what's actually recovered. `stayed` (a court staying this specific RC)
+// is a separate concept from the aggregate Stay Count/Stay Amount fields (a court staying
+// recovery of an amount) — no cross-check between the two.
+export type RcDetail = {
+  rcNumber: string;
+  rcAmount: number;
+  stayed: boolean;
+};
+
+export const RC_NUMBER_MAX_LENGTH = 50;
+
+// Zero-trust validator, mirrored server-side in api/lib/rc-details.ts's function of the same
+// name — used here both as YearStepForm's pre-Save&Continue check and the submit route's final
+// zero-trust check. Returns a plain English message or null if valid.
+export function validateRcDetails(rcCount: number, rcAmount: number, rcDetails: RcDetail[]): string | null {
+  if (rcDetails.length !== rcCount) {
+    return `RC Details must have exactly ${rcCount} entries (received ${rcDetails.length})`;
+  }
+  let sum = 0;
+  for (let i = 0; i < rcDetails.length; i++) {
+    const d = rcDetails[i];
+    const rcNumber = typeof d.rcNumber === "string" ? d.rcNumber.trim() : "";
+    if (!rcNumber) return `RC #${i + 1}: RC Number cannot be blank`;
+    if (rcNumber.length > RC_NUMBER_MAX_LENGTH) {
+      return `RC #${i + 1}: RC Number cannot exceed ${RC_NUMBER_MAX_LENGTH} characters`;
+    }
+    if (typeof d.rcAmount !== "number" || Number.isNaN(d.rcAmount) || d.rcAmount < 0) {
+      return `RC #${i + 1}: RC Amount must be a non-negative number`;
+    }
+    sum += d.rcAmount;
+  }
+  // Small epsilon, not strict equality — these are floating-point rupee amounts.
+  if (Math.abs(sum - rcAmount) > 0.01) {
+    return `RC Details total (${sum}) must equal RC Amount (${rcAmount})`;
+  }
+  return null;
+}
+
 // Strips the " / <Hindi>" half off a PAC_FIELD_LABELS entry. Shared by every admin-facing
 // view (Dashboard, Districts table, Excel export) — those audiences don't need the Hindi;
 // only the DEO-facing form (YearStepForm/MasterView) mirrors the actual bilingual government

@@ -46,6 +46,13 @@ export const pacData = sqliteTable("pac_data", {
   rcCount: integer("rc_count").notNull(),
   // 3. (ii) आर.सी. में निहित धनराशि
   rcAmount: real("rc_amount").notNull(),
+  // Per-RC breakdown behind rcCount/rcAmount above — JSON-stringified RcDetail[] (see
+  // api/lib/rc-details.ts). One entry per RC: rcNumber, this RC's own amount, and whether a
+  // court has stayed this specific RC (independent of stayCount/stayAmount below — see
+  // CLAUDE.md's Data model section). Stored as a JSON string in one column (not a child table)
+  // per the department's ask; the array's own rcAmount values must sum to rcAmount above,
+  // enforced server-side in the submit route, never trusted from the client.
+  rcDetails: text("rc_details").notNull().default("[]"),
   // 4. वसूल की गयी धनराशि — independent of rc_amount, no parity requirement (see CLAUDE.md).
   // Capped server-side (submit route) at openingBalance + grossArrears for that same FY — can't
   // recover more than was ever owed within this 5-year window (opening carry-forward + this

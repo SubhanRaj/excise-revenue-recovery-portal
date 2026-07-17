@@ -47,11 +47,18 @@ since they need to hook into React render/event cycles rather than run as passiv
   | `stayCount`       | 5. (i) स्थगन आदेशों की संख्या — No. of Stay Orders                           | integer |
   | `stayAmount`      | 5. (ii) सक्षम न्यायालय द्वारा स्थगित धनराशि                                  | money   |
 
-  Plus two computed columns, `opening_balance` and `net_recoverable` (see "Net Recoverable"
-  below), and `submitted_by_name`/`locked_at`, duplicated from `users` onto the row itself so
-  Admin views can show "locked by X on Y" without a join. `financial_year` is one of
-  `"2021-22" .. "2025-26"` (`FINANCIAL_YEARS`). Standard `id` primary key and a `created_at`
-  (row-insert timestamp, not shown in any UI — distinct from `locked_at`) round out the table.
+  Plus `rc_details` — a JSON-stringified array of `{ rcNumber, rcAmount, stayed }`, the per-RC
+  breakdown behind `rcCount`/`rcAmount` above (row count must equal `rcCount`, entries must sum
+  to `rcAmount` — see `api/lib/rc-details.ts`'s `validateRcDetails()`). Independent of
+  `recoveredAmount`/`stayAmount`/the computed columns below — an RC informs a defaulter what
+  they owe, for any amount, regardless of what's actually recovered; `stayed` (a court staying
+  this specific RC) is a different concept from the aggregate Stay Count/Stay Amount fields (a
+  court staying recovery of an amount). Two computed columns, `opening_balance` and
+  `net_recoverable` (see "Net Recoverable" below), and `submitted_by_name`/`locked_at`,
+  duplicated from `users` onto the row itself so Admin views can show "locked by X on Y" without
+  a join. `financial_year` is one of `"2021-22" .. "2025-26"` (`FINANCIAL_YEARS`). Standard `id`
+  primary key and a `created_at` (row-insert timestamp, not shown in any UI — distinct from
+  `locked_at`) round out the table.
 - **`audit_log`** — one row per login/logout, district lock/unlock, or DEO-provisioning batch:
   `id`, `event_type`, `actor_role`, `actor_email`, `district_name`, `metadata` (JSON string),
   `created_at`. Pruned to the last 30 days on read.
@@ -66,6 +73,7 @@ since they need to hook into React render/event cycles rather than run as passiv
 | `0003_overjoyed_malcolm_colcord` | `districts.unlocked_at` / `unlock_reason` / `unlocked_by` |
 | `0004_white_songbird` | `audit_log` table |
 | `0005_married_landau` | `pac_data.opening_balance` / `net_recoverable` |
+| `0006_numerous_marten_broadcloak` | `pac_data.rc_details` |
 
 ### Net Recoverable (cumulative running balance)
 

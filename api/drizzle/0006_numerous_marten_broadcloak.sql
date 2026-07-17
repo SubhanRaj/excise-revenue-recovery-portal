@@ -1,0 +1,1 @@
+ALTER TABLE `pac_data` ADD `rc_details` text DEFAULT '[]' NOT NULL;

@@ -75,6 +75,20 @@ function istFilenameStamp(): string {
   return `${get("year")}-${get("month")}-${get("day")}_${get("hour")}-${get("minute")}-${get("second")}`;
 }
 
+type RcDetail = { rcNumber: string; rcAmount: number; stayed: boolean };
+
+// Lenient — this reads a value the server already validated at submit time (see
+// api/lib/rc-details.ts), not a fresh zero-trust boundary.
+function parseRcDetails(raw: string | undefined): RcDetail[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 // FINANCIAL_YEARS entries are "YYYY-YY" (e.g. "2021-22" runs 1 April 2021 – 31 March 2022) —
 // unlike DATA_PERIOD_EN (site.ts), which spans the whole 5-year window for UI chrome shown once,
 // each exported sheet is a single FY, so its own banner should name that FY's own period, not the
@@ -240,6 +254,43 @@ export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData
     totalRow.eachCell((cell) => styleTotalCell(cell));
   }
 
+  // Full per-RC breakdown, one row per RC (not summarized) — an auditor needs every individual
+  // RC's number/amount/stay status, not just the FY-level rcAmount total already on each FY
+  // sheet above. One flat sheet across all districts/FYs (rather than a sheet per FY) since a
+  // district's RC count varies per FY and a flat table sorts/filters more usefully than five
+  // sparse per-FY sheets would.
+  const rcRows: (string | number)[][] = [];
+  for (const d of sortedDistricts) {
+    for (const fy of FINANCIAL_YEARS) {
+      const match = pacData.find((p) => p.districtId === d.id && p.financialYear === fy);
+      const details = parseRcDetails(match?.rcDetails);
+      for (const rc of details) {
+        rcRows.push([d.districtName, `FY ${fy}`, rc.rcNumber, rc.rcAmount, rc.stayed ? "Yes" : "No"]);
+      }
+    }
+  }
+  const rcHeader = ["District", "Financial Year", "RC Number", "RC Amount", "Stayed"];
+  const rcWs = wb.addWorksheet("RC Details", {
+    views: [{ state: "frozen", ySplit: TITLE_ROWS + 1 }],
+    pageSetup: { ...PAGE_SETUP, printTitlesRow: `1:${TITLE_ROWS + 1}` },
+  });
+  rcWs.columns = [{ width: 22 }, { width: 14 }, { width: 24 }, { width: 18 }, { width: 10 }];
+  rcWs.addRow([`${SITE_TITLE_EN} — RC Details`]);
+  rcWs.addRow([DATA_PERIOD_EN]);
+  rcWs.mergeCells(1, 1, 1, rcHeader.length);
+  rcWs.mergeCells(2, 1, 2, rcHeader.length);
+  styleTitleCell(rcWs.getCell(1, 1));
+  styleSubtitleCell(rcWs.getCell(2, 1));
+  const rcHeaderRow = rcWs.addRow(rcHeader);
+  rcHeaderRow.eachCell((cell) => styleHeaderCell(cell));
+  for (const row of rcRows) {
+    const excelRow = rcWs.addRow(row);
+    excelRow.getCell(4).numFmt = RUPEE_FORMAT;
+  }
+  if (rcRows.length === 0) {
+    rcWs.addRow(["No RCs recorded across any district/FY."]);
+  }
+
   await downloadWorkbook(wb, `excise-revenue-recovery-${istFilenameStamp()}.xlsx`);
 }
 
@@ -294,8 +345,8 @@ export function exportDistrictsToSql(districts: CachedDistrict[], pacData: Cache
 
   for (const p of [...pacData].sort((a, b) => a.id - b.id)) {
     lines.push(
-      `INSERT INTO pac_data (id, district_id, financial_year, gross_arrears, rc_count, rc_amount, recovered_amount, stay_count, stay_amount, opening_balance, net_recoverable, submitted_by_name, locked_at) VALUES ` +
-        `(${p.id}, ${p.districtId}, ${sqlLiteral(p.financialYear)}, ${p.grossArrears}, ${p.rcCount}, ${p.rcAmount}, ${p.recoveredAmount}, ${p.stayCount}, ${p.stayAmount}, ${p.openingBalance}, ${p.netRecoverable}, ${sqlLiteral(p.submittedByName)}, ${sqlLiteral(p.lockedAt)});`
+      `INSERT INTO pac_data (id, district_id, financial_year, gross_arrears, rc_count, rc_amount, rc_details, recovered_amount, stay_count, stay_amount, opening_balance, net_recoverable, submitted_by_name, locked_at) VALUES ` +
+        `(${p.id}, ${p.districtId}, ${sqlLiteral(p.financialYear)}, ${p.grossArrears}, ${p.rcCount}, ${p.rcAmount}, ${sqlLiteral(p.rcDetails)}, ${p.recoveredAmount}, ${p.stayCount}, ${p.stayAmount}, ${p.openingBalance}, ${p.netRecoverable}, ${sqlLiteral(p.submittedByName)}, ${sqlLiteral(p.lockedAt)});`
     );
   }
 

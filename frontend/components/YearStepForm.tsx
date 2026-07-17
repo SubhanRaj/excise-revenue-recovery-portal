@@ -1,10 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import Cleave from "cleave.js/react";
 import PacFieldInput from "./PacFieldInput";
-import { PAC_FIELD_LABELS, OPENING_BALANCE_LABEL, netRecoverableForYear } from "@/lib/pac-fields";
-import type { DraftYear } from "@/lib/db";
+import {
+  PAC_FIELD_LABELS,
+  OPENING_BALANCE_LABEL,
+  RC_NUMBER_MAX_LENGTH,
+  netRecoverableForYear,
+  validateRcDetails,
+} from "@/lib/pac-fields";
+import type { DraftYear, DraftRcDetail } from "@/lib/db";
 import Button from "./ui/Button";
+
+type CleaveChangeEvent = React.ChangeEvent<HTMLInputElement> & { target: { rawValue: string } };
 
 const RC_COUNT_ERROR =
   "No. of RCs Issued cannot be 0 when RC Amount is entered / यदि आर.सी. में निहित धनराशि दर्ज " +
@@ -21,18 +30,58 @@ export function countAmountErrors(year: DraftYear): string[] {
   return errors;
 }
 
+// Exported so deo-data-entry/page.tsx's saveAndContinue() can block on the same rule — mirrors
+// the zero-trust api/lib/rc-details.ts validator (row count + per-entry blanks + running total)
+// via the shared frontend/lib/pac-fields.ts copy, converting DraftRcDetail's raw string amounts
+// to numbers first.
+export function rcDetailsError(year: DraftYear): string | null {
+  const rcCount = Number(year.rcCount) || 0;
+  if (rcCount === 0) return null;
+  const rcAmount = Number(year.rcAmount) || 0;
+  const details = (year.rcDetails ?? []).map((d) => ({
+    rcNumber: d.rcNumber,
+    rcAmount: Number(d.rcAmount) || 0,
+    stayed: d.stayed,
+  }));
+  return validateRcDetails(rcCount, rcAmount, details);
+}
+
+// Keeps the RC Details row count in sync with rcCount as the DEO edits it — growing appends
+// blank rows, shrinking truncates trailing rows. No confirm dialog: this is a small in-form
+// edit, not a top-level destructive action like Clear/Clear All (which do get one). Exported so
+// deo-data-entry/page.tsx's updateField() can call it the moment rcCount changes.
+export function syncRcDetailsToCount(rcDetails: DraftRcDetail[], rcCount: number): DraftRcDetail[] {
+  const count = Math.max(0, rcCount);
+  if (rcDetails.length === count) return rcDetails;
+  if (rcDetails.length > count) return rcDetails.slice(0, count);
+  return [
+    ...rcDetails,
+    ...Array.from({ length: count - rcDetails.length }, () => ({ rcNumber: "", rcAmount: "", stayed: false })),
+  ];
+}
+
 type Props = {
   year: DraftYear;
   // The previous FY's netRecoverable (0 for the first FY) — see CLAUDE.md's Data model section.
   openingBalance: number;
   onFieldChange: (field: keyof DraftYear, value: string) => void;
+  onRcDetailChange: (index: number, field: keyof DraftRcDetail, value: string | boolean) => void;
   onSaveAndContinue: () => void;
   onBack?: () => void;
   onClear: () => void;
   isLastYear: boolean;
 };
 
-export default function YearStepForm({ year, openingBalance, onFieldChange, onSaveAndContinue, onBack, onClear, isLastYear }: Props) {
+export default function YearStepForm({
+  year,
+  openingBalance,
+  onFieldChange,
+  onRcDetailChange,
+  onSaveAndContinue,
+  onBack,
+  onClear,
+  isLastYear,
+}: Props) {
   const gross = Number(year.grossArrears) || 0;
   const recovered = Number(year.recoveredAmount) || 0;
   const stay = Number(year.stayAmount) || 0;
@@ -40,8 +89,16 @@ export default function YearStepForm({ year, openingBalance, onFieldChange, onSa
 
   const [rcTouched, setRcTouched] = useState(false);
   const [stayTouched, setStayTouched] = useState(false);
+  const [rcDetailsOpen, setRcDetailsOpen] = useState(true);
+  const [rcDetailsTouched, setRcDetailsTouched] = useState(false);
   const rcCountInvalid = (Number(year.rcAmount) || 0) > 0 && (Number(year.rcCount) || 0) === 0;
   const stayCountInvalid = (Number(year.stayAmount) || 0) > 0 && (Number(year.stayCount) || 0) === 0;
+
+  const rcDetails = year.rcDetails ?? [];
+  const rcCount = Number(year.rcCount) || 0;
+  const rcAmountTotal = Number(year.rcAmount) || 0;
+  const rcDetailsSum = rcDetails.reduce((s, d) => s + (Number(d.rcAmount) || 0), 0);
+  const rcDetailsMismatch = rcCount > 0 && Math.abs(rcDetailsSum - rcAmountTotal) > 0.01;
 
   return (
     <div className="space-y-5">
@@ -90,6 +147,98 @@ export default function YearStepForm({ year, openingBalance, onFieldChange, onSa
             onBlur={() => setRcTouched(true)}
           />
         </div>
+
+        {rcCount > 0 && (
+          <div className="rounded-lg border border-slate-200 dark:border-slate-800">
+            <button
+              type="button"
+              onClick={() => setRcDetailsOpen((v) => !v)}
+              className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-sm font-medium text-slate-700 dark:text-slate-300"
+            >
+              <span className="flex items-center gap-1.5">
+                <i className="ti ti-list-details text-base text-blue-600 dark:text-blue-400" />
+                RC Details ({rcCount})
+              </span>
+              <i className={`ti text-base ${rcDetailsOpen ? "ti-chevron-up" : "ti-chevron-down"}`} />
+            </button>
+            {rcDetailsOpen && (
+              <div className="border-t border-slate-200 p-4 dark:border-slate-800">
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr className="text-left text-xs font-medium text-slate-500 dark:text-slate-400">
+                        <th className="w-8 py-1.5 pr-2">#</th>
+                        <th className="py-1.5 pr-2">RC Number</th>
+                        <th className="w-40 py-1.5 pr-2">RC Amount</th>
+                        <th className="w-24 py-1.5 text-center">Stayed?</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Array.from({ length: rcCount }, (_, i) => rcDetails[i] ?? { rcNumber: "", rcAmount: "", stayed: false }).map(
+                        (detail, i) => (
+                          <tr key={i} className="border-t border-slate-100 dark:border-slate-800">
+                            <td className="py-1.5 pr-2 tabular-nums text-slate-500 dark:text-slate-400">{i + 1}</td>
+                            <td className="py-1.5 pr-2">
+                              <input
+                                type="text"
+                                maxLength={RC_NUMBER_MAX_LENGTH}
+                                placeholder="RC Number"
+                                value={detail.rcNumber}
+                                onChange={(e) => onRcDetailChange(i, "rcNumber", e.target.value)}
+                                onBlur={() => setRcDetailsTouched(true)}
+                                className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-blue-900"
+                              />
+                            </td>
+                            <td className="py-1.5 pr-2">
+                              <Cleave
+                                value={detail.rcAmount}
+                                onBlur={() => setRcDetailsTouched(true)}
+                                options={{
+                                  numeral: true,
+                                  numeralThousandsGroupStyle: "lakh",
+                                  numeralDecimalScale: 2,
+                                  prefix: "₹",
+                                  rawValueTrimPrefix: true,
+                                }}
+                                onChange={(e: CleaveChangeEvent) => onRcDetailChange(i, "rcAmount", e.target.rawValue)}
+                                className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-blue-900"
+                              />
+                            </td>
+                            <td className="py-1.5 text-center">
+                              <input
+                                type="checkbox"
+                                checked={detail.stayed}
+                                onChange={(e) => onRcDetailChange(i, "stayed", e.target.checked)}
+                                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-700"
+                              />
+                            </td>
+                          </tr>
+                        )
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <div
+                  className={`mt-3 flex items-center justify-between text-xs ${
+                    rcDetailsTouched && rcDetailsMismatch
+                      ? "font-bold text-red-600 dark:text-red-400"
+                      : "text-slate-500 dark:text-slate-400"
+                  }`}
+                >
+                  <span>
+                    Entered: ₹{rcDetailsSum.toLocaleString("en-IN", { minimumFractionDigits: 2 })} / Required: ₹
+                    {rcAmountTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                {rcDetailsTouched && rcDetailsMismatch && (
+                  <p className="mt-1 text-xs font-bold text-red-600 dark:text-red-400" lang="hi">
+                    आर.सी. विवरण की कुल राशि, आर.सी. राशि के बराबर होनी चाहिए।
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         <PacFieldInput
           label={PAC_FIELD_LABELS.recoveredAmount}

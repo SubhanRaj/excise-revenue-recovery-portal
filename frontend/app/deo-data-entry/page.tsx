@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { db, type DraftYear } from "@/lib/db";
+import { db, type DraftYear, type DraftRcDetail } from "@/lib/db";
 import { FINANCIAL_YEARS, PAC_FIELD_ORDER, computeNetRecoverableSeries } from "@/lib/pac-fields";
 import { apiFetch, ApiError } from "@/lib/api";
 import { clearClientSession, consumeJustAuthed } from "@/lib/session";
@@ -14,7 +14,7 @@ import {
   confirmClearAll,
   notifyToast,
 } from "@/lib/alerts";
-import YearStepForm, { countAmountErrors } from "@/components/YearStepForm";
+import YearStepForm, { countAmountErrors, rcDetailsError, syncRcDetailsToCount } from "@/components/YearStepForm";
 import MasterView from "@/components/MasterView";
 import Button from "@/components/ui/Button";
 import AppHeader from "@/components/ui/AppHeader";
@@ -35,13 +35,21 @@ const RECOVERED_CAP_TEXT =
   "recover more than was owed. / वसूल की गयी धनराशि इस वर्ष की प्रारंभिक शेष धनराशि + सकल बकाया " +
   "धनराशि से अधिक नहीं हो सकती — जितना बकाया था उससे अधिक वसूली संभव नहीं है।";
 
-// Shape of a row returned by GET /api/pac-data/mine — the raw pac_data table row (numbers),
-// as opposed to DraftYear's raw-string fields (see db.ts for why those stay strings).
+const RC_DETAILS_TITLE = "RC Details incomplete / आर.सी. विवरण अधूरा है";
+const RC_DETAILS_TEXT =
+  "Every RC Number/Amount must be filled in, and the RC Details total must equal the RC " +
+  "Amount entered above. / प्रत्येक आर.सी. नंबर/राशि भरी जानी चाहिए, और आर.सी. विवरण की कुल " +
+  "राशि ऊपर दर्ज आर.सी. राशि के बराबर होनी चाहिए।";
+
+// Shape of a row returned by GET /api/pac-data/mine — the raw pac_data table row (numbers, and
+// rcDetails as the stored JSON string), as opposed to DraftYear's raw-string fields (see db.ts
+// for why those stay strings).
 type RemoteYearRow = {
   financialYear: string;
   grossArrears: number;
   rcCount: number;
   rcAmount: number;
+  rcDetails: string;
   recoveredAmount: number;
   stayCount: number;
   stayAmount: number;
@@ -53,11 +61,29 @@ function blankYear(financialYear: (typeof FINANCIAL_YEARS)[number]): DraftYear {
     grossArrears: "",
     rcCount: "",
     rcAmount: "",
+    rcDetails: [],
     recoveredAmount: "",
     stayCount: "",
     stayAmount: "",
     completed: false,
   };
+}
+
+// Parses the stored JSON string back into DraftRcDetail's raw-string-amount shape — best-effort,
+// falls back to an empty array for a malformed/missing value rather than throwing (this is a
+// re-fetch of the DEO's own previously-submitted data, not a fresh zero-trust boundary).
+function parseRemoteRcDetails(raw: string): DraftRcDetail[] {
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((d) => ({
+      rcNumber: String(d.rcNumber ?? ""),
+      rcAmount: String(d.rcAmount ?? ""),
+      stayed: Boolean(d.stayed),
+    }));
+  } catch {
+    return [];
+  }
 }
 
 export default function EntryPage() {
@@ -112,6 +138,7 @@ export default function EntryPage() {
             grossArrears: String(row.grossArrears),
             rcCount: String(row.rcCount),
             rcAmount: String(row.rcAmount),
+            rcDetails: parseRemoteRcDetails(row.rcDetails),
             recoveredAmount: String(row.recoveredAmount),
             stayCount: String(row.stayCount),
             stayAmount: String(row.stayAmount),
@@ -139,7 +166,25 @@ export default function EntryPage() {
   function updateField(index: number, field: keyof DraftYear, value: string) {
     setYears((prev) => {
       const next = [...prev];
-      next[index] = { ...next[index], [field]: value };
+      const updated = { ...next[index], [field]: value } as DraftYear;
+      // Keep the RC Details row count in sync the moment rcCount changes — see
+      // YearStepForm.tsx's syncRcDetailsToCount() for why this lives here (that component holds
+      // no internal field state, per its own controlled-component convention).
+      if (field === "rcCount") {
+        updated.rcDetails = syncRcDetailsToCount(updated.rcDetails ?? [], Number(value) || 0);
+      }
+      next[index] = updated;
+      db.draftYears.put(next[index]);
+      return next;
+    });
+  }
+
+  function updateRcDetail(index: number, rcIndex: number, field: keyof DraftRcDetail, value: string | boolean) {
+    setYears((prev) => {
+      const next = [...prev];
+      const details = [...(next[index].rcDetails ?? [])];
+      details[rcIndex] = { ...details[rcIndex], [field]: value };
+      next[index] = { ...next[index], rcDetails: details };
       db.draftYears.put(next[index]);
       return next;
     });
@@ -147,7 +192,10 @@ export default function EntryPage() {
 
   async function saveAndContinue(index: number) {
     const year = years[index];
-    const blank = PAC_FIELD_ORDER.some((field) => year[field].trim() === "");
+    const rcDetailsBlank = (year.rcDetails ?? []).some(
+      (d) => d.rcNumber.trim() === "" || d.rcAmount.trim() === ""
+    );
+    const blank = PAC_FIELD_ORDER.some((field) => year[field].trim() === "") || rcDetailsBlank;
     if (blank) return notifyToast({ icon: "error", title: BLANK_FIELD_TITLE, text: BLANK_FIELD_TEXT });
 
     // A non-zero RC/Stay Amount with a 0 count is a data-entry oversight — the inline field
@@ -168,6 +216,12 @@ export default function EntryPage() {
     const recovered = Number(year.recoveredAmount) || 0;
     if (recovered > openingBalance + gross) {
       return notifyToast({ icon: "error", title: RECOVERED_CAP_TITLE, text: RECOVERED_CAP_TEXT });
+    }
+
+    // Zero-trust cap mirrored server-side (validateRcDetails() in the submit route) — every RC
+    // Details row must be filled in (checked above) and their amounts must sum to RC Amount.
+    if (rcDetailsError(year)) {
+      return notifyToast({ icon: "error", title: RC_DETAILS_TITLE, text: RC_DETAILS_TEXT });
     }
 
     const updated = { ...year, completed: true };
@@ -241,6 +295,11 @@ export default function EntryPage() {
               grossArrears: Number(y.grossArrears),
               rcCount: Number(y.rcCount),
               rcAmount: Number(y.rcAmount),
+              rcDetails: (y.rcDetails ?? []).map((d) => ({
+                rcNumber: d.rcNumber.trim(),
+                rcAmount: Number(d.rcAmount) || 0,
+                stayed: d.stayed,
+              })),
               recoveredAmount: Number(y.recoveredAmount),
               stayCount: Number(y.stayCount),
               stayAmount: Number(y.stayAmount),
@@ -457,6 +516,7 @@ export default function EntryPage() {
               year={years[step]}
               openingBalance={netRecoverableSeries[years[step].financialYear].openingBalance}
               onFieldChange={(field, value) => updateField(step, field, value)}
+              onRcDetailChange={(rcIndex, field, value) => updateRcDetail(step, rcIndex, field, value)}
               onSaveAndContinue={() => saveAndContinue(step)}
               onBack={step > 0 ? () => setStep(step - 1) : undefined}
               onClear={() => clearYear(step)}
