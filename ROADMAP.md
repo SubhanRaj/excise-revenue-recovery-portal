@@ -903,10 +903,22 @@ ends in a bilingual "contact the Admin" paragraph + a Logout button.
 Requests**/Audit Log) — a real nav slot rather than a `ProfileMenu` one-off, since this is a
 queue admins are expected to check regularly (unlike DEO Provisioning, which is occasional
 bulk-ops and correctly stays a one-off `Link`). Each row: district, requested-at, reason,
-attachment link (if any, via the admin-only download route), Approve/Deny buttons — both open a
-small reason-required prompt (reusing `promptUnlockReason()`'s SweetAlert2 pattern from
-`alerts.ts`, since this is plain single-textarea text like that existing modal, unlike the DEO
-side's form).
+attachment link (if any), Approve/Deny buttons — both open a small reason-required prompt
+(reusing `promptUnlockReason()`'s SweetAlert2 pattern from `alerts.ts`, since this is plain
+single-textarea text like that existing modal, unlike the DEO side's form).
+
+**In-browser PDF preview, not a forced download — decided.** "View attachment" opens a modal
+using the browser's own native PDF viewer, same drawer+`<iframe>` pattern as the
+`pdf-markdown-pipeline` project's `resources/views/approvals/index.blade.php` (`<iframe
+id="drawer-pdf">`, slide-out panel, action buttons alongside). Since this app's attachment route
+needs `Authorization: Bearer <token>` (no cookies — see CLAUDE.md's Auth section), an `<iframe
+src="...">` can't hit the API URL directly; the click handler `apiFetch()`s the attachment route
+as a blob, `URL.createObjectURL(blob)`, and sets that as the iframe `src`. Revoke the object URL
+(`URL.revokeObjectURL`) on modal close to avoid leaking memory across repeated opens. The modal
+also carries an explicit "Download" button (`<a download>` on the same already-fetched blob) for
+an admin who wants a local copy, alongside Approve/Deny — no second network request needed for
+that. New `components/ui/PdfPreviewModal.tsx`, first modal in the app that isn't SweetAlert2
+(same reasoning as the DEO-side form: an iframe doesn't fit Swal's HTML-string API).
 
 **Also relocates `AppHeader`'s "Synced: <time>" text** (`components/ui/AppHeader.tsx:138-144`,
 currently a `lg:flex` span next to the Sync button) into `ProfileMenu`'s dropdown, placed beneath
@@ -943,13 +955,19 @@ just extended to also require one on deny.
   section already documents and relies on (the Bearer-token-in-localStorage trade-off is only
   safe *because* no user-controlled data is ever rendered as raw HTML anywhere in the frontend) —
   audit this again if that ever changes.
-- **PDF content itself isn't sanitized** (embedded JS in a PDF can execute in some viewers) —
-  mitigated by never rendering it inline in the admin UI (`<iframe>`/`<embed>`): the download
-  route always sets `Content-Disposition: attachment` (forces a download, not an in-page render)
-  plus `X-Content-Type-Options: nosniff` (stops the browser from MIME-sniffing past the declared
-  `application/pdf`). No malware/AV scanning of the PDF content — accepted as reasonable given
-  every uploader is an authenticated, provisioned government DEO, not the open internet; call
-  this out explicitly if that trust assumption ever changes (e.g. if login is ever opened wider).
+- **PDF content itself isn't sanitized** (embedded JS in a PDF can execute in some viewers) — the
+  preview modal renders it through the **browser's own native PDF viewer** (via a `blob:` object
+  URL in an `<iframe>`), never through a JS-based PDF renderer or `dangerouslySetInnerHTML`; any
+  script embedded in the PDF runs inside that native viewer's own sandbox (no DOM/cookie/token
+  access to the parent page — the same isolation Gmail/Drive's inline PDF preview relies on), not
+  as page-level JS. The attachment route still sets `X-Content-Type-Options: nosniff` (stops
+  MIME-sniffing past the declared `application/pdf`) and `Content-Type: application/pdf`; dropped
+  the earlier plan to force `Content-Disposition: attachment` on every response now that inline
+  preview is the primary path — a hardcoded `attachment` disposition would fight the browser's
+  native viewer on some hosts (route back to a mandatory download instead of showing the iframe).
+  No malware/AV scanning of the PDF content — accepted as reasonable given every uploader is an
+  authenticated, provisioned government DEO, not the open internet; call this out explicitly if
+  that trust assumption ever changes (e.g. if login is ever opened wider).
 - **Enumeration**: the attachment download route takes the `unlock_requests.id`, looks up
   `attachmentKey` server-side, and never accepts a raw R2 key from the client — an admin can't
   probe for attachments outside what a real request row points at. The R2 bucket itself has no
