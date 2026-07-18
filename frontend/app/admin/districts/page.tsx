@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   createColumnHelper,
@@ -17,10 +17,9 @@ import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, OPENING_BALANCE_LAB
 import { formatIST } from "@/lib/format";
 import { ApiError } from "@/lib/api";
 import { notifyToast, promptUnlockReason, confirmTruncateDemo } from "@/lib/alerts";
-import { exportDistrictsToXlsx, exportDistrictsToSql, downloadDeoTemplate, parseDeoTemplateFile } from "@/lib/export";
+import { exportDistrictsToXlsx, exportDistrictsToSql } from "@/lib/export";
 import { useAdminData } from "@/lib/useAdminData";
 import { setNavDistrictId, consumeNavStatusFilter } from "@/lib/adminNav";
-import { apiFetch } from "@/lib/api";
 import AppHeader, { type NavLink } from "@/components/ui/AppHeader";
 import Button from "@/components/ui/Button";
 import Select from "@/components/ui/Select";
@@ -69,9 +68,7 @@ export default function DistrictsPage() {
       setPagination((p) => ({ ...p, pageSize: Number(saved) }));
     }
   }, []);
-  const [provisioning, setProvisioning] = useState(false);
   const [exporting, setExporting] = useState<"xlsx" | "sql" | null>(null);
-  const deoFileInputRef = useRef<HTMLInputElement>(null);
 
   const hasDemoDistrict = districts.some(d => d.districtName === "Demo District");
 
@@ -149,44 +146,6 @@ export default function DistrictsPage() {
       }
     } finally {
       setExporting(null);
-    }
-  }
-
-  async function handleDeoFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // allow re-selecting the same file name after a fix-and-reupload
-    if (!file) return;
-
-    setProvisioning(true);
-    try {
-      const buffer = await file.arrayBuffer();
-      const workbook = new window.ExcelJS.Workbook();
-      await workbook.xlsx.load(buffer);
-      const templateRows = parseDeoTemplateFile(workbook);
-      if (templateRows.length === 0) {
-        setError("No rows found in the uploaded file.");
-        return;
-      }
-
-      const { results } = await apiFetch<{
-        results: { districtName: string; status: "inserted" | "updated" | "skipped" | "error"; message?: string }[];
-      }>("/api/admin/provision-deos", { method: "POST", body: JSON.stringify({ rows: templateRows }) }, "admin");
-
-      const inserted = results.filter((r) => r.status === "inserted").length;
-      const updated = results.filter((r) => r.status === "updated").length;
-      const errors = results.filter((r) => r.status === "error");
-
-      notifyToast({
-        icon: errors.length > 0 ? "error" : "success",
-        title: `${inserted} added, ${updated} updated${errors.length ? `, ${errors.length} failed` : ""}`,
-      });
-      if (errors.length > 0) {
-        setError(`Failed rows: ${errors.map((r) => `${r.districtName} (${r.message})`).join("; ")}`);
-      }
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Upload failed.");
-    } finally {
-      setProvisioning(false);
     }
   }
 
@@ -324,12 +283,6 @@ export default function DistrictsPage() {
           doesn&apos;t look like the page has frozen. <strong>Unlock</strong> lets a District
           Excise Officer re-edit a submission they already locked.
         </p>
-        <p>
-          <strong>Download DEO Template</strong> gives you all 75 districts pre-filled; type
-          each DEO&apos;s CUG mobile number and/or email into the blank columns and upload the
-          same file back with <strong>Upload DEO Data</strong> to add or update their login.
-          Existing DEOs are updated, not duplicated, by matching district name.
-        </p>
       </HelpPanel>
       <div className="flex w-full flex-1 flex-col px-4 py-6 sm:px-6 lg:px-[10%] xl:px-[5%] 2xl:px-[3%]">
         {error && (
@@ -338,13 +291,13 @@ export default function DistrictsPage() {
           </div>
         )}
 
-        <div className="mb-4 flex flex-nowrap items-center justify-between gap-3">
+        <div className="mb-4 flex flex-nowrap items-center justify-between gap-6">
           <input
             type="text"
             placeholder="Search district..."
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
-            className="w-full max-w-xs shrink-0 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            className="w-full max-w-[13rem] shrink-0 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           />
 
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
@@ -376,21 +329,6 @@ export default function DistrictsPage() {
                 </option>
               ))}
             </Select>
-            <Button variant="blue" size="xs" onClick={() => void downloadDeoTemplate(districts)}>
-              <i className="ti ti-download text-sm" />
-              DEO Template
-            </Button>
-            <input
-              ref={deoFileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleDeoFileSelected}
-              className="hidden"
-            />
-            <Button variant="amber" size="xs" onClick={() => deoFileInputRef.current?.click()} disabled={provisioning}>
-              <i className={`ti ti-upload text-sm ${provisioning ? "animate-pulse" : ""}`} />
-              {provisioning ? "Uploading..." : "Upload DEO Data"}
-            </Button>
             <Button size="xs" onClick={exportExcel} disabled={exporting !== null}>
               <i className={`ti ti-file-spreadsheet text-sm ${exporting === "xlsx" ? "animate-pulse" : ""}`} />
               {exporting === "xlsx" ? "Exporting..." : "Export as Excel Workbook"}

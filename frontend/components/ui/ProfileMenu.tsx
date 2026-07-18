@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 
 export type Profile = {
   role: "deo" | "admin";
@@ -64,6 +65,16 @@ export default function ProfileMenu({ profile, onLogout }: { profile: Profile | 
               <i className="ti ti-mail text-base text-slate-400" />
               <span className="truncate">{profile.email}</span>
             </div>
+          )}
+          {profile.role === "admin" && (
+            <Link
+              href="/admin/districts/provisioning"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-1.5 rounded-md border-t border-slate-100 pt-2 text-slate-600 hover:text-slate-900 dark:border-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+            >
+              <i className="ti ti-user-plus text-base text-slate-400" />
+              DEO Provisioning
+            </Link>
           )}
           {onLogout && (
             <button

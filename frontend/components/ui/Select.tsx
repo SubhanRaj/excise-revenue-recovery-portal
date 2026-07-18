@@ -22,7 +22,7 @@ const SIZES: Record<NonNullable<Props["size"]>, string> = {
 // own bulky default arrow eating extra padding. One text-sm size for every admin dropdown —
 // these used to mix text-xs (status/event filters) and text-sm (FY/rows-per-page filters)
 // sitting side by side in the same toolbar row, which is what made them look mismatched.
-export default function Select({ className = "", size = "sm", ...props }: Props) {
+export default function Select({ className = "", size = "sm", style, ...props }: Props) {
   return (
     <div className="relative inline-block">
       {/* min-w-[8rem]: with appearance-none + border-box (Tailwind's preflight), browsers'
@@ -32,6 +32,14 @@ export default function Select({ className = "", size = "sm", ...props }: Props)
           browser to size around our padding correctly. */}
       <select
         {...props}
+        // globals.css forces `select { line-height: 1 }` app-wide (icon/label alignment fix —
+        // see CLAUDE.md) via an unlayered rule that no Tailwind leading-* utility can outrank.
+        // At line-height: 1, tall glyphs (Devanagari मात्राएँ, some digit renderings) visually
+        // clip at the top regardless of how much vertical padding the size variants above add
+        // — padding grows the box, it doesn't grow the text's own line box. An inline style is
+        // the one thing with enough cascade precedence to beat that unlayered rule; callers can
+        // still override it via their own `style` prop.
+        style={{ lineHeight: "1.4", ...style }}
         className={`min-w-[8rem] appearance-none rounded-md border border-slate-300 bg-white pl-3 pr-9 text-sm text-slate-700 shadow-sm outline-none hover:bg-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 ${SIZES[size]} ${className}`}
       />
       <i className="ti ti-chevron-down pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-500 dark:text-slate-400" />
