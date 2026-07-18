@@ -150,13 +150,13 @@ Then:
    before reversing it — check the detail page again to see "Last unlocked by / on / Reason", and
    check **Audit Log** (top nav) to see the lock and unlock events recorded, newest first — try
    filtering to just "District locked"/"District unlocked" with the event dropdown to confirm
-   both show up. **Export as Excel Workbook** — open the downloaded file and confirm: the FY sheet
-   you entered RC Details for shows the district's row followed by a collapsed group (click the
-   `+` to its left) of one sub-row per RC, indented, amount under the RC Amount column; and a
-   trailing **RC Details** sheet exists (District, Financial Year, RC Number, RC Amount, Stayed)
-   with a bold summary row per district ("N RC(s)") and that district's RCs collapsed underneath —
-   confirm the header row's filter dropdowns (AutoFilter) let you narrow to one District/FY/Stayed
-   value.
+   both show up. **Export as Excel Workbook** — open the downloaded file (confirm Excel opens it
+   cleanly, no "problem with some content"/repair prompt) and check: the FY sheet you entered RC
+   Details for shows the district's row followed by one indented sub-row per RC, amount under the
+   RC Amount column; and a trailing **RC Details** sheet exists (District, Financial Year, RC
+   Number, RC Amount, Stayed) with a bold summary row per district ("N RC(s)") followed by that
+   district's RC rows — confirm the header row's filter dropdowns (AutoFilter) let you narrow to
+   one District/FY/Stayed value.
 5. **Re-login as the now-unlocked DEO**: CUG tab → the demo CUG → should land on the Master
    View with the previously submitted figures already filled in (re-fetched from D1, not
    blank), not a fresh empty Year 1. Editing and hitting "Submit & Lock" again should succeed

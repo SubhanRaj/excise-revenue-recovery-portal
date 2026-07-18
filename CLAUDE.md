@@ -473,14 +473,12 @@ header/data/freeze-pane/print-titles math; update it, not individual call sites,
 banner row is added. Every column header is English-only (`englishLabel()`).
 
 Each FY sheet also shows that year's own per-RC breakdown in place: every district row is
-immediately followed by one collapsed sub-row per RC it has in that FY (indented `↳ RC number —
-Stayed` in the District column, the amount under the same RC Amount column, parsed via
-`parseRcDetails()`), collapsed by default via Excel's outline `+`/`-` group control
-(`ws.properties.outlineProperties = { summaryBelow: false, summaryRight: false }` so the toggle
-sits on the district row rather than expecting a subtotal row below the group, `subRow.hidden =
-true` + `subRow.outlineLevel = 1` on each RC row). `rcAmountCol0` (computed once, shared by every
-FY sheet) is the single source of truth for which column a sub-row's amount lines up under —
-update it, not each FY-sheet call site, if the field order ever changes.
+immediately followed by one sub-row per RC it has in that FY (indented `↳ RC number — Stayed` in
+the District column, the amount under the same RC Amount column, parsed via `parseRcDetails()`,
+styled italic/gray to read as a nested detail rather than another district). `rcAmountCol0`
+(computed once, shared by every FY sheet) is the single source of truth for which column a
+sub-row's amount lines up under — update it, not each FY-sheet call site, if the field order ever
+changes.
 
 **RC Details** is one flat sheet across every district/FY (not per-FY, unlike the 5 sheets
 above) — District, Financial Year, RC Number, RC Amount, Stayed (Yes/No), parsed from each
@@ -488,11 +486,23 @@ above) — District, Financial Year, RC Number, RC Amount, Stayed (Yes/No), pars
 district's RCs (or every stayed RC portfolio-wide) without opening all 5 FY sheets. Rows are
 grouped per district (a bold `District — "N RC(s)"` summary row, same `styleTotalCell()` used for
 FY sheets' TOTAL row, applied via `eachCell({ includeEmpty: true }, ...)` so the tint spans every
-column even where a cell has no value) with that district's RCs collapsed underneath it (same
-outline convention as the FY sheets above) — a flat 75-district table with no structure would run
-to hundreds of unusable rows. `rcWs.autoFilter` spans the header row through the last data row so
-District/Financial Year/Stayed can be filtered directly without expanding every group first. Same
-`TITLE_ROWS`/frozen-header/print-titles treatment as the FY sheets.
+column even where a cell has no value, followed by that district's own RC rows) — a flat
+75-district table with no structure would run to hundreds of unusable rows. `rcWs.autoFilter`
+spans the header row through the last data row so District/Financial Year/Stayed can be filtered
+directly. This sheet's title/subtitle banner is deliberately **not** `mergeCells`'d, unlike every
+other sheet in this workbook — ExcelJS has a documented bug (exceljs/exceljs#970) where a merged
+cell anywhere on a sheet that also carries an `autoFilter` corrupts the file (Excel's own repair
+silently strips both features on open); the banner text sits left-aligned in column A instead.
+Same `TITLE_ROWS`/frozen-header/print-titles treatment as the FY sheets otherwise.
+
+**Neither sheet uses Excel's row `outlineLevel`/`hidden`/`collapsed` grouping** (no
+"click `+` to expand a district's RCs") even though that would visually compact both of the above
+further — multiple open ExcelJS issues (exceljs/exceljs#550, #2814) document that feature writing
+outline XML Excel doesn't reliably accept, which is what caused the "problem with some content"
+repair prompt the first two attempts at this feature hit. Don't reintroduce
+`row.outlineLevel`/`row.hidden`/`worksheet.properties.outlineProperties` on these sheets without
+re-verifying against a real Excel install first (`xmllint`/openpyxl/SheetJS all happily accepted
+the broken files — none of them catch what Excel's own stricter loader rejects).
 
 The Summary sheet is added first (`SITE_TITLE_EN`, portal-wide `DATA_PERIOD_EN`, a `Generated:
 <formatIST(...)> IST` line, and a Metric/Value table: district counts, Gross Arrears/Recovered

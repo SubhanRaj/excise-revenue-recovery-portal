@@ -762,18 +762,28 @@ tooling only.
 ## Milestone 27 — RC Details grouped into the Excel export (done)
 
 - [x] Each FY sheet in `exportDistrictsToXlsx()` now shows that year's own per-RC breakdown
-      in place: every district row is immediately followed by a collapsed sub-row per RC it has
-      that FY (indented `↳ RC number — Stayed`, amount under the same RC Amount column),
-      collapsed by default via Excel's outline `+`/`-` group control on the district row
-      (`ws.properties.outlineProperties = { summaryBelow: false, summaryRight: false }`).
-      Previously a district's RC breakdown for a given year wasn't visible on that year's own
-      sheet at all — only the aggregate `rcAmount` total.
+      in place: every district row is immediately followed by a sub-row per RC it has that FY
+      (indented `↳ RC number — Stayed`, amount under the same RC Amount column, styled italic/
+      gray). Previously a district's RC breakdown for a given year wasn't visible on that year's
+      own sheet at all — only the aggregate `rcAmount` total.
 - [x] The trailing **RC Details** sheet — previously one flat, unstructured row-per-RC table
       across all 75 districts × 5 years — is now grouped per district (a bold `District — "N
-      RC(s)"` summary row, its RCs collapsed underneath, same outline convention as the FY
-      sheets) with an `autoFilter` on the header row so District/Financial Year/Stayed can be
-      filtered directly. Un-grouped, an admin/auditor had to scroll a table that could run to
-      hundreds of rows with no structure to find one district's RCs.
+      RC(s)"` summary row followed by that district's RC rows) with an `autoFilter` on the header
+      row so District/Financial Year/Stayed can be filtered directly. Un-grouped, an admin/
+      auditor had to scroll a table that could run to hundreds of rows with no structure to find
+      one district's RCs.
+- [x] **Two rounds of Excel-corruption fixes**, both hit only after seeding real demo data and
+      actually opening the downloaded file in Excel (every other validator tried —
+      `xmllint`, openpyxl, SheetJS — accepted the broken files without complaint):
+      1. The RC Details sheet's title/subtitle banner used `mergeCells` (like every other sheet)
+         alongside the new `autoFilter` — ExcelJS has a documented bug (exceljs/exceljs#970)
+         where any merged cell on a sheet that also carries an autoFilter corrupts the file.
+         Fixed by dropping the merge on that one sheet, left-aligning the banner text instead.
+      2. The per-RC sub-rows' `outlineLevel`/`hidden`/`collapsed` attributes (Excel's row-
+         grouping/"click + to expand" feature) were *also* independently corrupting the file —
+         multiple open ExcelJS issues (exceljs/exceljs#550, #2814) document this feature writing
+         outline XML Excel doesn't reliably accept. Dropped entirely; sub-rows are always visible
+         now (still indented/grouped visually, just not collapsible).
 - [x] No schema/migration change — this is entirely `frontend/lib/export.ts`, reading the same
       `rc_details` JSON already synced client-side.
 
