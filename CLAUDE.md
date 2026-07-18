@@ -65,7 +65,10 @@ reference. Rules an agent must preserve when touching `pac_data` or its computed
   `netRecoverable` — an RC's own detail is independent of what's actually recovered (see
   Validation rules below). Only the admin district detail page (a small disclosure next to the
   RC Amount cell) and the Excel export's dedicated "RC Details" sheet surface it; the admin
-  districts table stays summary-only.
+  districts table stays summary-only. `stayed` is still a plain `boolean` in the schema/
+  validation — `YearStepForm.tsx`'s entry row renders it as a bilingual "No / नहीं" (default) /
+  "Yes / हाँ" `Select` dropdown rather than a checkbox (a DEO could tick a checkbox by accident;
+  a dropdown forces a deliberate choice), not a new field or type.
 
 ## Validation rules — enforce on both client and server
 

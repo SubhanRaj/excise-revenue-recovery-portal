@@ -422,8 +422,10 @@ export default function EntryPage() {
             <p>
               यदि <strong>आर.सी. की संख्या</strong> 0 से अधिक है, तो एक{" "}
               <strong>आर.सी. विवरण</strong> अनुभाग दिखाई देगा — प्रत्येक आर.सी. की अपनी संख्या और
-              राशि दर्ज करें, और यह चिह्नित करें कि क्या वह किसी सक्षम न्यायालय द्वारा स्थगित है।
-              सभी आर.सी. राशियों का योग ऊपर दर्ज आर.सी. राशि के बराबर होना चाहिए।
+              राशि दर्ज करें, और &quot;सक्षम न्यायालय द्वारा स्थगित?&quot; ड्रॉपडाउन से चुनें
+              (डिफ़ॉल्ट रूप से नहीं — केवल तभी हाँ चुनें जब उस विशेष आर.सी. को किसी सक्षम
+              न्यायालय द्वारा स्थगित किया गया हो)। सभी आर.सी. राशियों का योग ऊपर दर्ज आर.सी.
+              राशि के बराबर होना चाहिए।
             </p>
             <p>
               <strong>प्रारंभिक शेष धनराशि</strong> पिछले वर्ष की शुद्ध वसूली योग्य धनराशि से आगे
@@ -448,9 +450,10 @@ export default function EntryPage() {
         </p>
         <p>
           If <strong>RC Count</strong> is more than 0, an <strong>RC Details</strong> section
-          appears — enter each RC&apos;s own Number and Amount, and mark whether it has been
-          stayed by a competent court. Every RC Amount must add up to the RC Amount entered
-          above.
+          appears — enter each RC&apos;s own Number and Amount, and select from the
+          &quot;Stayed by Court?&quot; dropdown (defaults to No — choose Yes only if a
+          competent court has stayed that specific RC). Every RC Amount must add up to the RC
+          Amount entered above.
         </p>
         <p>
           <strong>Opening Balance</strong> carries forward from the previous year&apos;s Net

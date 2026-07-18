@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Cleave from "cleave.js/react";
 import PacFieldInput from "./PacFieldInput";
+import Select from "./ui/Select";
 import {
   PAC_FIELD_LABELS,
   OPENING_BALANCE_LABEL,
@@ -171,13 +172,13 @@ export default function YearStepForm({
                 <div className="overflow-x-auto">
                   <table className="w-full table-fixed border-collapse text-sm">
                     <thead>
-                      <tr className="text-left text-xs font-medium text-slate-500 dark:text-slate-400">
+                      <tr className="text-left text-xs font-semibold text-slate-600 dark:text-slate-400">
                         <th className="w-8 py-1.5 pr-2">#</th>
-                        <th className="w-[38%] py-1.5 pr-2">RC Number</th>
-                        <th className="w-[38%] py-1.5 pr-2">RC Amount</th>
-                        <th className="w-28 py-1.5 text-center leading-tight">
+                        <th className="w-[34%] py-1.5 pr-2">RC Number</th>
+                        <th className="w-[34%] py-1.5 pr-2">RC Amount</th>
+                        <th className="w-32 py-1.5 text-center leading-tight">
                           <span className="block">Stayed by Court?</span>
-                          <span className="block text-[10px] font-normal normal-case text-slate-400 dark:text-slate-500" lang="hi">
+                          <span className="block text-[10px] font-normal normal-case text-slate-500 dark:text-slate-500" lang="hi">
                             सक्षम न्यायालय द्वारा स्थगित?
                           </span>
                         </th>
@@ -187,7 +188,7 @@ export default function YearStepForm({
                       {Array.from({ length: rcCount }, (_, i) => rcDetails[i] ?? { rcNumber: "", rcAmount: "", stayed: false }).map(
                         (detail, i) => (
                           <tr key={i} className="border-t border-slate-100 dark:border-slate-800">
-                            <td className="py-1.5 pr-2 tabular-nums text-slate-500 dark:text-slate-400">{i + 1}</td>
+                            <td className="py-1.5 pr-2 tabular-nums text-slate-600 dark:text-slate-400">{i + 1}</td>
                             <td className="py-1.5 pr-2">
                               <input
                                 type="text"
@@ -214,13 +215,16 @@ export default function YearStepForm({
                                 className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-blue-900"
                               />
                             </td>
-                            <td className="py-1.5 text-center">
-                              <input
-                                type="checkbox"
-                                checked={detail.stayed}
-                                onChange={(e) => onRcDetailChange(i, "stayed", e.target.checked)}
-                                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-700"
-                              />
+                            <td className="py-1.5">
+                              <Select
+                                size="sm"
+                                value={detail.stayed ? "yes" : "no"}
+                                onChange={(e) => onRcDetailChange(i, "stayed", e.target.value === "yes")}
+                                className="w-full min-w-0"
+                              >
+                                <option value="no">No / नहीं</option>
+                                <option value="yes">Yes / हाँ</option>
+                              </Select>
                             </td>
                           </tr>
                         )
@@ -232,7 +236,7 @@ export default function YearStepForm({
                   className={`mt-3 flex items-center justify-between text-xs ${
                     rcDetailsTouched && rcDetailsMismatch
                       ? "font-bold text-red-600 dark:text-red-400"
-                      : "text-slate-500 dark:text-slate-400"
+                      : "text-slate-600 dark:text-slate-400"
                   }`}
                 >
                   <span>

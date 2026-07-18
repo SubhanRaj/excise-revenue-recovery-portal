@@ -715,6 +715,28 @@ tooling only.
   pnpm's stricter (non-flat, symlinked) `node_modules` didn't surface a phantom-dependency bug
   that npm's flat hoisting had been silently papering over.
 
+## Milestone 25 — RC Details contrast fix, stayed dropdown, production rollout (done)
+
+- [x] `YearStepForm.tsx`'s RC Details table had several light-mode text elements (`slate-400`/
+      `slate-500` on white) that were hard to read — header cells, the Hindi sub-label under
+      "Stayed by Court?", the row-number column, and the "Entered / Required" total line all
+      bumped one shade darker (`slate-500`/`slate-600`) in light mode; dark mode unchanged.
+- [x] The per-RC "Stayed by Court?" checkbox replaced with a bilingual `Select` dropdown
+      ("No / नहीं", defaulting to No; "Yes / हाँ") — a checkbox risked an accidental/unintentional
+      tick, a dropdown forces a deliberate choice. `RcDetail.stayed` is still a plain `boolean`
+      in the schema, `api/lib/rc-details.ts`'s `validateRcDetails()`, and
+      `frontend/lib/pac-fields.ts` — this was a UI-widget change only, no type/schema/migration
+      change needed.
+- [x] DEO entry Help panel (English + Hindi) updated to describe the dropdown and its No-default
+      instead of the old "mark whether it has been stayed" checkbox wording.
+- [x] Deployed to production: confirmed migration `0006_numerous_marten_broadcloak` (`rc_details`)
+      was already applied to remote D1 (checked via `wrangler d1 execute --remote`, so no
+      migration run was needed this time); `api` redeployed (`pnpm run deploy`); `frontend`
+      rebuilt and redeployed (`pnpm run pages:deploy`), confirmed landing as a real `Production`
+      deployment (not a stray Preview) via `wrangler pages deployment list`; verified CORS
+      headers and `/login`/`/deo-data-entry` both 200 post-deploy. Portal is now ready for DEOs
+      to enter real (non-demo) data.
+
 ## Backlog / not started
 
 - [ ] Real domain + DNS, and (optional) collapse `/frontend` + `/api` onto one zone via a

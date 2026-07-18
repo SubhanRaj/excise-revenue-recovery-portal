@@ -116,7 +116,8 @@ Then:
    with no fresh dues), watch Net Recoverable update live, and confirm Opening Balance on FY
    2022-23 onward equals the previous FY's Net Recoverable (FY 2021-22's Opening Balance should
    always read 0). Enter a non-zero RC Count and confirm the **RC Details** section appears
-   with exactly that many numbered rows (RC Number, RC Amount, Stayed checkbox); leave one RC
+   with exactly that many numbered rows (RC Number, RC Amount, a "Stayed by Court?" dropdown
+   defaulting to "No / नहीं" — confirm selecting "Yes / हाँ" sticks); leave one RC
    Number blank and hit Save & Continue (blocked, same blank-field toast as any other field);
    fill every row but make the RC Amounts *not* sum to the RC Amount field above (blocked with
    the bold bilingual "RC Details incomplete" toast, and the inline total under the section
