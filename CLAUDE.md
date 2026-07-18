@@ -299,7 +299,12 @@ financial year appears: DEO nav pills, `YearStepForm` headings, Admin selectors/
 - **Icon-vs-label vertical alignment**: `globals.css`'s `input, select, button { font: inherit;
   line-height: 1; }` keeps button/label text and Tabler's `.ti` icons (which hardcode
   `line-height: 1`) in matching line boxes. Keep both declarations together on this rule if you
-  touch it.
+  touch it. This rule is unlayered, so no Tailwind `leading-*` utility can override it for a
+  specific `<select>` that needs more vertical room (e.g. Devanagari मात्राएँ visually clipping
+  at `line-height: 1`) — only an inline `style` has enough cascade precedence. `Select.tsx`
+  already does this by default (`style={{ lineHeight: "1.4", ...style }}`, overridable via its
+  own `style` prop) so every dropdown in the app gets it for free; don't re-solve this per call
+  site.
 
 ## UI conventions
 
@@ -381,9 +386,9 @@ DEPLOY.md). **Never connect a Cloudflare Pages Git integration for this repo** �
 auto-build uses the wrong adapter for this app's static-export setup and will race manual/Action
 deploys. If the Cloudflare dashboard nudges you to "connect to Git," decline.
 
-## Admin pages: Dashboard / Districts / district detail / Audit Log
+## Admin pages: Dashboard / Districts / district detail / DEO Provisioning / Audit Log
 
-See [README.md](./README.md)'s App flow → Admin for a one-line summary of each page. Four
+See [README.md](./README.md)'s App flow → Admin for a one-line summary of each page. Five
 separate routes, not an in-page toggle:
 
 - **`/admin`** (`AdminDashboard.tsx`) — colorful clickable KPI cards (Districts/Locked/Unlocked/
@@ -401,32 +406,38 @@ separate routes, not an in-page toggle:
   `/admin/districts`'s own FY selector is unrelated and correctly kept — viewing one year's
   figures per district there is a legitimate, different use case.
 - **`/admin/districts`** — sortable/searchable/pinned-column table (`getPaginationRowModel`,
-  25/50/75/100 rows/page), a Locked/Unlocked/All status filter, Lock/Unlock, Download DEO
-  Template, Upload DEO Data, and two export buttons. Column headers use `englishLabel()` only, no
-  bilingual tooltip. Container padding shrinks progressively at wider breakpoints
-  (`lg:px-[10%] xl:px-[5%] 2xl:px-[3%]`). The table's scroll container is capped at
-  `max-h-[70vh]` at every breakpoint (not `flex-1`/`lg:max-h-none`) — an uncapped container has
-  no scrolling ancestor for its `sticky top-0` header to freeze within. Row click navigates to
-  the district's detail page; Unlock's button calls `e.stopPropagation()` to not also trigger
-  that navigation, and prompts for a reason first (`promptUnlockReason()`) before calling the
-  unlock endpoint. All `<select>`s across admin pages go through `components/ui/Select.tsx`
-  (never a bare `<select>`) for consistent sizing/chevron; it carries a `min-w-[8rem]` floor,
-  overridable via `className` for options with longer text. **Export as Excel Workbook** and
-  **Export as SQL** both re-sync first (via `sync()`'s return value, not the pre-sync closure),
-  then build the file, showing a disabled `animate-pulse` "Exporting..." state on their own
-  button while running. **Export as SQL** (`exportDistrictsToSql()`) writes a plain `.sql`
-  `DELETE`+`INSERT` file for `districts`+`pac_data` only (the two tables cached client-side) via
-  a native `Blob`/anchor download.
+  25/50/75/100 rows/page), a Locked/Unlocked/All status filter, Lock/Unlock, and two export
+  buttons. Column headers use `englishLabel()` only, no bilingual tooltip. Container padding
+  shrinks progressively at wider breakpoints (`lg:px-[10%] xl:px-[5%] 2xl:px-[3%]`). The table's
+  scroll container is capped at `max-h-[70vh]` at every breakpoint (not `flex-1`/`lg:max-h-none`)
+  — an uncapped container has no scrolling ancestor for its `sticky top-0` header to freeze
+  within. Row click navigates to the district's detail page; Unlock's button calls
+  `e.stopPropagation()` to not also trigger that navigation, and prompts for a reason first
+  (`promptUnlockReason()`) before calling the unlock endpoint. All `<select>`s across admin pages
+  go through `components/ui/Select.tsx` (never a bare `<select>`) for consistent sizing/chevron;
+  it carries a `min-w-[8rem]` floor, overridable via `className` for options with longer text.
+  **Export as Excel Workbook** and **Export as SQL** both re-sync first (via `sync()`'s return
+  value, not the pre-sync closure), then build the file, showing a disabled `animate-pulse`
+  "Exporting..." state on their own button while running. **Export as SQL**
+  (`exportDistrictsToSql()`) writes a plain `.sql` `DELETE`+`INSERT` file for `districts`+
+  `pac_data` only (the two tables cached client-side) via a native `Blob`/anchor download. The
+  toolbar's search box (`max-w-[13rem]`) filters the on-page table only — it's a plain `<input>`
+  distinct from `AppHeader`'s global district-jump `DistrictSearch` autocomplete.
 - **`/admin/districts/detail`** — one district's PAC figures across all 5 years as a field × year
   table, with its own value/field search box, lock-status badge, who locked it/when, and (if
   unlocked) who last unlocked it/when/why. `max-w-7xl`, table has no `w-full` (auto-layout, see
   Visual language above). The table's scroll wrapper is `max-h-[70vh] overflow-auto` (both axes)
   with `sticky top-0` header cells. Unlock is a small hand-styled pill matching the badges beside
   it, not a full `Button.tsx` instance.
+- **`/admin/districts/provisioning`** — Download DEO Template / Upload DEO Data, split out of
+  `/admin/districts`'s toolbar (it was crowding the export/filter buttons there and reads as an
+  occasional bulk-ops task, not something an admin needs on every visit to the districts table).
+  Not on the flat Dashboard/Districts/Audit Log nav — reached via `ProfileMenu`'s "Admin"
+  dropdown (a new `Link` there, admin-role-only) instead, alongside Logout.
 - **`/admin/audit`** — paginated (100/page), newest-first, auto-pruned to 30 days on read. A
   "Filter by event" `<select>` and a separate sort button (`ti-sort-descending`/`ti-sort-
   ascending`) both apply only to the currently-loaded page in memory — no extra request. Uses the
-  same `useAdminData()` hook as the other three pages (Sync, district search, "Synced:"
+  same `useAdminData()` hook as the other admin pages (Sync, district search, "Synced:"
   timestamp), even though it has no districts/pacData of its own to render.
 
 **Which district/status to show travels via `sessionStorage`** (`frontend/lib/adminNav.ts`),
@@ -436,11 +447,16 @@ never a `?id=`/`?status=` URL query string — this app is a static export
 keep showing the same district). `setNavStatusFilter()`/`consumeNavStatusFilter()` are
 consume-on-read — landing on `/admin/districts` via the regular nav link should default to "all".
 
-All four pages share `frontend/lib/useAdminData.ts` (session guard, Dexie cache, `sync()`,
+All five pages share `frontend/lib/useAdminData.ts` (session guard, Dexie cache, `sync()`,
 `unlock()`). `AppHeader` takes `navLinks`, `onSync`/`syncing`, `lastSyncedAt` (persisted to
 `localStorage` as `excise-portal:admin-last-sync`), and an optional `districts` prop that renders
-a global "jump to a district" search. Logout lives inside `ProfileMenu`'s dropdown, not as a
-top-level header button, for both Admin and DEO headers.
+a global "jump to a district" search. `AppHeader.navLinks` is still just Dashboard/Districts/
+Audit Log — DEO Provisioning isn't in it, by design (see above). Logout lives inside
+`ProfileMenu`'s dropdown, not as a top-level header button, for both Admin and DEO headers.
+`ProfileMenu`'s `NavLink`/`{ label, href }` shape has no dropdown/submenu concept — the "DEO
+Provisioning" entry is a one-off `Link` in that menu's JSX, not a reusable nav-dropdown
+component; if a second item like this shows up, that's the point to build one instead of adding
+a third one-off.
 
 Admin pages favor a compact toolbar (`Button size="sm"`, no large page-title heading) —
 deliberately different from the DEO side, which stays verbose/hand-holding on purpose.

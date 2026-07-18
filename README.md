@@ -125,17 +125,18 @@ A returning DEO lands in one of three states, decided by the server's current lo
 
 ### Admin
 
-Four pages: **Dashboard** (KPI cards + charts, totals across all 5 years), **Districts**
-(sortable/searchable table, lock/unlock, exports, bulk DEO provisioning), **district detail**
-(one district's full 5-year figures), **Audit Log** (login/lock/unlock history). All four share
-one Dexie-backed cache with a manual Sync button.
+Five pages: **Dashboard** (KPI cards + charts, totals across all 5 years), **Districts**
+(sortable/searchable table, lock/unlock, exports), **district detail** (one district's full
+5-year figures), **DEO Provisioning** (bulk DEO login upload/download, reached via the profile
+menu rather than the main nav), **Audit Log** (login/lock/unlock history). All five share one
+Dexie-backed cache with a manual Sync button.
 
 ### Bulk DEO provisioning
 
 Admin downloads an `.xlsx` template pre-filled with all 75 district names, fills in each
-district's CUG mobile number and email, and re-uploads it — the one flow where a raw CUG number
-does cross the network (from the Admin's browser), since there's no DEO browser involved to hash
-it first. The server hashes it before storing.
+district's CUG mobile number and email, and re-uploads it (at `/admin/districts/provisioning`)
+— the one flow where a raw CUG number does cross the network (from the Admin's browser), since
+there's no DEO browser involved to hash it first. The server hashes it before storing.
 
 ## System flow
 
@@ -185,9 +186,10 @@ flowchart TD
         Dashboard --> Districts["/admin/districts<br/>sortable table · FY filter ·<br/>lock-status filter"]
         Districts --> Detail["/admin/districts/detail<br/>field × year table, one district"]
         Districts --> UnlockAction["Unlock (reason required)<br/>POST /api/admin/unlock"]
-        Districts --> Provision["Download Template /<br/>Upload DEO Data<br/>POST /api/admin/provision-deos"]
         Districts --> ExportAction["Export Excel Workbook /<br/>Export SQL backup"]
         Dashboard --> AuditPage["/admin/audit<br/>login / lock / unlock history"]
+        Dashboard -. "available on every admin page header" .-> ProfileMenu["Profile menu (Admin)"]
+        ProfileMenu --> Provision["/admin/districts/provisioning<br/>Download Template /<br/>Upload DEO Data<br/>POST /api/admin/provision-deos"]
     end
 
     LockedNow -. "district_locked" .-> AuditLog[("audit_log")]

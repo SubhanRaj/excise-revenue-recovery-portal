@@ -67,8 +67,8 @@ DEO-role account, since none is seeded by default. As of the bulk-provisioning f
 CLAUDE.md's "Bulk DEO provisioning" section) this is done through the Admin dashboard, not a
 manual DB insert:
 
-1. Sign in as Admin, click **Download DEO Template**, open the `.xlsx` — column A has all 75
-   district names pre-filled.
+1. Sign in as Admin, open the profile menu (top right) → **DEO Provisioning**, click
+   **Download DEO Template**, open the `.xlsx` — column A has all 75 district names pre-filled.
 2. Fill in the demo CUG (see the `DEMO_CUG` Worker secret, not written here) in the "DEO CUG
    Mobile" column for `Lucknow`, save, and **Upload DEO Data** the same file back. A toast
    confirms `1 added, 0 updated`.

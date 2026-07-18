@@ -737,6 +737,28 @@ tooling only.
       headers and `/login`/`/deo-data-entry` both 200 post-deploy. Portal is now ready for DEOs
       to enter real (non-demo) data.
 
+## Milestone 26 — DEO Provisioning split out, app-wide dropdown-clipping fix (done)
+
+- [x] New `/admin/districts/provisioning` page: Download DEO Template / Upload DEO Data moved
+      off the `/admin/districts` toolbar, which was crowded next to the status/FY filters and
+      the two export buttons. Reached via `ProfileMenu`'s "Admin" dropdown (a new admin-only
+      `Link`, not the flat Dashboard/Districts/Audit Log nav) since it's an occasional bulk-ops
+      task, not a page an admin needs on every visit.
+- [x] `/admin/districts` toolbar: search box narrowed (`max-w-xs` → `max-w-[13rem]`) and its row
+      gap widened (`gap-3` → `gap-6`) so it reads as clearly left-aligned against the
+      now-shorter right-aligned filter/export button group.
+- [x] Root-caused the recurring "dropdown text clipped at the top" complaint (previously patched
+      once, per-instance, on the RC Details "Stayed by Court?" dropdown in Milestone 25) instead
+      of patching each new occurrence: `Select.tsx` now sets `style={{ lineHeight: "1.4", ...style
+      }}` by default on every dropdown app-wide (overridable per call site via its own `style`
+      prop). `globals.css`'s `select { line-height: 1 }` is an unlayered rule no Tailwind
+      `leading-*` utility can outrank (see CLAUDE.md) — only an inline style has enough cascade
+      precedence, and padding alone (the FY selector's earlier `py-2` → `py-2.5` fix) was never
+      going to fully fix it. Removed the now-redundant one-off inline style this replaced from
+      `YearStepForm.tsx`.
+- [x] Deployed to production and verified: new route returns 200, existing `/admin/districts`
+      unaffected.
+
 ## Backlog / not started
 
 - [ ] Real domain + DNS, and (optional) collapse `/frontend` + `/api` onto one zone via a
