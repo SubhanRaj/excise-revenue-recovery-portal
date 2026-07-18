@@ -132,12 +132,14 @@ Then:
    digits or "DEO Lucknow" to see the validator reject it). Confirming both locks the district,
    kills the DEO session, redirects to `/login`.
 3. **Re-login as the locked DEO**: CUG tab → the demo CUG again → should land on a read-only
-   "Data Already Locked" screen (locked timestamp in IST, bilingual contact-Admin message), not
+   "Data Already Locked" screen (locked timestamp in IST, bilingual message pointing at the
+   **Request Unlock** button below it rather than a plain "contact the Admin" line), not
    a blank form — this is the fix for a real bug where a re-login after locking showed an empty
    form. The card should be noticeably wide (not a narrow column forcing the message onto many
    short lines) and the Hindi text should be the same size as the English body text, not smaller
-   fine print. Click the card's own **Logout** button — it should log out immediately with no
-   confirmation popup (logout is the only thing to do here, unlike the profile menu's Logout
+   fine print. Click the card's own **Logout** button (below Request Unlock) — it should log out
+   immediately with no confirmation popup (logout is one of only two things to do here, unlike
+   the profile menu's Logout
    elsewhere, which does still confirm).
 3a. **Self-service unlock request, same locked DEO session**: click **Request Unlock** — an
     inline form opens on the card (not a SweetAlert2 popup): a reason textarea only, no file

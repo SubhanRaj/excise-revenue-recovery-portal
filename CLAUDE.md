@@ -232,9 +232,11 @@ agent must preserve:
 - The three-state branch on login must key off the **server's** current `lockStatus` (from `GET
   /api/auth/me?role=deo`), never a cached value — an Admin unlock can happen at any time between
   logins. Still-locked renders a read-only "Data Already Locked" screen (`formatIST(lockedAt)`,
-  bilingual contact-Admin message, `max-w-2xl`, no form); its own full-width Logout button skips
-  the blocking confirm (`logoutLocked()`, not the shared `AppHeader.logout()`), since logout is
-  the only action available there. Unlocked-after-a-previous-submission calls `GET
+  `max-w-2xl`, no data-entry form) with a bilingual **Request Unlock** flow instead of a plain
+  "contact the Admin" message — see the "DEO self-service unlock requests" section below. Its
+  own full-width Logout button skips the blocking confirm (`logoutLocked()`, not the shared
+  `AppHeader.logout()`), since logout is one of only two actions available there. Unlocked-after-
+  a-previous-submission calls `GET
   /api/pac-data/mine`, writes the result into Dexie via `bulkPut`, and marks every year
   `completed` before landing on the Master View.
 

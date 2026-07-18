@@ -403,19 +403,26 @@ export default function EntryPage() {
             </p>
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
               You cannot make any further changes. If any data was entered incorrectly or needs
-              editing, contact the Admin / Excise Headquarters to have this district unlocked.
+              editing, use <strong>Request Unlock</strong> below to send the Admin / Excise
+              Headquarters your reason directly — you'll be notified here once it's reviewed.
             </p>
             <p className="mt-3 text-sm text-slate-600 dark:text-slate-400" lang="hi">
               आपने अपना डेटा {formatIST(profile?.lockedAt)} IST को लॉक कर दिया है। अब कोई और
-              बदलाव संभव नहीं है। किसी भी गलत डेटा या संशोधन के लिए एडमिन / आबकारी मुख्यालय से
-              संपर्क करें।
+              बदलाव संभव नहीं है। किसी भी गलत डेटा या संशोधन के लिए नीचे दिए गए{" "}
+              <strong>Request Unlock</strong> बटन से एडमिन / आबकारी मुख्यालय को सीधे अपना कारण
+              भेजें — समीक्षा होने पर आपको यहीं सूचित किया जाएगा।
             </p>
             {pendingRequest ? (
               <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-left dark:border-amber-900 dark:bg-amber-950">
                 <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
-                  Request pending since {formatIST(pendingRequest.requestedAt)} IST
+                  Request pending since {formatIST(pendingRequest.requestedAt)} IST — awaiting
+                  Admin review.
                 </p>
-                <p className="mt-1 text-sm text-amber-700 dark:text-amber-400">{pendingRequest.reason}</p>
+                <p className="mt-1 text-sm font-medium text-amber-800 dark:text-amber-300" lang="hi">
+                  अनुरोध {formatIST(pendingRequest.requestedAt)} IST से लंबित है — एडमिन की
+                  समीक्षा की प्रतीक्षा है।
+                </p>
+                <p className="mt-2 text-sm text-amber-700 dark:text-amber-400">{pendingRequest.reason}</p>
               </div>
             ) : requestFormOpen ? (
               <div className="mt-6 space-y-3 rounded-lg border border-slate-200 p-4 text-left dark:border-slate-800">
