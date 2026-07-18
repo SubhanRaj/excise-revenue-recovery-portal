@@ -787,6 +787,181 @@ tooling only.
 - [x] No schema/migration change — this is entirely `frontend/lib/export.ts`, reading the same
       `rc_details` JSON already synced client-side.
 
+## Milestone 28 (planned, not started) — DEO self-service unlock requests
+
+**Problem**: today a locked-out DEO's only option is to contact an Admin outside the app (phone/
+email) and ask them to unlock the district manually via `promptUnlockReason()` on
+`/admin/districts`. This adds an in-app request/response loop: a DEO submits a plaintext reason
+(+ optional PDF letter) from the locked-out screen; an Admin sees a queue of these requests and
+approves (which unlocks the district, same as today's manual unlock) or denies (district stays
+locked, DEO sees why). Everything below is unstarted — this section exists to pick one option per
+open question before writing any code, not to describe what's built.
+
+### Schema — new `unlock_requests` table
+
+Matches house style from `api/db/schema.ts` (snake_case columns, camelCase JS fields, FK via
+`.references()`, `id` autoincrement PK, timestamps written from JS as ISO strings — never a SQL
+`CURRENT_TIMESTAMP` default, per the existing `auditLog.createdAt` precedent):
+
+```ts
+export const unlockRequests = sqliteTable("unlock_requests", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  districtId: integer("district_id").notNull().references(() => districts.id),
+  reason: text("reason").notNull(),                 // plaintext, bilingual (Hindi/English), no rich-text/HTML
+  attachmentKey: text("attachment_key"),             // R2 object key, null if no PDF attached
+  attachmentFilename: text("attachment_filename"),   // original filename, for display only
+  status: text("status", { enum: ["pending", "approved", "denied"] }).notNull().default("pending"),
+  requestedAt: text("requested_at").notNull(),       // new Date().toISOString(), written from JS
+  resolvedAt: text("resolved_at"),
+  resolvedBy: text("resolved_by"),                   // admin's email
+  adminNote: text("admin_note"),                     // null while pending; always set on resolve (approve or deny)
+});
+```
+
+One open question: **enforce "only one pending request per district" how?** SQLite/Drizzle
+doesn't cleanly support a partial unique index (`WHERE status = 'pending'`) in this Drizzle
+version — options are (a) check-then-insert in application code (a TOCTOU race in theory, but
+low-stakes here — worst case is two pending rows, which the admin UI can just show both of), or
+(b) a real partial unique index if the Drizzle/SQLite version turns out to support it. Leaning
+(a) — simplest, matches this codebase's general comfort with app-level checks over DB constraints
+for non-critical invariants.
+
+### PDF storage — **decided: new R2 bucket**
+
+No R2 bucket exists in this project today — `api/wrangler.jsonc` only binds `assets` + the `DB`
+(D1). At this app's real scale (75 districts max, one attachment each, 2MB ceiling — 150MB total
+even in the worst case) this stays **inside Cloudflare R2's free tier indefinitely**: free tier is
+10 GB-month storage, 1M Class A ops/month (writes), 10M Class B ops/month (reads), and — R2's
+actual differentiator vs S3 — **$0 egress, uncapped**. 150MB is 1.5% of the free storage
+allowance; upload/download call volume for an internal 75-district portal won't approach 1M/month
+either. Expected cost: **$0/month**, with headroom to spare even at 50-100x this usage.
+
+Provisioning: `wrangler r2 bucket create excise-revenue-recovery-attachments`, bind as
+`ATTACHMENTS` in `api/wrangler.jsonc` (mirrors the existing `DB` D1 binding's style). Object key
+convention: `unlock-requests/{districtId}/{requestId}.pdf` — server-generated, **never** built
+from the client-supplied filename (see Security section below). The bucket stays private (no
+public-access binding, no `R2.dev` public URL, no CORS) — the only way to read an object is
+through the admin-authenticated download route.
+
+### API routes
+
+- `POST /api/deo/request-unlock` — DEO auth (`requireSession(req, "deo")`), `FormData` body
+  (**first multipart/file-upload endpoint in this codebase** — every existing route reads
+  `req.json()`; worth naming explicitly in CLAUDE.md once built, since it's a new precedent, not
+  a pattern to copy for anything else without a similar reason). Rejects if: the district isn't
+  actually locked, a pending request already exists for it, the reason is blank or over a length
+  cap (~2000 chars, same Anti-Blank-Rule spirit as every other text field), or an attached file
+  fails validation (see Security section — content-type, magic bytes, and size are all
+  re-checked server-side regardless of what the client already checked).
+- **Extend `GET /api/auth/me?role=deo`** (not a new endpoint) to also return the DEO's own
+  pending request, if any (`pendingUnlockRequest: { requestedAt, reason } | null`) — this route
+  is already the documented single source of truth for lock state, re-fetched on every load per
+  CLAUDE.md's Auth section, so a pending-request flag belongs there rather than a second polling
+  endpoint.
+- `GET /api/admin/unlock-requests` — admin auth, lists all requests (join district name),
+  filterable by status client-side, same pattern as the Audit Log page's event filter.
+- `POST /api/admin/unlock-requests/resolve` — admin auth, body `{ id, action: "approve" | "deny",
+  note: string }` — **`note` is required in both directions** (see decision below: the admin
+  always types their own reason, approve or deny, the DEO's submitted text is never auto-copied).
+  Re-checks the row is still `"pending"` before acting (avoids a double-resolve race). Approve:
+  one `db.batch()` — same `districts` update the existing `POST /api/admin/unlock/route.ts` does
+  (`lockStatus: 0`, `unlockedAt`, `unlockReason: note`, `unlockedBy`), update the
+  `unlock_requests` row (`status: "approved"`, `resolvedAt`, `resolvedBy`, `adminNote: note`),
+  plus an audit row. Deny: update the `unlock_requests` row only (`status: "denied"`, `adminNote:
+  note`), district stays locked, plus an audit row — no district-table change.
+- `GET /api/admin/unlock-requests/attachment?id=` — admin auth. Takes the **request `id`**, looks
+  up `attachmentKey` from the DB row server-side — never accepts an R2 key directly from the
+  client (see Security section). Streams from R2 with `Content-Type: application/pdf`,
+  `Content-Disposition: attachment; filename="..."` (sanitized), and
+  `X-Content-Type-Options: nosniff`.
+
+### Audit log — new event types
+
+Following the existing `noun_pastverb` convention (`district_locked`, `district_unlocked`):
+`unlock_requested`, `unlock_request_approved`, `unlock_request_denied`. `metadata` carries the
+reason/note text (already a JSON-string column on `audit_log`, no schema change needed there).
+
+### Frontend — DEO side
+
+The "Data Already Locked" card (`frontend/app/deo-data-entry/page.tsx`, `locked` state) currently
+ends in a bilingual "contact the Admin" paragraph + a Logout button.
+- **Reason + file input UI**: built as a plain inline section on the existing card (toggle-open
+  on "Request Unlock" click), not forced through SweetAlert2 — every existing `Swal.fire` in this
+  codebase is text-only (`input: "textarea"` at most), and a `<textarea>` + `<input type="file">`
+  + submit wired to `FormData` doesn't fit Swal's HTML-string API cleanly. First form on this
+  screen that deliberately doesn't use the modal pattern.
+- **Client-side PDF validation**: `type === "application/pdf"` and `size <= 2 * 1024 * 1024`,
+  inline bilingual error under the file input, same "bold, bilingual, inline" convention as every
+  other field error in this app (CLAUDE.md's Feedback rule) — never trusted alone, server
+  re-validates (zero-trust, same as every existing submit path).
+- **Pending-state display**: once a request exists, replace the button with "Request pending
+  since `formatIST(requestedAt)`" and the submitted reason, no resubmission until resolved.
+
+### Frontend — Admin side — **decided: new top-level nav page**
+
+`/admin/unlock-requests`, added to `AppHeader.navLinks` (Dashboard/Districts/**Unlock
+Requests**/Audit Log) — a real nav slot rather than a `ProfileMenu` one-off, since this is a
+queue admins are expected to check regularly (unlike DEO Provisioning, which is occasional
+bulk-ops and correctly stays a one-off `Link`). Each row: district, requested-at, reason,
+attachment link (if any, via the admin-only download route), Approve/Deny buttons — both open a
+small reason-required prompt (reusing `promptUnlockReason()`'s SweetAlert2 pattern from
+`alerts.ts`, since this is plain single-textarea text like that existing modal, unlike the DEO
+side's form).
+
+**Also relocates `AppHeader`'s "Synced: <time>" text** (`components/ui/AppHeader.tsx:138-144`,
+currently a `lg:flex` span next to the Sync button) into `ProfileMenu`'s dropdown, placed beneath
+the "DEO Provisioning" `Link` — frees up header width now that a 4th nav link (Unlock Requests)
+is being added, and groups it with the other profile/account-scoped info already in that dropdown
+(role, district, email). Plain text, not a link.
+
+### Reason handling — **decided: admin always types their own note, no auto-copy**
+
+Approving or denying always requires the admin to type their own reason (via the reworked
+`promptUnlockReason`-style modal) — the DEO's submitted `reason` is shown for context but never
+silently copied into `districts.unlockReason` or `unlock_requests.adminNote`. Matches how the
+existing manual-unlock modal already works today (the admin always types their own reason there),
+just extended to also require one on deny.
+
+### Security considerations
+
+- **IDOR**: `POST /api/deo/request-unlock` derives `districtId` from the authenticated session
+  (`requireSession(req, "deo")` → the DEO's own `districtId`), **never** accepts a client-supplied
+  district id — a DEO can only ever request unlock for their own district.
+- **File-type spoofing**: a client-reported `Content-Type: application/pdf` is trivially spoofed.
+  Server checks the **magic bytes** (`%PDF-` header) on the uploaded buffer, not just the
+  browser-reported MIME type, before accepting it — same zero-trust posture as every other
+  client-supplied value in this app (CLAUDE.md's Validation rules section).
+- **Size limit enforced server-side**, not just client-side — reject anything over 2MB in the
+  route handler regardless of what the browser already checked.
+- **No path traversal / key injection**: the R2 object key is always server-generated
+  (`unlock-requests/{districtId}/{requestId}.pdf`) — the client-supplied original filename is
+  stored *only* as a display string (`attachmentFilename`), never used to build the storage key
+  or a filesystem path.
+- **Stored-XSS surface stays at zero**: the `reason`/`adminNote` fields are plaintext only (no
+  rich-text editor, per the original ask) and render through normal React JSX (auto-escaped) —
+  never through `dangerouslySetInnerHTML`. This preserves the existing invariant CLAUDE.md's Auth
+  section already documents and relies on (the Bearer-token-in-localStorage trade-off is only
+  safe *because* no user-controlled data is ever rendered as raw HTML anywhere in the frontend) —
+  audit this again if that ever changes.
+- **PDF content itself isn't sanitized** (embedded JS in a PDF can execute in some viewers) —
+  mitigated by never rendering it inline in the admin UI (`<iframe>`/`<embed>`): the download
+  route always sets `Content-Disposition: attachment` (forces a download, not an in-page render)
+  plus `X-Content-Type-Options: nosniff` (stops the browser from MIME-sniffing past the declared
+  `application/pdf`). No malware/AV scanning of the PDF content — accepted as reasonable given
+  every uploader is an authenticated, provisioned government DEO, not the open internet; call
+  this out explicitly if that trust assumption ever changes (e.g. if login is ever opened wider).
+- **Enumeration**: the attachment download route takes the `unlock_requests.id`, looks up
+  `attachmentKey` server-side, and never accepts a raw R2 key from the client — an admin can't
+  probe for attachments outside what a real request row points at. The R2 bucket itself has no
+  public access/CORS configured, so the *only* path to an object is through this authenticated
+  route.
+- **Double-resolve race**: `POST /api/admin/unlock-requests/resolve` re-checks the row's status
+  is still `"pending"` inside the same operation before writing — prevents two admins (or one
+  admin double-clicking) from double-unlocking or leaving inconsistent audit rows.
+- **Abuse/spam**: reason length capped (~2000 chars) and one-pending-request-per-district
+  (app-level check) bounds how much a single DEO account can generate; no rate limiting beyond
+  that is planned, same posture as the rest of this app (internal users, not public-facing).
+
 ## Backlog / not started
 
 - [ ] Real domain + DNS, and (optional) collapse `/frontend` + `/api` onto one zone via a
