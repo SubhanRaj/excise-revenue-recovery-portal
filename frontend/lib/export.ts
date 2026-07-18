@@ -294,12 +294,15 @@ export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData
   });
   rcWs.properties.outlineProperties = { summaryBelow: false, summaryRight: false };
   rcWs.columns = [{ width: 22 }, { width: 14 }, { width: 24 }, { width: 18 }, { width: 10 }];
+  // No mergeCells on this sheet's title/subtitle rows, unlike every other sheet in this
+  // workbook — ExcelJS has a documented bug (exceljs/exceljs#970) where a merged cell anywhere
+  // on a sheet that also carries an autoFilter (added below, for District/FY/Stayed filtering)
+  // corrupts the file; Excel's own repair silently strips both features on open. Left-aligned
+  // in column A instead, since AutoFilter is the feature actually worth keeping here.
   rcWs.addRow([`${SITE_TITLE_EN} — RC Details`]);
   rcWs.addRow([DATA_PERIOD_EN]);
-  rcWs.mergeCells(1, 1, 1, rcHeader.length);
-  rcWs.mergeCells(2, 1, 2, rcHeader.length);
-  styleTitleCell(rcWs.getCell(1, 1));
-  styleSubtitleCell(rcWs.getCell(2, 1));
+  rcWs.getCell(1, 1).font = { bold: true, size: 14 };
+  rcWs.getCell(2, 1).font = { italic: true, size: 11 };
   const rcHeaderRow = rcWs.addRow(rcHeader);
   rcHeaderRow.eachCell((cell) => styleHeaderCell(cell));
 
