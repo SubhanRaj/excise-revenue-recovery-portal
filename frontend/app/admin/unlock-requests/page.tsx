@@ -109,6 +109,9 @@ export default function UnlockRequestsPage() {
       <div className="flex min-h-full flex-1 flex-col bg-slate-50 dark:bg-slate-950">
         <AppHeader title="Unlock Requests" role="admin" profile={profile} navLinks={NAV_LINKS} onSync={sync} syncing={syncing} lastSyncedAt={lastSyncedAt} districts={districts} />
         <div className="w-full flex-1 px-4 py-6 sm:px-6 lg:px-[10%] xl:px-[5%] 2xl:px-[3%]">
+          <div className="mb-4 flex items-center justify-end">
+            <div className="h-9 w-40 animate-pulse rounded-md bg-slate-200 dark:bg-slate-800" />
+          </div>
           <div className="h-[500px] w-full animate-pulse rounded-lg bg-slate-200 dark:bg-slate-800" />
         </div>
       </div>
@@ -148,7 +151,7 @@ export default function UnlockRequestsPage() {
           </Select>
         </div>
 
-        <div className="max-h-[70vh] overflow-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="min-h-[500px] max-h-[70vh] overflow-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800">

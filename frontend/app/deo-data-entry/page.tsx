@@ -12,6 +12,7 @@ import {
   promptDeoNameAndLock,
   confirmClearYear,
   confirmClearAll,
+  confirmUnlockRequest,
   notifyToast,
 } from "@/lib/alerts";
 import YearStepForm, { countAmountErrors, rcDetailsError, syncRcDetailsToCount } from "@/components/YearStepForm";
@@ -266,6 +267,8 @@ export default function EntryPage() {
     const reason = requestReason.trim();
     if (!reason) return notifyToast({ icon: "error", title: BLANK_FIELD_TITLE, text: BLANK_FIELD_TEXT });
 
+    if (!(await confirmUnlockRequest())) return;
+
     setRequestSubmitting(true);
     setRequestError(null);
     try {
@@ -442,7 +445,8 @@ export default function EntryPage() {
                 {/* No PDF attachment input yet — see the comment on submitUnlockRequest() above. */}
                 {requestError && <p className="text-sm font-bold text-red-600 dark:text-red-400">{requestError}</p>}
                 <div className="flex gap-2">
-                  <Button variant="dark" size="sm" className="flex-1" onClick={submitUnlockRequest} disabled={requestSubmitting}>
+                  <Button variant="primary" size="sm" className="flex-1" onClick={submitUnlockRequest} disabled={requestSubmitting}>
+                    {requestSubmitting && <i className="ti ti-loader animate-spin text-sm" />}
                     {requestSubmitting ? "Submitting..." : "Submit Request"}
                   </Button>
                   <Button

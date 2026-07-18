@@ -154,6 +154,25 @@ export async function confirmClearAll(): Promise<boolean> {
   return result.isConfirmed;
 }
 
+// Before a DEO's unlock request actually goes out — a blocking confirm since it notifies the
+// Admin and can't be un-sent once submitted (only cancelled by the Admin resolving it).
+export async function confirmUnlockRequest(): Promise<boolean> {
+  const result = await window.Swal.fire({
+    icon: "question",
+    title: "Submit unlock request?",
+    html:
+      "This sends your reason to the Admin / Excise Headquarters for review. You'll see the " +
+      "status here once it's approved or denied." +
+      '<br><br><span lang="hi">इससे आपका कारण एडमिन / आबकारी मुख्यालय को समीक्षा के लिए भेजा ' +
+      "जाएगा। स्वीकृत या अस्वीकृत होने पर स्थिति यहीं दिखाई देगी।</span>",
+    showCancelButton: true,
+    confirmButtonText: "Yes, submit request",
+    cancelButtonText: "Cancel",
+    confirmButtonColor: "#1d4ed8",
+  });
+  return result.isConfirmed;
+}
+
 export async function confirmTruncateDemo(): Promise<boolean> {
   const result = await window.Swal.fire({
     icon: "warning",
