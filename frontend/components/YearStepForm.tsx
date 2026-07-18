@@ -177,8 +177,10 @@ export default function YearStepForm({
                         <th className="w-[34%] py-1.5 pr-2">RC Number</th>
                         <th className="w-[34%] py-1.5 pr-2">RC Amount</th>
                         <th className="w-32 py-1.5 text-center leading-tight">
-                          <span className="block">Stayed by Court?</span>
-                          <span className="block text-[10px] font-normal normal-case text-slate-500 dark:text-slate-500" lang="hi">
+                          <span className="block text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                            Stayed by Court?
+                          </span>
+                          <span className="block text-xs font-medium normal-case text-slate-700 dark:text-slate-300" lang="hi">
                             सक्षम न्यायालय द्वारा स्थगित?
                           </span>
                         </th>
@@ -217,7 +219,7 @@ export default function YearStepForm({
                             </td>
                             <td className="py-1.5">
                               <Select
-                                size="sm"
+                                size="md"
                                 value={detail.stayed ? "yes" : "no"}
                                 onChange={(e) => onRcDetailChange(i, "stayed", e.target.value === "yes")}
                                 className="w-full min-w-0"
