@@ -181,7 +181,7 @@ export default function YearStepForm({
                             Stayed by Court?
                           </span>
                           <span
-                            className="mt-0.5 block text-sm leading-normal normal-case text-slate-700 dark:text-slate-300"
+                            className="mt-0.5 block text-xs leading-normal normal-case text-slate-700 dark:text-slate-300"
                             lang="hi"
                           >
                             सक्षम न्यायालय द्वारा स्थगित?
@@ -226,6 +226,13 @@ export default function YearStepForm({
                                 value={detail.stayed ? "yes" : "no"}
                                 onChange={(e) => onRcDetailChange(i, "stayed", e.target.value === "yes")}
                                 className="w-full min-w-0"
+                                /* globals.css forces `select { line-height: 1 }` app-wide (see
+                                   CLAUDE.md) via an unlayered rule Tailwind's own leading-*
+                                   utilities can't outrank — an inline style is the only thing
+                                   with enough precedence to override it, needed here because
+                                   Devanagari मात्राएँ (matras) get visually clipped at
+                                   line-height: 1. */
+                                style={{ lineHeight: "1.6" }}
                               >
                                 <option value="no">No / नहीं</option>
                                 <option value="yes">Yes / हाँ</option>
