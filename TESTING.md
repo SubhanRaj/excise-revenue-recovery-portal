@@ -308,3 +308,34 @@ magic-link round-trip test updated to assert a stored `localStorage` token inste
 different origins plus a session cookie is a third-party-cookie problem in general, and browser
 privacy defaults in this space only get stricter over time — treat any `SameSite=None` cookie
 between two separate public-suffix domains as inherently fragile, not just risky in one browser.
+
+**2026-07-18 — the "Deploy API Worker" GitHub Actions job for the Milestone 28 (unlock
+requests) commit silently failed, and nothing caught it until an explicit "check if the
+deployment is good" request.**
+
+The commit added an `r2_buckets` binding to `api/wrangler.jsonc` for PDF attachments, but the
+R2 bucket didn't exist yet (Cloudflare requires a payment method on file before R2 can be
+enabled at all, even on the free tier — see CLAUDE.md's unlock-requests section). `wrangler
+deploy` hard-fails the *entire* Worker deploy with `[code: 10042]` if a declared binding's
+bucket doesn't exist — this is a deploy-time Cloudflare API call, not a build-time/type check,
+so `pnpm run build`/`tsc --noEmit` both passed while the live deploy job failed. Because
+`deploy.yml`'s "Deploy API Worker" job is path-filtered to `api/**` (`dorny/paths-filter@v3`),
+the *next* push (docs + frontend only) didn't touch `api/**`, so that job just showed
+`skipped` — not retried, not failed — while `gh run list` reported the overall run as
+`success`. The live API Worker kept running pre-Milestone-28 code (missing the new unlock-
+request routes) while the already-deployed frontend had UI calling them, for several commits,
+undetected.
+
+Fix: commented out the `r2_buckets` binding in `api/wrangler.jsonc` (see CLAUDE.md), verified
+via `wrangler deploy --dry-run` that only `env.DB`/`env.ASSETS` bindings were listed, then
+pushed and confirmed via `gh run view <id> --json jobs -q '.jobs[] | {name, conclusion}'` that
+"Deploy API Worker" showed `success` (not `skipped`).
+
+**Lesson for next time a deploy needs verifying:** `gh run list` showing the latest run as
+`success` is not sufficient — a path-filtered job can be `skipped` on a run that "succeeds"
+while a *previous* run's job for that same path genuinely failed. Always check
+`gh run view <id> --json jobs -q '.jobs[] | {name, status, conclusion}'` on the run that
+actually touched the path you care about, not just the most recent run. For the API Worker
+specifically, also cross-check `wrangler deployments list` (in `api/`) — its most recent
+`Created:` timestamp should match the commit time of the last `api/**`-touching push; if it's
+stale, the Worker didn't actually redeploy even if Actions reports green.

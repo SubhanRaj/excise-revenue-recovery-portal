@@ -160,6 +160,33 @@ Then in a real browser (or run `pnpm run e2e` in `frontend/` — see TESTING.md)
 `$FRONT/login` with the superadmin email, confirm the Magic Link email arrives, click
 through, and confirm `/admin` loads the 75 districts.
 
+**`gh run list` showing the latest run as `success` is not enough** — `deploy.yml`'s two jobs
+are path-filtered (`api/**` / `frontend/**`), so a run that only touched one app shows the
+other job as `skipped`, and a *skipped* job on a green run can be hiding a *failed* job on an
+earlier run for that same path (see TESTING.md's 2026-07-18 incident, where the API Worker ran
+stale code in production for several commits this way). Whenever `api/` changed, check the run
+that actually touched it:
+
+```bash
+gh run list --workflow=deploy.yml --limit 5 --json databaseId,headSha,conclusion
+gh run view <databaseId> --json jobs -q '.jobs[] | {name, status, conclusion}'
+```
+
+and cross-check the Worker itself redeployed (not just that Actions reports green):
+
+```bash
+cd api && pnpm exec wrangler deployments list   # latest "Created:" should match the push time
+```
+
+A quick live route check (200/401 is fine, 500 is not) is worth running after any `api/**`
+deploy too — a `500` here on a route that should just be an auth check means the Worker itself
+is broken, not merely unauthenticated:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" "$API/api/auth/me?role=admin"       # expect 401
+curl -s -o /dev/null -w "%{http_code}\n" "$API/api/admin/unlock-requests"    # expect 401
+```
+
 ## Known deployment constraints
 
 - **Frontend/API are cross-origin in production** (`*.pages.dev` vs `*.workers.dev`). Session
