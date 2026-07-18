@@ -226,20 +226,18 @@ export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData
       // shared A4/landscape/fit-to-width page setup.
       pageSetup: { ...PAGE_SETUP, printTitlesRow: `1:${TITLE_ROWS + 1}` },
     });
-    // Group headers (a district's own row) sit above their detail rows (its per-RC breakdown)
-    // here, the opposite of Excel's subtotal-below default — summaryBelow: false puts the
-    // outline +/- toggle on the district row instead of expecting a subtotal row underneath it.
-    ws.properties.outlineProperties = { summaryBelow: false, summaryRight: false };
     ws.columns = [{ width: 22 }, { width: 18 }, ...PAC_FIELD_ORDER.map(() => ({ width: 18 })), { width: 18 }];
 
     ws.addRow([`${SITE_TITLE_EN} — FY ${fy}`]);
     ws.addRow([dataPeriodForFY(fy)]);
     const headerRow = ws.addRow(header);
-    // Each district's row is immediately followed by one collapsed sub-row per RC it has in this
-    // FY (indented in the District column, its amount under the same RC Amount column) — an
-    // admin expands only the district(s) they care about via Excel's outline +/- control, rather
-    // than leaving the per-RC breakdown out of the FY sheet entirely or scrolling a separate
-    // all-district/all-year flat sheet (see the "RC Details" sheet below for that cross-year view).
+    // Each district's row is immediately followed by one sub-row per RC it has in this FY
+    // (indented in the District column, its amount under the same RC Amount column) — always
+    // visible rather than collapsed via Excel's row outlineLevel/hidden/collapsed grouping,
+    // which multiple ExcelJS issues (exceljs/exceljs#550, #2814) document as writing outline XML
+    // Excel doesn't reliably accept, triggering its "problem with content" repair prompt. This
+    // still puts the per-RC breakdown in context on the FY sheet without leaving it out entirely
+    // (see the "RC Details" sheet below for the cross-year view).
     const dataRows = sortedDistricts.map((d, i) => {
       const row = ws.addRow(rows[i]);
       const match = pacData.find((p) => p.districtId === d.id && p.financialYear === fy);
@@ -248,8 +246,6 @@ export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData
         subValues[0] = `    ↳ ${rc.rcNumber}${rc.stayed ? " — Stayed" : ""}`;
         subValues[rcAmountCol0] = rc.rcAmount;
         const subRow = ws.addRow(subValues);
-        subRow.outlineLevel = 1;
-        subRow.hidden = true;
         subRow.font = { italic: true, size: 10, color: { argb: "FF64748B" } };
         subRow.getCell(rcAmountCol0 + 1).numFmt = RUPEE_FORMAT;
       }
@@ -284,15 +280,15 @@ export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData
   // added to each FY sheet above) — an auditor needing a cross-year view of one district's RCs,
   // or every stayed RC portfolio-wide, shouldn't have to open all 5 FY sheets to find them. A
   // flat 75-district table would run to hundreds of rows with no structure, so rows are grouped
-  // per district (a bold district row, its RCs collapsed underneath via Excel's outline +/-,
-  // same convention as the FY sheets) with an AutoFilter on the header row for a direct
-  // District/Financial Year/Stayed search that doesn't require expanding every group first.
+  // per district (a bold district row, its RCs listed underneath — not collapsed via Excel's row
+  // outlineLevel/hidden/collapsed grouping, which multiple ExcelJS issues (exceljs/exceljs#550,
+  // #2814) document as writing outline XML Excel doesn't reliably accept) with an AutoFilter on
+  // the header row for a direct District/Financial Year/Stayed search.
   const rcHeader = ["District", "Financial Year", "RC Number", "RC Amount", "Stayed"];
   const rcWs = wb.addWorksheet("RC Details", {
     views: [{ state: "frozen", ySplit: TITLE_ROWS + 1 }],
     pageSetup: { ...PAGE_SETUP, printTitlesRow: `1:${TITLE_ROWS + 1}` },
   });
-  rcWs.properties.outlineProperties = { summaryBelow: false, summaryRight: false };
   rcWs.columns = [{ width: 22 }, { width: 14 }, { width: 24 }, { width: 18 }, { width: 10 }];
   // No mergeCells on this sheet's title/subtitle rows, unlike every other sheet in this
   // workbook — ExcelJS has a documented bug (exceljs/exceljs#970) where a merged cell anywhere
@@ -323,8 +319,6 @@ export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData
 
     for (const row of districtRcRows) {
       const detailRow = rcWs.addRow(row);
-      detailRow.outlineLevel = 1;
-      detailRow.hidden = true;
       detailRow.getCell(4).numFmt = RUPEE_FORMAT;
     }
   }
