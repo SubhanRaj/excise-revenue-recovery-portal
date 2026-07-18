@@ -176,11 +176,14 @@ export default function YearStepForm({
                         <th className="w-8 py-1.5 pr-2">#</th>
                         <th className="w-[34%] py-1.5 pr-2">RC Number</th>
                         <th className="w-[34%] py-1.5 pr-2">RC Amount</th>
-                        <th className="w-32 py-1.5 text-center leading-tight">
-                          <span className="block text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                        <th className="w-32 py-1.5 text-center">
+                          <span className="block text-[10px] leading-tight font-semibold text-slate-700 dark:text-slate-300">
                             Stayed by Court?
                           </span>
-                          <span className="block text-xs font-medium normal-case text-slate-700 dark:text-slate-300" lang="hi">
+                          <span
+                            className="mt-0.5 block text-sm leading-normal normal-case text-slate-700 dark:text-slate-300"
+                            lang="hi"
+                          >
                             सक्षम न्यायालय द्वारा स्थगित?
                           </span>
                         </th>
