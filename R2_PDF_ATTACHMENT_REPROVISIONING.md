@@ -2,10 +2,14 @@
 
 **Status as of this writing: reason-only.** The DEO-side "Request Unlock" form (Milestone 28,
 see ROADMAP.md and CLAUDE.md's "DEO self-service unlock requests" section) has no PDF-attachment
-file input right now. Not because the feature was cut — every other piece of it (schema, both
-backend routes, the admin PDF-preview modal) is fully built. It's off because R2 requires a
-payment method on file to enable at the Cloudflare-account level, even for free-tier usage, and
-that hadn't been set up yet at build time.
+file input, and the admin `/admin/unlock-requests` table has no Attachment column, right now.
+Not because the feature was cut — the schema and both backend routes are fully built and
+untouched; the admin PDF-preview modal (`PdfPreviewModal.tsx`) exists but isn't wired into the
+admin page. It's off because R2 requires a payment method on file to enable at the
+Cloudflare-account level, even for free-tier usage, and that hadn't been set up yet at build
+time — and once it was clear attachments couldn't work yet, the now-permanently-empty Attachment
+column and its `hasAttachment: false` audit metadata were removed as dead UI rather than left
+sitting there unused.
 
 **The `r2_buckets` binding in `api/wrangler.jsonc` is currently commented out**, not just
 unused — `wrangler deploy` hard-fails the *entire* Worker deploy with `[code: 10042]` if this
@@ -110,11 +114,14 @@ Already streams from R2 by request `id` (never a raw R2 key from the client), al
 changes needed — this route already works the moment the bucket exists and a row has an
 `attachmentKey`.
 
-### 5. Admin UI — `frontend/components/ui/PdfPreviewModal.tsx` and `/admin/unlock-requests`
+### 5. Admin UI — `frontend/components/ui/PdfPreviewModal.tsx` (built, not wired up)
 
-Already built. The "View" link in the Attachment column of `/admin/unlock-requests` is already
-conditional on `row.attachmentFilename` — it will start appearing automatically the moment a
-request row has one, no admin-side code change needed.
+The modal component itself is untouched and ready — fetches the attachment as a blob via
+`apiFetchBlob()`, renders it through the browser's native PDF viewer, has a Download button.
+**`/admin/unlock-requests/page.tsx` no longer renders it** — the Attachment column, its "View"
+button, and the `previewFor` state were removed (there was nothing to view while attachments are
+disabled, and a permanently-empty column read as dead UI). Re-adding it there is a real code
+change this time (not "already works"), covered in step 6 below.
 
 ### 6. `frontend/lib/api.ts` — `apiFetchForm` / `apiFetchBlob`
 
@@ -244,10 +251,74 @@ onClick={() => {
 }}
 ```
 
-### Step 6 — Update docs
+### Step 6 — Re-add the admin Attachment column + `PdfPreviewModal` wiring
+
+File: `frontend/app/admin/unlock-requests/page.tsx`. This section used to be "already works, no
+change needed" — it isn't anymore, since the column/button/modal usage were removed once
+attachments had nothing to show. Re-adding is the mirror image of removing them:
+
+**6a. Import** — add back:
+
+```tsx
+import PdfPreviewModal from "@/components/ui/PdfPreviewModal";
+```
+
+**6b. Type** — add `attachmentFilename: string | null;` back to the `RequestRow` type (the
+backend route already returns this field — it was never removed from the `GET
+/api/admin/unlock-requests` route's `SELECT`, only from the frontend type/render).
+
+**6c. State** — add back next to `resolvingId`:
+
+```tsx
+const [previewFor, setPreviewFor] = useState<RequestRow | null>(null);
+```
+
+**6d. Table header** — add an `Attachment` `<th>` back between `Reason` and `Status`, and bump
+the empty-state `<td colSpan={5}>` back to `colSpan={6}`.
+
+**6e. Table cell** — add the Attachment `<td>` back between the Reason cell and the Status cell:
+
+```tsx
+<td className="whitespace-nowrap px-3 py-2.5">
+  {row.attachmentFilename ? (
+    <button
+      type="button"
+      onClick={() => setPreviewFor(row)}
+      className="flex items-center gap-1 text-blue-700 hover:underline dark:text-blue-400"
+    >
+      <i className="ti ti-file-type-pdf text-base" />
+      View
+    </button>
+  ) : (
+    <span className="text-slate-400 dark:text-slate-600">—</span>
+  )}
+</td>
+```
+
+**6f. Modal render** — add back just before the component's closing `</div>`:
+
+```tsx
+{previewFor && (
+  <PdfPreviewModal requestId={previewFor.id} filename={previewFor.attachmentFilename} onClose={() => setPreviewFor(null)} />
+)}
+```
+
+### Step 7 — Restore the `hasAttachment` audit metadata (optional)
+
+`api/app/api/deo/request-unlock/route.ts`'s audit-log insert currently writes `metadata: {
+reason }` — it used to also carry `hasAttachment: attachmentKey !== null`, removed since it was
+always `false` while uploads were disabled. Restore it if that's still useful for the audit
+trail:
+
+```ts
+metadata: { reason, hasAttachment: attachmentKey !== null },
+```
+
+### Step 8 — Update docs
 
 - `CLAUDE.md`'s "DEO self-service unlock requests" section — remove the "reason-only for now"
-  caveat on the DEO-side UI bullet.
+  caveat on the DEO-side UI bullet, and the note about the Admin-side Attachment column/modal
+  being unwired.
 - `ROADMAP.md`'s Milestone 28 — remove or mark done the "PDF attachment upload has no DEO-facing
   UI right now" note.
 - `TESTING.md`'s unlock-request manual test steps (3a/4a) — restore the attachment upload/view
@@ -257,7 +328,7 @@ onClick={() => {
 - This file (`R2_PDF_ATTACHMENT_REPROVISIONING.md`) can be deleted once re-enabled — it has no
   purpose once the feature is live again.
 
-### Step 7 — Test
+### Step 9 — Test
 
 Follow the (restored) manual test steps: submit a request with a small real PDF attached as a
 DEO, confirm it appears in `/admin/unlock-requests`' Attachment column as a "View" link, open the

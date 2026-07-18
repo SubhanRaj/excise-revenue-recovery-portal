@@ -95,7 +95,7 @@ export const POST = withErrorHandling("deo/request-unlock", async (req: NextRequ
       actorRole: "deo",
       actorEmail: deo?.email,
       districtName: district.districtName,
-      metadata: { reason, hasAttachment: attachmentKey !== null },
+      metadata: { reason },
     }),
   ] as unknown as Parameters<typeof db.batch>[0]);
 

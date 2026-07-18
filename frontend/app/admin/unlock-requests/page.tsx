@@ -9,7 +9,6 @@ import AppHeader, { type NavLink } from "@/components/ui/AppHeader";
 import Banner from "@/components/ui/Banner";
 import HelpPanel from "@/components/ui/HelpPanel";
 import Select from "@/components/ui/Select";
-import PdfPreviewModal from "@/components/ui/PdfPreviewModal";
 
 const NAV_LINKS: NavLink[] = [
   { label: "Dashboard", href: "/admin" },
@@ -23,7 +22,6 @@ type RequestRow = {
   districtId: number;
   districtName: string | null;
   reason: string;
-  attachmentFilename: string | null;
   status: "pending" | "approved" | "denied";
   requestedAt: string;
   resolvedAt: string | null;
@@ -63,7 +61,6 @@ export default function UnlockRequestsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"pending" | "all">("pending");
-  const [previewFor, setPreviewFor] = useState<RequestRow | null>(null);
   const [resolvingId, setResolvingId] = useState<number | null>(null);
 
   async function load() {
@@ -158,7 +155,6 @@ export default function UnlockRequestsPage() {
                 <th className="sticky top-0 z-10 whitespace-nowrap bg-slate-50 px-3 py-2.5 text-left font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">District</th>
                 <th className="sticky top-0 z-10 whitespace-nowrap bg-slate-50 px-3 py-2.5 text-left font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">Requested (IST)</th>
                 <th className="sticky top-0 z-10 bg-slate-50 px-3 py-2.5 text-left font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">Reason</th>
-                <th className="sticky top-0 z-10 whitespace-nowrap bg-slate-50 px-3 py-2.5 text-left font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">Attachment</th>
                 <th className="sticky top-0 z-10 whitespace-nowrap bg-slate-50 px-3 py-2.5 text-left font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">Status</th>
                 <th className="sticky top-0 z-10 whitespace-nowrap bg-slate-50 px-3 py-2.5 text-left font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">Actions</th>
               </tr>
@@ -166,7 +162,7 @@ export default function UnlockRequestsPage() {
             <tbody>
               {visibleRows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-3 py-6 text-center text-slate-500 dark:text-slate-400">
+                  <td colSpan={5} className="px-3 py-6 text-center text-slate-500 dark:text-slate-400">
                     {loading ? "Loading..." : "No unlock requests."}
                   </td>
                 </tr>
@@ -181,20 +177,6 @@ export default function UnlockRequestsPage() {
                         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                           Admin note: {row.adminNote} ({row.resolvedBy}, {formatIST(row.resolvedAt)})
                         </p>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2.5">
-                      {row.attachmentFilename ? (
-                        <button
-                          type="button"
-                          onClick={() => setPreviewFor(row)}
-                          className="flex items-center gap-1 text-blue-700 hover:underline dark:text-blue-400"
-                        >
-                          <i className="ti ti-file-type-pdf text-base" />
-                          View
-                        </button>
-                      ) : (
-                        <span className="text-slate-400 dark:text-slate-600">—</span>
                       )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5">
@@ -231,9 +213,6 @@ export default function UnlockRequestsPage() {
           </table>
         </div>
       </div>
-      {previewFor && (
-        <PdfPreviewModal requestId={previewFor.id} filename={previewFor.attachmentFilename} onClose={() => setPreviewFor(null)} />
-      )}
     </div>
   );
 }

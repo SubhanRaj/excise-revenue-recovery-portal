@@ -567,15 +567,20 @@ section documents the shipped shape.
   still `"pending"` before writing, to avoid a double-resolve race. Approve mirrors the existing
   `POST /api/admin/unlock/route.ts` district update, batched with the `unlock_requests` row
   update and an audit-log insert.
-- **In-browser PDF preview, not a forced download**: `components/ui/PdfPreviewModal.tsx` fetches
-  the attachment as a blob via `apiFetchBlob()` (this app has no cookies — see Auth above — so a
-  plain `<iframe src="...">` can't attach the Bearer token itself) and renders it through the
-  **browser's own native PDF viewer** via `URL.createObjectURL()`. Any script embedded in the
-  PDF runs inside that native viewer's own sandbox, not as page-level JS — this is why the
-  attachment route sets `Content-Disposition: inline` (not `attachment`) plus
-  `X-Content-Type-Options: nosniff`. Revoke the object URL on modal close. First non-SweetAlert2
-  modal in the app — an `<iframe>` doesn't fit Swal's HTML-string API, same reasoning as the
-  DEO-side form below.
+- **In-browser PDF preview, not a forced download — built, not currently wired up**:
+  `components/ui/PdfPreviewModal.tsx` fetches the attachment as a blob via `apiFetchBlob()` (this
+  app has no cookies — see Auth above — so a plain `<iframe src="...">` can't attach the Bearer
+  token itself) and renders it through the **browser's own native PDF viewer** via
+  `URL.createObjectURL()`. Any script embedded in the PDF runs inside that native viewer's own
+  sandbox, not as page-level JS — this is why the attachment route sets `Content-Disposition:
+  inline` (not `attachment`) plus `X-Content-Type-Options: nosniff`. Revoke the object URL on
+  modal close. First non-SweetAlert2 modal in the app — an `<iframe>` doesn't fit Swal's
+  HTML-string API, same reasoning as the DEO-side form below. **The component is untouched, but
+  `/admin/unlock-requests/page.tsx` no longer imports or renders it** — the Attachment
+  column/"View" button/`previewFor` state were removed since nothing could ever populate an
+  attachment while the DEO-side upload is disabled, and a permanently-empty column read as dead
+  UI. Re-adding both sides is covered step-by-step in
+  [R2_PDF_ATTACHMENT_REPROVISIONING.md](./R2_PDF_ATTACHMENT_REPROVISIONING.md).
 - **DEO-side UI**: a plain inline form on the existing "Data Already Locked" card
   (`deo-data-entry/page.tsx`), not SweetAlert2 — a `<textarea>` (+ eventually `<input
   type="file">`) doesn't fit Swal's API either. **Reason-only for now — no PDF attachment field

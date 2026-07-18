@@ -259,10 +259,10 @@ export default function EntryPage() {
   // PDF attachment upload has no UI here for now — R2 (its storage backend) needs a payment
   // method on file to enable, even on Cloudflare's free tier, which isn't set up yet. The
   // provision stays intact server-side (POST /api/deo/request-unlock still accepts an optional
-  // `attachment` field, the R2 binding/admin PdfPreviewModal/attachment route are all live) —
-  // once R2 is enabled, re-add a `<input type="file" accept="application/pdf">` here (2MB cap,
-  // client + server validated) and append it to the FormData below as `attachment`. Until then,
-  // requests are reason-only.
+  // `attachment` field) — the admin Attachment column/PdfPreviewModal.tsx wiring was removed
+  // from /admin/unlock-requests since nothing can produce an attachment right now; see
+  // R2_PDF_ATTACHMENT_REPROVISIONING.md for the full re-add checklist (DEO input here, and the
+  // admin table + modal wiring) once R2 is enabled. Until then, requests are reason-only.
   async function submitUnlockRequest() {
     const reason = requestReason.trim();
     if (!reason) return notifyToast({ icon: "error", title: BLANK_FIELD_TITLE, text: BLANK_FIELD_TEXT });
