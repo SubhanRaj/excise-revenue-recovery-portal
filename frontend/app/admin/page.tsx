@@ -50,7 +50,22 @@ export default function AdminDashboardPage() {
     [districts, pacData]
   );
 
-  if (!ready) return null;
+  if (!ready) {
+    return (
+      <div className="flex min-h-full flex-1 flex-col bg-slate-50 dark:bg-slate-950">
+        <AppHeader title="Admin Dashboard" role="admin" profile={profile} navLinks={NAV_LINKS} />
+        <div className="w-full flex-1 px-4 py-6 sm:px-6 lg:px-[10%] xl:px-[5%] 2xl:px-[3%]">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-24 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-800" />
+            ))}
+          </div>
+          <div className="mt-4 h-64 w-full animate-pulse rounded-lg bg-slate-200 dark:bg-slate-800" />
+          <div className="mt-4 h-64 w-full animate-pulse rounded-lg bg-slate-200 dark:bg-slate-800" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-full flex-1 flex-col bg-slate-50 dark:bg-slate-950">

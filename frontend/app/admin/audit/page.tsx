@@ -181,7 +181,7 @@ export default function AuditLogPage() {
           </button>
         </div>
 
-        <div className="max-h-[65vh] overflow-auto rounded-lg border border-slate-200 bg-white shadow-sm [scrollbar-width:thin] scroll-smooth dark:border-slate-800 dark:bg-slate-900">
+        <div className="min-h-[500px] max-h-[65vh] overflow-auto rounded-lg border border-slate-200 bg-white shadow-sm [scrollbar-width:thin] scroll-smooth dark:border-slate-800 dark:bg-slate-900">
           {isChangingFilter ? (
             <div className="p-6">
               <div className="mb-6 h-8 w-full animate-pulse rounded bg-slate-200 dark:bg-slate-800" />

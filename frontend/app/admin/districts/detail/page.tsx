@@ -88,7 +88,17 @@ export default function DistrictDetailPage() {
     }
   }
 
-  if (!ready || districtId === null) return null;
+  if (!ready || districtId === null) {
+    return (
+      <div className="flex min-h-full flex-1 flex-col bg-slate-50 dark:bg-slate-950">
+        <AppHeader title="District Detail" role="admin" profile={profile} navLinks={NAV_LINKS} />
+        <div className="mx-auto w-full max-w-7xl flex-1 px-6 py-6 lg:px-10">
+          <div className="mb-6 h-8 w-48 animate-pulse rounded-md bg-slate-200 dark:bg-slate-800" />
+          <div className="min-h-[500px] w-full animate-pulse rounded-lg bg-slate-200 dark:bg-slate-800" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-full flex-1 flex-col bg-slate-50 dark:bg-slate-950">

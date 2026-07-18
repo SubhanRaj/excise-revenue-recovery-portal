@@ -312,10 +312,12 @@ financial year appears: DEO nav pills, `YearStepForm` headings, Admin selectors/
 
 - **Language**: UI chrome is English only. The only Hindi is the 6 PAC field labels, the
   department name, the RC Details section's "Stayed by Court?" column (mirrors the existing
-  Stay Amount field's Hindi phrasing, since it's the same concept applied per-RC), and the
-  DEO entry page's Help panel (see below) — because all of these mirror the actual government
-  form or exist specifically to help a DEO who reads Hindi more comfortably. Don't add Hindi
-  elsewhere without a similarly concrete reason.
+  Stay Amount field's Hindi phrasing, since it's the same concept applied per-RC), the
+  DEO entry page's Help panel (see below), and the locked-DEO-page messaging (the "Data Already
+  Locked" paragraphs, the Request Unlock form's reason label, the pending-status text, and
+  `confirmUnlockRequest()`'s SweetAlert2 dialog) — because all of these mirror the actual
+  government form or exist specifically to help a DEO who reads Hindi more comfortably. Don't
+  add Hindi elsewhere without a similarly concrete reason.
 - **Feedback**: a field-specific error renders inline under the field (bold, bilingual, only
   after blur). A generic error not tied to one field uses `notifyToast()`. Page-level
   success/failure (sync, submit) uses `components/ui/Banner.tsx`. `window.Swal` (SweetAlert2) is
@@ -362,6 +364,15 @@ financial year appears: DEO nav pills, `YearStepForm` headings, Admin selectors/
 - `disabled:cursor-not-allowed` does not work on `<button>` under this Tailwind version (preflight
   sets `button { cursor: pointer }` unconditionally). Set `style={{ cursor: "not-allowed" }}`
   directly from the disabled condition instead; `disabled:opacity-*` still works normally.
+- **A `!ready` skeleton must roughly match its page's real loaded height**, not just exist — a
+  short mismatch (or `return null` and popping in the whole page at once, which several admin
+  pages did before this was caught) reads as the page visibly shrinking/growing on every load.
+  Give the real content's scrollable table wrapper a `min-h-[...]` that roughly matches the
+  skeleton's placeholder height (see `/admin/unlock-requests`, `/admin/audit`) so the
+  skeleton → loading → loaded sequence doesn't jump twice (once when the real `AppHeader`/toolbar
+  swaps in, once when a short results list collapses a tall empty table down). Mirror the real
+  page's toolbar row in the skeleton too (a same-sized pulse block per real control), not just
+  the big content block below it.
 - **Tailwind loads via CDN script** (`@tailwindcss/browser@4`), not a build step — it must stay a
   plain blocking `<script src=...>` tag in `frontend/app/layout.tsx`, not `next/script` (whose
   `beforeInteractive` strategy injects via a JS hook rather than blocking HTML parsing, letting
@@ -537,10 +548,15 @@ section documents the shipped shape.
   The R2 object key is always server-generated (`unlock-requests/{districtId}/{timestamp}.pdf`)
   — the client's original filename is stored only as a display string, never used to build the
   key or a path.
-- **R2 bucket** `excise-revenue-recovery-attachments`, bound as `ATTACHMENTS` in
+- **R2 bucket** `excise-revenue-recovery-attachments`, meant to bind as `ATTACHMENTS` in
   `api/wrangler.jsonc` — private, no public access/CORS/`R2.dev` URL. The only read path is
   `GET /api/admin/unlock-requests/attachment?id=`, which takes the request `id` (never a raw R2
-  key from the client) and looks up `attachmentKey` server-side.
+  key from the client) and looks up `attachmentKey` server-side. **That binding is currently
+  commented out in `api/wrangler.jsonc`** — `wrangler deploy` hard-fails the entire Worker
+  deploy with `[code: 10042]` if it's present while the bucket doesn't exist (R2 needs a payment
+  method enabled on the Cloudflare account, not done yet). See
+  [R2_PDF_ATTACHMENT_REPROVISIONING.md](./R2_PDF_ATTACHMENT_REPROVISIONING.md) before touching
+  this binding.
 - **`GET /api/auth/me?role=deo`** (not a separate polling endpoint) also returns
   `pendingUnlockRequest: { requestedAt, reason } | null` — this route is already the DEO page's
   single source of truth for lock state, re-fetched on every load, so the pending-request flag
@@ -572,7 +588,15 @@ section documents the shipped shape.
   so re-enabling this is a **frontend-only** change (re-add the file input; see the comment on
   `submitUnlockRequest()`) once R2 is actually provisioned — see
   [R2_PDF_ATTACHMENT_REPROVISIONING.md](./R2_PDF_ATTACHMENT_REPROVISIONING.md) for the exact,
-  copy-paste-ready steps and code.
+  copy-paste-ready steps and code. The "Data Already Locked" card's English/Hindi paragraphs
+  point at the **Request Unlock** button rather than telling the DEO to contact the Admin
+  outside the app. Submitting goes through `confirmUnlockRequest()` (`lib/alerts.ts`) — a
+  blocking SweetAlert2 confirm, same "irreversible-ish action" pattern as
+  `confirmFinalSubmit()`/`confirmClearYear()` — before the actual `POST` fires. The Submit
+  Request button uses `Button`'s `primary` variant (not `dark`, unlike the rest of this card) so
+  it reads as the clear next action, shows a `ti-loader animate-spin` icon while
+  `requestSubmitting` is true, and stays `disabled` for the same duration to block a double-
+  submit from a second click.
 - **Admin-side UI**: new top-level nav page `/admin/unlock-requests` (added to every
   `AppHeader.navLinks` array — Dashboard/Districts/**Unlock Requests**/Audit Log, duplicated
   per-page same as the other three links), reusing the `promptUnlockReason()`-style single-

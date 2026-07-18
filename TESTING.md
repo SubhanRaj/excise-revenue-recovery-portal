@@ -145,10 +145,14 @@ Then:
     inline form opens on the card (not a SweetAlert2 popup): a reason textarea only, no file
     input (PDF attachment upload is deliberately not shown right now — pending R2, see
     ROADMAP.md's Milestone 28). Submitting blank — blocked with the same bilingual blank-field
-    toast as any other field. Fill in a reason and submit — the form should replace itself with
-    "Request pending since `<IST timestamp>`" and your reason text; reload the page and confirm
-    that pending state persists (it's read from `GET /api/auth/me?role=deo`, not local-only
-    state). Try requesting again — there's no button to do so while a request is pending.
+    toast as any other field. Fill in a reason and click the blue **Submit Request** button — a
+    bilingual SweetAlert2 confirm should appear first ("Submit unlock request?"); cancelling it
+    should leave the form open and untouched, nothing sent. Confirming should show a spinning
+    loader icon on the button while it's disabled (try double-clicking fast — should not create
+    two requests), then the form should replace itself with "Request pending since
+    `<IST timestamp>`" (English + Hindi) and your reason text; reload the page and confirm that
+    pending state persists (it's read from `GET /api/auth/me?role=deo`, not local-only state).
+    Try requesting again — there's no button to do so while a request is pending.
 4. **Back to Admin → Districts** → Sync → the district now shows "Locked" with real numbers,
    including its own Opening Balance/Net Recoverable columns for the currently-selected FY —
    these are now read straight from `pac_data` (computed server-side at submit time), not
