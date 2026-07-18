@@ -417,7 +417,15 @@ separate routes, not an in-page toggle:
   filter has nothing to filter. Net Recoverable is the one exception: it carries each district's
   FY 2025-26 `net_recoverable` straight through, per the Data model section above.
   `/admin/districts`'s own FY selector is unrelated and correctly kept — viewing one year's
-  figures per district there is a legitimate, different use case.
+  figures per district there is a legitimate, different use case. **Mobile sizing**: the bar
+  chart's canvas wrapper is `h-56 sm:h-72` with `overflow-hidden` (Chart.js's own responsive
+  resize can't shrink below a fixed-height parent, so the parent has to be the one that shrinks
+  first); the lock-status donut + its legend go `flex-col` below `sm` (`sm:flex-row` above it) so
+  the fixed-width `h-44 w-44` donut doesn't force the legend into a too-narrow remainder and
+  overflow; KPI card values are `break-words` (a long ₹ figure has no natural wrap point
+  otherwise, which can force the whole grid past the viewport width); the "All fields" `dl` is
+  `grid-cols-1 sm:grid-cols-2` for the same reason, stacking on phones instead of squeezing two
+  money columns into half the width each.
 - **`/admin/districts`** — sortable/searchable/pinned-column table (`getPaginationRowModel`,
   25/50/75/100 rows/page), a Locked/Unlocked/All status filter, Lock/Unlock, and two export
   buttons. Column headers use `englishLabel()` only, no bilingual tooltip. Container padding
@@ -464,13 +472,26 @@ All admin pages share `frontend/lib/useAdminData.ts` (session guard, Dexie cache
 `unlock()`). `AppHeader` takes `navLinks`, `onSync`/`syncing`, `lastSyncedAt` (persisted to
 `localStorage` as `excise-portal:admin-last-sync`), and an optional `districts` prop that renders
 a global "jump to a district" search. `AppHeader.navLinks` is still just Dashboard/Districts/
-Unlock Requests/Audit Log — DEO Provisioning isn't in it, by design (see above). Below the `sm`
-breakpoint the inline `navLinks` row (`hidden sm:flex`) disappears, so a hamburger button
-(`sm:hidden`, `ti-menu-2`/`ti-x`) toggles a stacked nav panel across the header's full width —
-this is the *only* mobile entry point to those links, so it must exist any time `navLinks` is
-passed; don't remove it as "redundant" with the inline row, the two are mutually exclusive by
-breakpoint, not actually duplicated. `DistrictSearch` stays desktop-only (`hidden lg:block`,
-unchanged) — jump-to-district is a power-user shortcut, not core mobile navigation. Logout lives inside
+Unlock Requests/Audit Log — DEO Provisioning isn't in it, by design (see above).
+
+**Mobile nav is a left-side drawer, not an inline row.** Whenever `navLinks` is passed
+(`hasDrawer = Boolean(navLinks)`, i.e. every admin page — DEO pages pass none), the entire
+right-aligned header group (nav links, `DistrictSearch`, Sync, `ThemeToggle`, `ProfileMenu`) is
+`hidden sm:flex` — below `sm` the header shrinks to just a hamburger (`ti-menu-2`, left of the
+brand square) and the page title, with the "Excise Revenue Recovery Portal" subtitle line also
+hidden (`hidden sm:block`) to save the row's height. The hamburger opens a `fixed inset-y-0
+left-0 w-72` drawer (dark `bg-black/40` backdrop, click to close) holding all of the above
+stacked vertically — `ProfileMenu` rendered a second time inside it (not moved, since the
+desktop copy needs to stay for `sm:flex`), `DistrictSearch` passed `mobile` (drops its desktop
+`hidden lg:block, w-44` sizing for `w-full`), and Sync/`ThemeToggle` as full-width rows. This is
+the *only* mobile entry point to any of these — don't remove it as "redundant" with the desktop
+row, the two are mutually exclusive by breakpoint. **The backdrop + drawer render as siblings of
+`<header>`, not children of it** — `<header>` has `backdrop-blur` (`backdrop-filter`), which
+per spec makes it a CSS containing block for `position: fixed` descendants, so a fixed drawer
+nested inside it sizes against the header's own ~60px height instead of the viewport (verified
+empirically: computed height came back `60px`, not `812px`, before this was caught). If
+`AppHeader` is ever restructured, keep the drawer/backdrop outside the `<header>` tag or
+re-verify this against a real render first. Logout lives inside
 `ProfileMenu`'s dropdown, not as a top-level header button, for both Admin and DEO headers.
 `ProfileMenu`'s `NavLink`/`{ label, href }` shape has no dropdown/submenu concept — the "DEO
 Provisioning" entry is a one-off `Link` in that menu's JSX, not a reusable nav-dropdown

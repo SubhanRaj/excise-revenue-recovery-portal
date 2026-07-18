@@ -27,7 +27,10 @@ type Props = {
 // Global "jump to a district" search, shown whenever a page passes `districts` (every /admin/*
 // page, via useAdminData). Separate from the Districts page's own table search box — this one
 // is reachable from anywhere and navigates straight to that district's detail page.
-function DistrictSearch({ districts }: { districts: SearchableDistrict[] }) {
+// `mobile` swaps the desktop `hidden lg:block, w-44` sizing for a full-width block — used inside
+// the mobile drawer, where this is the only place a phone user can reach it at all (the desktop
+// instance stays `lg:block`-gated in the header itself, unrelated to this one).
+function DistrictSearch({ districts, mobile }: { districts: SearchableDistrict[]; mobile?: boolean }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -50,7 +53,7 @@ function DistrictSearch({ districts }: { districts: SearchableDistrict[] }) {
   // before the font loads (see the identical fix on TextField.tsx and the earlier admin
   // district search input, both of which dropped their icon for the same reason).
   return (
-    <div className="relative hidden w-44 shrink-0 lg:block">
+    <div className={`relative shrink-0 ${mobile ? "w-full" : "hidden w-44 lg:block"}`}>
       <input
         type="text"
         placeholder="Jump to district..."
@@ -98,23 +101,46 @@ export default function AppHeader({ title, role, profile, navLinks, onSync, sync
     router.replace("/login");
   }
 
+  // Only admin pages pass navLinks (Dashboard/Districts/Unlock Requests/Audit Log, plus Sync
+  // and the district-jump search). Below `sm` there's no room to fit all of that in one row, so
+  // every one of those items — nav links, search, Sync, the theme toggle, the profile pill —
+  // moves into this left-side drawer, and the header itself shrinks to just the hamburger +
+  // title. DEO pages (no navLinks, no Sync, no districts) never had more than the theme toggle
+  // and profile pill to begin with, so they stay inline unchanged — nothing to hide there.
+  const hasDrawer = Boolean(navLinks);
+
   return (
+    <>
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
+        {hasDrawer && (
+          <button
+            type="button"
+            onClick={() => setMobileOpen(true)}
+            aria-expanded={mobileOpen}
+            aria-label="Open navigation menu"
+            className="-ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 sm:hidden dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+          >
+            <i className="ti ti-menu-2 text-lg" />
+          </button>
+        )}
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-700 text-base font-bold text-white">
           ₹
         </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</p>
-          <p className="truncate text-xs text-slate-500 dark:text-slate-400">Excise Revenue Recovery Portal</p>
+          <p className="hidden truncate text-xs text-slate-500 sm:block dark:text-slate-400">
+            Excise Revenue Recovery Portal
+          </p>
         </div>
 
         {/* Everything else lives in one right-aligned group — deliberately not spread across
             the full header width, which read as cluttered once nav links, search, Sync, the
-            theme toggle, and the profile menu all needed a place to live. */}
-        <div className="ml-auto flex items-center gap-2">
+            theme toggle, and the profile menu all needed a place to live. Hidden below `sm`
+            whenever a drawer exists to hold the same items instead (see hasDrawer above). */}
+        <div className={`ml-auto items-center gap-2 ${hasDrawer ? "hidden sm:flex" : "flex"}`}>
           {navLinks && (
-            <nav className="hidden items-center gap-1 sm:flex">
+            <nav className="flex items-center gap-1">
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
@@ -142,43 +168,86 @@ export default function AppHeader({ title, role, profile, navLinks, onSync, sync
               <span className="hidden md:inline">{syncing ? "Syncing..." : "Sync"}</span>
             </button>
           )}
-          {/* Nav links are hidden below `sm` (no room to fit 4 of them on a phone header) — this
-              hamburger is the only mobile entry point to them, so it must exist whenever navLinks
-              does; without it a phone user has no way to reach Districts/Audit Log/etc at all. */}
-          {navLinks && (
-            <button
-              type="button"
-              onClick={() => setMobileOpen((v) => !v)}
-              aria-expanded={mobileOpen}
-              aria-label="Open navigation menu"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 sm:hidden dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-            >
-              <i className={`ti ${mobileOpen ? "ti-x" : "ti-menu-2"} text-lg`} />
-            </button>
-          )}
           <ThemeToggle />
           <ProfileMenu profile={profile ?? null} onLogout={logout} lastSyncedAt={onSync ? lastSyncedAt : undefined} />
         </div>
       </div>
-
-      {navLinks && mobileOpen && (
-        <nav className="flex flex-col gap-1 border-t border-slate-200 px-4 py-2 sm:hidden dark:border-slate-800">
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              onClick={() => setMobileOpen(false)}
-              className={`rounded-md px-3 py-2 text-sm font-medium ${
-                pathname === link.href
-                  ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
-                  : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-              }`}
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
-      )}
     </header>
+
+      {/* Rendered as a sibling of <header>, not nested inside it — <header> has backdrop-blur
+          (backdrop-filter), which per spec makes it a containing block for `fixed` descendants,
+          so a fixed drawer nested inside it would size against the header's own ~60px height
+          instead of the viewport. Verified empirically (computed height came back 60px, not
+          the viewport height) before moving this out — don't renest it inside <header> without
+          re-checking that. */}
+      {hasDrawer && mobileOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/40 sm:hidden"
+            onClick={() => setMobileOpen(false)}
+            aria-hidden="true"
+          />
+          <div className="fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col gap-4 overflow-y-auto bg-white p-4 shadow-xl sm:hidden dark:bg-slate-950">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">Menu</span>
+              <button
+                type="button"
+                onClick={() => setMobileOpen(false)}
+                aria-label="Close navigation menu"
+                className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+              >
+                <i className="ti ti-x text-lg" />
+              </button>
+            </div>
+
+            <ProfileMenu profile={profile ?? null} onLogout={logout} lastSyncedAt={onSync ? lastSyncedAt : undefined} />
+
+            {navLinks && (
+              <nav className="flex flex-col gap-1 border-t border-slate-100 pt-3 dark:border-slate-800">
+                {navLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setMobileOpen(false)}
+                    className={`rounded-md px-3 py-2 text-sm font-medium ${
+                      pathname === link.href
+                        ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                        : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </nav>
+            )}
+
+            {districts && (
+              <div className="border-t border-slate-100 pt-3 dark:border-slate-800">
+                <DistrictSearch districts={districts} mobile />
+              </div>
+            )}
+
+            {onSync && (
+              <button
+                onClick={() => {
+                  onSync();
+                  setMobileOpen(false);
+                }}
+                disabled={syncing}
+                className="flex items-center gap-1.5 rounded-md border-t border-slate-100 px-3 pt-3 text-sm font-medium text-slate-600 disabled:opacity-50 dark:border-slate-800 dark:text-slate-400"
+              >
+                <i className={`ti ti-refresh text-base ${syncing ? "animate-spin" : ""}`} />
+                {syncing ? "Syncing..." : "Sync latest data"}
+              </button>
+            )}
+
+            <div className="flex items-center justify-between border-t border-slate-100 pt-3 dark:border-slate-800">
+              <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Theme</span>
+              <ThemeToggle />
+            </div>
+          </div>
+        </>
+      )}
+    </>
   );
 }

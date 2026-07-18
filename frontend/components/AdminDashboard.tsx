@@ -151,7 +151,7 @@ function TopDistrictsBarChart({
   }, [districts, onBarClick]);
 
   return (
-    <div className="relative h-72 w-full">
+    <div className="relative h-56 w-full max-w-full overflow-hidden sm:h-72">
       <canvas ref={canvasRef} />
     </div>
   );
@@ -211,7 +211,7 @@ function KpiCard({
           <i className="ti ti-chevron-right ml-auto text-slate-300 transition-transform group-hover:translate-x-0.5 dark:text-slate-600" />
         )}
       </div>
-      <p className="mt-2 text-xl font-semibold tabular-nums text-slate-900 dark:text-slate-100">{value}</p>
+      <p className="mt-2 break-words text-lg font-semibold tabular-nums text-slate-900 sm:text-xl dark:text-slate-100">{value}</p>
     </div>
   );
   return href ? <Link href={href}>{content}</Link> : content;
@@ -274,9 +274,9 @@ export default function AdminDashboard({ rows }: { rows: Row[] }) {
 
         <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
           <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Lock status</h3>
-          <div className="flex items-center gap-6">
+          <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
             <LockStatusDonut locked={locked} unlocked={unlocked} />
-            <div className="flex-1">
+            <div className="w-full min-w-0 flex-1">
               <div className="flex h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                 <div className="bg-emerald-500" style={{ width: `${(locked / Math.max(1, totalDistricts)) * 100}%` }} />
                 <div
@@ -301,13 +301,13 @@ export default function AdminDashboard({ rows }: { rows: Row[] }) {
           {/* plainLabel(), not englishLabel() — this is a summary list, not laid out to mirror
               the government form's field order/grouping, so the form's own numbering
               ("1.", "2. (i)") is just noise here. */}
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+          <dl className="grid grid-cols-1 gap-x-4 gap-y-2 text-sm sm:grid-cols-2">
             {PAC_FIELD_ORDER.map((field) => (
-              <div key={field} className="flex items-center justify-between gap-2">
+              <div key={field} className="flex min-w-0 items-center justify-between gap-2">
                 <dt className="truncate text-slate-500 dark:text-slate-400" title={plainLabel(PAC_FIELD_LABELS[field])}>
                   {plainLabel(PAC_FIELD_LABELS[field])}
                 </dt>
-                <dd className="tabular-nums font-medium text-slate-900 dark:text-slate-100">
+                <dd className="break-words text-right tabular-nums font-medium text-slate-900 dark:text-slate-100">
                   {isMoneyField(field) ? formatMoney(sums[field]) : sums[field].toLocaleString("en-IN")}
                 </dd>
               </div>
