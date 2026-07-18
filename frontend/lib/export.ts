@@ -136,6 +136,9 @@ export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData
     ...PAC_FIELD_ORDER.map((field, i) => (isMoneyField(field) ? i + 2 : -1)).filter((c) => c >= 0),
     netRecoverableCol,
   ];
+  // 0-based column position of the aggregate RC Amount field within `header` — reused to place
+  // each per-RC sub-row's amount directly under that same column (see the FY-sheet loop below).
+  const rcAmountCol0 = 2 + PAC_FIELD_ORDER.indexOf("rcAmount");
 
   const wb = new window.ExcelJS.Workbook();
   // One shared timestamp for the whole workbook — this is when the download actually happened,
@@ -223,12 +226,35 @@ export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData
       // shared A4/landscape/fit-to-width page setup.
       pageSetup: { ...PAGE_SETUP, printTitlesRow: `1:${TITLE_ROWS + 1}` },
     });
+    // Group headers (a district's own row) sit above their detail rows (its per-RC breakdown)
+    // here, the opposite of Excel's subtotal-below default — summaryBelow: false puts the
+    // outline +/- toggle on the district row instead of expecting a subtotal row underneath it.
+    ws.properties.outlineProperties = { summaryBelow: false, summaryRight: false };
     ws.columns = [{ width: 22 }, { width: 18 }, ...PAC_FIELD_ORDER.map(() => ({ width: 18 })), { width: 18 }];
 
     ws.addRow([`${SITE_TITLE_EN} — FY ${fy}`]);
     ws.addRow([dataPeriodForFY(fy)]);
     const headerRow = ws.addRow(header);
-    const dataRows = rows.map((r) => ws.addRow(r));
+    // Each district's row is immediately followed by one collapsed sub-row per RC it has in this
+    // FY (indented in the District column, its amount under the same RC Amount column) — an
+    // admin expands only the district(s) they care about via Excel's outline +/- control, rather
+    // than leaving the per-RC breakdown out of the FY sheet entirely or scrolling a separate
+    // all-district/all-year flat sheet (see the "RC Details" sheet below for that cross-year view).
+    const dataRows = sortedDistricts.map((d, i) => {
+      const row = ws.addRow(rows[i]);
+      const match = pacData.find((p) => p.districtId === d.id && p.financialYear === fy);
+      for (const rc of parseRcDetails(match?.rcDetails)) {
+        const subValues: (string | number)[] = header.map(() => "");
+        subValues[0] = `    ↳ ${rc.rcNumber}${rc.stayed ? " — Stayed" : ""}`;
+        subValues[rcAmountCol0] = rc.rcAmount;
+        const subRow = ws.addRow(subValues);
+        subRow.outlineLevel = 1;
+        subRow.hidden = true;
+        subRow.font = { italic: true, size: 10, color: { argb: "FF64748B" } };
+        subRow.getCell(rcAmountCol0 + 1).numFmt = RUPEE_FORMAT;
+      }
+      return row;
+    });
     const totalRow = ws.addRow(totalRowValues);
 
     // Title/data-period rows only occupy column A; merge them across the full table width so
@@ -254,26 +280,19 @@ export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData
     totalRow.eachCell((cell) => styleTotalCell(cell));
   }
 
-  // Full per-RC breakdown, one row per RC (not summarized) — an auditor needs every individual
-  // RC's number/amount/stay status, not just the FY-level rcAmount total already on each FY
-  // sheet above. One flat sheet across all districts/FYs (rather than a sheet per FY) since a
-  // district's RC count varies per FY and a flat table sorts/filters more usefully than five
-  // sparse per-FY sheets would.
-  const rcRows: (string | number)[][] = [];
-  for (const d of sortedDistricts) {
-    for (const fy of FINANCIAL_YEARS) {
-      const match = pacData.find((p) => p.districtId === d.id && p.financialYear === fy);
-      const details = parseRcDetails(match?.rcDetails);
-      for (const rc of details) {
-        rcRows.push([d.districtName, `FY ${fy}`, rc.rcNumber, rc.rcAmount, rc.stayed ? "Yes" : "No"]);
-      }
-    }
-  }
+  // Full per-RC breakdown across every district/FY (not just the current FY, unlike the sub-rows
+  // added to each FY sheet above) — an auditor needing a cross-year view of one district's RCs,
+  // or every stayed RC portfolio-wide, shouldn't have to open all 5 FY sheets to find them. A
+  // flat 75-district table would run to hundreds of rows with no structure, so rows are grouped
+  // per district (a bold district row, its RCs collapsed underneath via Excel's outline +/-,
+  // same convention as the FY sheets) with an AutoFilter on the header row for a direct
+  // District/Financial Year/Stayed search that doesn't require expanding every group first.
   const rcHeader = ["District", "Financial Year", "RC Number", "RC Amount", "Stayed"];
   const rcWs = wb.addWorksheet("RC Details", {
     views: [{ state: "frozen", ySplit: TITLE_ROWS + 1 }],
     pageSetup: { ...PAGE_SETUP, printTitlesRow: `1:${TITLE_ROWS + 1}` },
   });
+  rcWs.properties.outlineProperties = { summaryBelow: false, summaryRight: false };
   rcWs.columns = [{ width: 22 }, { width: 14 }, { width: 24 }, { width: 18 }, { width: 10 }];
   rcWs.addRow([`${SITE_TITLE_EN} — RC Details`]);
   rcWs.addRow([DATA_PERIOD_EN]);
@@ -283,13 +302,33 @@ export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData
   styleSubtitleCell(rcWs.getCell(2, 1));
   const rcHeaderRow = rcWs.addRow(rcHeader);
   rcHeaderRow.eachCell((cell) => styleHeaderCell(cell));
-  for (const row of rcRows) {
-    const excelRow = rcWs.addRow(row);
-    excelRow.getCell(4).numFmt = RUPEE_FORMAT;
+
+  let totalRcCount = 0;
+  for (const d of sortedDistricts) {
+    const districtRcRows: (string | number)[][] = [];
+    for (const fy of FINANCIAL_YEARS) {
+      const match = pacData.find((p) => p.districtId === d.id && p.financialYear === fy);
+      for (const rc of parseRcDetails(match?.rcDetails)) {
+        districtRcRows.push([d.districtName, `FY ${fy}`, rc.rcNumber, rc.rcAmount, rc.stayed ? "Yes" : "No"]);
+      }
+    }
+    if (districtRcRows.length === 0) continue;
+    totalRcCount += districtRcRows.length;
+
+    const summaryRow = rcWs.addRow([d.districtName, "", `${districtRcRows.length} RC(s)`, "", ""]);
+    summaryRow.eachCell({ includeEmpty: true }, (cell) => styleTotalCell(cell));
+
+    for (const row of districtRcRows) {
+      const detailRow = rcWs.addRow(row);
+      detailRow.outlineLevel = 1;
+      detailRow.hidden = true;
+      detailRow.getCell(4).numFmt = RUPEE_FORMAT;
+    }
   }
-  if (rcRows.length === 0) {
+  if (totalRcCount === 0) {
     rcWs.addRow(["No RCs recorded across any district/FY."]);
   }
+  rcWs.autoFilter = { from: { row: TITLE_ROWS + 1, column: 1 }, to: { row: rcWs.rowCount, column: rcHeader.length } };
 
   await downloadWorkbook(wb, `excise-revenue-recovery-${istFilenameStamp()}.xlsx`);
 }

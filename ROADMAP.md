@@ -759,6 +759,24 @@ tooling only.
 - [x] Deployed to production and verified: new route returns 200, existing `/admin/districts`
       unaffected.
 
+## Milestone 27 — RC Details grouped into the Excel export (done)
+
+- [x] Each FY sheet in `exportDistrictsToXlsx()` now shows that year's own per-RC breakdown
+      in place: every district row is immediately followed by a collapsed sub-row per RC it has
+      that FY (indented `↳ RC number — Stayed`, amount under the same RC Amount column),
+      collapsed by default via Excel's outline `+`/`-` group control on the district row
+      (`ws.properties.outlineProperties = { summaryBelow: false, summaryRight: false }`).
+      Previously a district's RC breakdown for a given year wasn't visible on that year's own
+      sheet at all — only the aggregate `rcAmount` total.
+- [x] The trailing **RC Details** sheet — previously one flat, unstructured row-per-RC table
+      across all 75 districts × 5 years — is now grouped per district (a bold `District — "N
+      RC(s)"` summary row, its RCs collapsed underneath, same outline convention as the FY
+      sheets) with an `autoFilter` on the header row so District/Financial Year/Stayed can be
+      filtered directly. Un-grouped, an admin/auditor had to scroll a table that could run to
+      hundreds of rows with no structure to find one district's RCs.
+- [x] No schema/migration change — this is entirely `frontend/lib/export.ts`, reading the same
+      `rc_details` JSON already synced client-side.
+
 ## Backlog / not started
 
 - [ ] Real domain + DNS, and (optional) collapse `/frontend` + `/api` onto one zone via a

@@ -472,11 +472,27 @@ banner rows (`SITE_TITLE_EN`, that sheet's own `dataPeriodForFY(fy)`) above the 
 header/data/freeze-pane/print-titles math; update it, not individual call sites, if another
 banner row is added. Every column header is English-only (`englishLabel()`).
 
+Each FY sheet also shows that year's own per-RC breakdown in place: every district row is
+immediately followed by one collapsed sub-row per RC it has in that FY (indented `↳ RC number —
+Stayed` in the District column, the amount under the same RC Amount column, parsed via
+`parseRcDetails()`), collapsed by default via Excel's outline `+`/`-` group control
+(`ws.properties.outlineProperties = { summaryBelow: false, summaryRight: false }` so the toggle
+sits on the district row rather than expecting a subtotal row below the group, `subRow.hidden =
+true` + `subRow.outlineLevel = 1` on each RC row). `rcAmountCol0` (computed once, shared by every
+FY sheet) is the single source of truth for which column a sub-row's amount lines up under —
+update it, not each FY-sheet call site, if the field order ever changes.
+
 **RC Details** is one flat sheet across every district/FY (not per-FY, unlike the 5 sheets
-above) — District, Financial Year, RC Number, RC Amount, Stayed (Yes/No), one row per RC, parsed
-from each `pac_data` row's `rc_details` JSON string. Flat rather than split per-FY because a
-district's RC count varies per FY, so a flat table sorts/filters more usefully than five sparse
-per-FY sheets would. Same `TITLE_ROWS`/frozen-header/print-titles treatment as the FY sheets.
+above) — District, Financial Year, RC Number, RC Amount, Stayed (Yes/No), parsed from each
+`pac_data` row's `rc_details` JSON string — for an auditor who needs a cross-year view of one
+district's RCs (or every stayed RC portfolio-wide) without opening all 5 FY sheets. Rows are
+grouped per district (a bold `District — "N RC(s)"` summary row, same `styleTotalCell()` used for
+FY sheets' TOTAL row, applied via `eachCell({ includeEmpty: true }, ...)` so the tint spans every
+column even where a cell has no value) with that district's RCs collapsed underneath it (same
+outline convention as the FY sheets above) — a flat 75-district table with no structure would run
+to hundreds of unusable rows. `rcWs.autoFilter` spans the header row through the last data row so
+District/Financial Year/Stayed can be filtered directly without expanding every group first. Same
+`TITLE_ROWS`/frozen-header/print-titles treatment as the FY sheets.
 
 The Summary sheet is added first (`SITE_TITLE_EN`, portal-wide `DATA_PERIOD_EN`, a `Generated:
 <formatIST(...)> IST` line, and a Metric/Value table: district counts, Gross Arrears/Recovered
