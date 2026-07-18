@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { db, type DraftYear, type DraftRcDetail } from "@/lib/db";
 import { FINANCIAL_YEARS, PAC_FIELD_ORDER, computeNetRecoverableSeries } from "@/lib/pac-fields";
-import { apiFetch, ApiError } from "@/lib/api";
+import { apiFetch, apiFetchForm, ApiError } from "@/lib/api";
 import { clearClientSession, consumeJustAuthed } from "@/lib/session";
 import { formatIST } from "@/lib/format";
 import {
@@ -100,6 +100,16 @@ export default function EntryPage() {
   // login itself) previously saw a blank form, because the local Dexie draft is wiped on
   // submit and there was nothing checking D1 for the real, current lock state.
   const [locked, setLocked] = useState(false);
+  // Self-service unlock request (ROADMAP.md Milestone 28) — separate from `profile` so
+  // submitting a request can update this immediately without waiting on a full /api/auth/me
+  // re-fetch.
+  const [pendingRequest, setPendingRequest] = useState<{ requestedAt: string; reason: string } | null>(null);
+  const [requestFormOpen, setRequestFormOpen] = useState(false);
+  const [requestReason, setRequestReason] = useState("");
+  const [requestFile, setRequestFile] = useState<File | null>(null);
+  const [requestFileError, setRequestFileError] = useState<string | null>(null);
+  const [requestSubmitting, setRequestSubmitting] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -121,6 +131,7 @@ export default function EntryPage() {
 
       if (p.lockStatus === 1) {
         setLocked(true);
+        setPendingRequest(p.pendingUnlockRequest ?? null);
         setReady(true);
         return;
       }
@@ -244,6 +255,43 @@ export default function EntryPage() {
     clearClientSession("deo");
     notifyToast({ icon: "info", title: "Logged out" });
     router.replace("/login");
+  }
+
+  const REQUEST_UNLOCK_FILE_ERROR =
+    "Attachment must be a PDF file, 2MB or smaller. / अनुलग्नक PDF फ़ाइल होनी चाहिए, अधिकतम 2MB।";
+
+  function onRequestFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] ?? null;
+    if (f && (f.type !== "application/pdf" || f.size > 2 * 1024 * 1024)) {
+      setRequestFileError(REQUEST_UNLOCK_FILE_ERROR);
+      setRequestFile(null);
+      e.target.value = "";
+      return;
+    }
+    setRequestFileError(null);
+    setRequestFile(f);
+  }
+
+  async function submitUnlockRequest() {
+    const reason = requestReason.trim();
+    if (!reason) return notifyToast({ icon: "error", title: BLANK_FIELD_TITLE, text: BLANK_FIELD_TEXT });
+
+    setRequestSubmitting(true);
+    setRequestError(null);
+    try {
+      const form = new FormData();
+      form.append("reason", reason);
+      if (requestFile) form.append("attachment", requestFile);
+      await apiFetchForm("/api/deo/request-unlock", form, "deo");
+      setPendingRequest({ requestedAt: new Date().toISOString(), reason });
+      setRequestFormOpen(false);
+      setRequestReason("");
+      setRequestFile(null);
+    } catch (err) {
+      setRequestError(err instanceof ApiError ? err.message : "Request failed.");
+    } finally {
+      setRequestSubmitting(false);
+    }
   }
 
   async function clearYear(index: number) {
@@ -374,7 +422,63 @@ export default function EntryPage() {
               बदलाव संभव नहीं है। किसी भी गलत डेटा या संशोधन के लिए एडमिन / आबकारी मुख्यालय से
               संपर्क करें।
             </p>
-            <Button variant="dark" size="md" className="mt-6 w-full" onClick={logoutLocked}>
+            {pendingRequest ? (
+              <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-left dark:border-amber-900 dark:bg-amber-950">
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                  Request pending since {formatIST(pendingRequest.requestedAt)} IST
+                </p>
+                <p className="mt-1 text-sm text-amber-700 dark:text-amber-400">{pendingRequest.reason}</p>
+              </div>
+            ) : requestFormOpen ? (
+              <div className="mt-6 space-y-3 rounded-lg border border-slate-200 p-4 text-left dark:border-slate-800">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Reason (Hindi or English) / कारण (हिंदी या अंग्रेज़ी)
+                  </label>
+                  <textarea
+                    value={requestReason}
+                    onChange={(e) => setRequestReason(e.target.value)}
+                    rows={3}
+                    maxLength={2000}
+                    placeholder="Why does this district need to be unlocked?"
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Attach a letter (optional, PDF only, max 2MB)
+                  </label>
+                  <input type="file" accept="application/pdf" onChange={onRequestFileChange} className="text-sm" />
+                  {requestFileError && <p className="mt-1 text-sm font-bold text-red-600 dark:text-red-400">{requestFileError}</p>}
+                </div>
+                {requestError && <p className="text-sm font-bold text-red-600 dark:text-red-400">{requestError}</p>}
+                <div className="flex gap-2">
+                  <Button variant="dark" size="sm" className="flex-1" onClick={submitUnlockRequest} disabled={requestSubmitting}>
+                    {requestSubmitting ? "Submitting..." : "Submit Request"}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      setRequestFormOpen(false);
+                      setRequestReason("");
+                      setRequestFile(null);
+                      setRequestFileError(null);
+                      setRequestError(null);
+                    }}
+                    disabled={requestSubmitting}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button variant="dark" size="md" className="mt-6 w-full" onClick={() => setRequestFormOpen(true)}>
+                <i className="ti ti-lock-open text-sm" />
+                Request Unlock
+              </Button>
+            )}
+            <Button variant="secondary" size="md" className="mt-3 w-full" onClick={logoutLocked}>
               <i className="ti ti-logout text-sm" />
               Logout
             </Button>

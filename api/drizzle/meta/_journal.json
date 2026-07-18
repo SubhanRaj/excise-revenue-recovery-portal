@@ -50,6 +50,13 @@
       "when": 1784290370853,
       "tag": "0006_numerous_marten_broadcloak",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1784363143758,
+      "tag": "0007_woozy_maelstrom",
+      "breakpoints": true
     }
   ]
 }

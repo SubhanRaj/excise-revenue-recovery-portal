@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { requireSession } from "@/lib/auth-guard";
 import { getDb } from "@/lib/db";
-import { users, districts } from "@/db/schema";
+import { users, districts, unlockRequests } from "@/db/schema";
 import { withErrorHandling } from "@/lib/with-error-handling";
 
 // The frontend is a static SPA with no server, so it can't inspect the HttpOnly session
@@ -41,6 +41,19 @@ export const GET = withErrorHandling("auth/me", async (req: NextRequest) => {
     .where(eq(users.id, session.userId))
     .limit(1);
 
+  // Re-fetched on every load per CLAUDE.md's Auth section — a pending unlock request belongs
+  // here rather than a second polling endpoint, since this route is already the DEO page's
+  // single source of truth for lock state.
+  let pendingUnlockRequest: { requestedAt: string; reason: string } | null = null;
+  if (role === "deo" && session.districtId) {
+    const [pending] = await db
+      .select({ requestedAt: unlockRequests.requestedAt, reason: unlockRequests.reason })
+      .from(unlockRequests)
+      .where(and(eq(unlockRequests.districtId, session.districtId), eq(unlockRequests.status, "pending")))
+      .limit(1);
+    pendingUnlockRequest = pending ?? null;
+  }
+
   return NextResponse.json({
     ...session,
     email: row?.email ?? null,
@@ -48,5 +61,6 @@ export const GET = withErrorHandling("auth/me", async (req: NextRequest) => {
     lockStatus: row?.lockStatus ?? null,
     lockedAt: row?.lockedAt ?? null,
     submittedByName: row?.submittedByName ?? null,
+    pendingUnlockRequest,
   });
 });

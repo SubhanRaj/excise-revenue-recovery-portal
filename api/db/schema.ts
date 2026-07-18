@@ -105,6 +105,26 @@ export const auditLog = sqliteTable("audit_log", {
   createdAt: text("created_at").notNull(),
 });
 
+// DEO self-service unlock requests (ROADMAP.md Milestone 28) — a locked-out DEO submits a
+// plaintext reason (+ optional PDF letter in R2) instead of only contacting an Admin outside
+// the app; an Admin approves (unlocks the district, same as the existing manual unlock) or
+// denies. "Only one pending request per district" is enforced in application code (a
+// check-then-insert in the route), not a DB constraint — this Drizzle/SQLite version has no
+// clean partial-unique-index support, and the TOCTOU race is low-stakes (worst case: two
+// pending rows, which the admin UI just shows both of).
+export const unlockRequests = sqliteTable("unlock_requests", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  districtId: integer("district_id").notNull().references(() => districts.id),
+  reason: text("reason").notNull(), // plaintext, bilingual, no rich-text/HTML — see CLAUDE.md
+  attachmentKey: text("attachment_key"), // R2 object key, null if no PDF attached
+  attachmentFilename: text("attachment_filename"), // original filename, display only — never used to build the R2 key
+  status: text("status", { enum: ["pending", "approved", "denied"] }).notNull().default("pending"),
+  requestedAt: text("requested_at").notNull(), // written from JS, never a SQL default — see pac_data.locked_at above
+  resolvedAt: text("resolved_at"),
+  resolvedBy: text("resolved_by"), // admin's email
+  adminNote: text("admin_note"), // null while pending; always set on resolve (approve or deny) — never auto-copied from `reason`
+});
+
 export const FINANCIAL_YEARS = [
   "2021-22",
   "2022-23",

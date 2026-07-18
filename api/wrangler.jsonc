@@ -14,8 +14,14 @@
 			"database_name": "excise-revenue-recovery-db",
 			"database_id": "4f3e37fd-006a-4bce-b2d3-4bfb8bb16248"
 		}
+	],
+	// Unlock-request PDF attachments (ROADMAP.md Milestone 28) — private bucket, no public
+	// access/CORS, no R2.dev URL; the only read path is the admin-authenticated attachment
+	// route. Not the Next.js ISR incremental cache binding (this API has no ISR pages).
+	"r2_buckets": [
+		{
+			"binding": "ATTACHMENTS",
+			"bucket_name": "excise-revenue-recovery-attachments"
+		}
 	]
-	// ponytail: no R2 incremental cache / images binding — this API has no ISR pages or
-	// next/image usage. Add them back (see @opennextjs/cloudflare templates/wrangler.jsonc)
-	// if that changes.
 }

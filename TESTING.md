@@ -139,6 +139,15 @@ Then:
    fine print. Click the card's own **Logout** button — it should log out immediately with no
    confirmation popup (logout is the only thing to do here, unlike the profile menu's Logout
    elsewhere, which does still confirm).
+3a. **Self-service unlock request, same locked DEO session**: click **Request Unlock** — an
+    inline form opens on the card (not a SweetAlert2 popup): a reason textarea (try submitting
+    blank — blocked with the same bilingual blank-field toast as any other field) and an
+    optional PDF attachment input (try a non-PDF file or one over 2MB — blocked with an inline
+    bilingual error under the input, no request sent). Attach a real small PDF, fill in a
+    reason, submit — the form should replace itself with "Request pending since `<IST
+    timestamp>`" and your reason text; reload the page and confirm that pending state persists
+    (it's read from `GET /api/auth/me?role=deo`, not local-only state). Try requesting again —
+    there's no button to do so while a request is pending.
 4. **Back to Admin → Districts** → Sync → the district now shows "Locked" with real numbers,
    including its own Opening Balance/Net Recoverable columns for the currently-selected FY —
    these are now read straight from `pac_data` (computed server-side at submit time), not
@@ -157,6 +166,20 @@ Then:
    Number, RC Amount, Stayed) with a bold summary row per district ("N RC(s)") followed by that
    district's RC rows — confirm the header row's filter dropdowns (AutoFilter) let you narrow to
    one District/FY/Stayed value.
+4a. **Admin → Unlock Requests** (top nav): the pending request from step 3a should appear —
+    district, requested-at (IST), reason, a "View" link on the Attachment column if a PDF was
+    attached. Click **View** — a modal opens (not a download prompt) showing the PDF rendered
+    inline via the browser's native viewer; confirm the **Download** button in the modal saves a
+    local copy, and closing the modal (✕ or clicking outside) doesn't leave it open. Click
+    **Deny** on a *different* pending request (or resubmit one first) — a SweetAlert2 prompt
+    requires a note (blank rejected); confirm it moves to "denied" status with your note shown,
+    the district stays locked. Click **Approve** on the original request — same required-note
+    prompt; confirm the district unlocks (check Districts page shows it unlocked) and the row's
+    status flips to "approved". Check **Audit Log** for `unlock_requested`,
+    `unlock_request_approved`, `unlock_request_denied` events with your notes in the metadata.
+    Also confirm the header's "Synced: <time>" text is gone from the top bar on every admin page
+    and now lives in the profile-menu dropdown (below "DEO Provisioning"), and that the top nav
+    now shows Dashboard/Districts/**Unlock Requests**/Audit Log.
 5. **Re-login as the now-unlocked DEO**: CUG tab → the demo CUG → should land on the Master
    View with the previously submitted figures already filled in (re-fetched from D1, not
    blank), not a fresh empty Year 1. Editing and hitting "Submit & Lock" again should succeed

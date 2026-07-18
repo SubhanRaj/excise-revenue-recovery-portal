@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { formatIST } from "@/lib/format";
 
 export type Profile = {
   role: "deo" | "admin";
@@ -13,9 +14,22 @@ export type Profile = {
   lockStatus?: number | null;
   lockedAt?: string | null;
   submittedByName?: string | null;
+  // Also DEO-only — the DEO's own pending self-service unlock request, if any (ROADMAP.md
+  // Milestone 28). Re-fetched on every load same as lockStatus, never cached.
+  pendingUnlockRequest?: { requestedAt: string; reason: string } | null;
 };
 
-export default function ProfileMenu({ profile, onLogout }: { profile: Profile | null; onLogout?: () => void }) {
+export default function ProfileMenu({
+  profile,
+  onLogout,
+  lastSyncedAt,
+}: {
+  profile: Profile | null;
+  onLogout?: () => void;
+  // Admin-only — relocated here from AppHeader's own header row to free up width once a 4th
+  // nav link (Unlock Requests) was added. Undefined on DEO pages, which never render it.
+  lastSyncedAt?: string | null;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -75,6 +89,15 @@ export default function ProfileMenu({ profile, onLogout }: { profile: Profile | 
               <i className="ti ti-user-plus text-base text-slate-400" />
               DEO Provisioning
             </Link>
+          )}
+          {profile.role === "admin" && lastSyncedAt !== undefined && (
+            <div
+              title="When the districts/PAC cache was last refreshed from the server"
+              className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500"
+            >
+              <i className="ti ti-clock-hour-4 text-sm" />
+              Synced: {formatIST(lastSyncedAt)}
+            </div>
           )}
           {onLogout && (
             <button

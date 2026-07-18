@@ -7,7 +7,6 @@ import { apiFetch } from "@/lib/api";
 import { clearClientSession } from "@/lib/session";
 import { confirmLogout, notifyToast } from "@/lib/alerts";
 import { setNavDistrictId } from "@/lib/adminNav";
-import { formatIST } from "@/lib/format";
 import ProfileMenu, { type Profile } from "./ProfileMenu";
 import ThemeToggle from "./ThemeToggle";
 
@@ -132,18 +131,6 @@ export default function AppHeader({ title, role, profile, navLinks, onSync, sync
           )}
           {districts && <DistrictSearch districts={districts} />}
           {onSync && (
-            // 24" FHD admin displays have room for this; it exists so an admin who lands on a
-            // page via the instant Dexie cache (no auto-sync, see useAdminData.ts) can tell how
-            // stale the numbers on screen are without having to click Sync just to find out.
-            <span
-              title="When the districts/PAC cache was last refreshed from the server"
-              className="hidden items-center gap-1 whitespace-nowrap text-xs text-slate-400 lg:flex dark:text-slate-500"
-            >
-              <i className="ti ti-clock-hour-4 text-sm" />
-              Synced: {formatIST(lastSyncedAt)}
-            </span>
-          )}
-          {onSync && (
             <button
               onClick={onSync}
               disabled={syncing}
@@ -155,7 +142,7 @@ export default function AppHeader({ title, role, profile, navLinks, onSync, sync
             </button>
           )}
           <ThemeToggle />
-          <ProfileMenu profile={profile ?? null} onLogout={logout} />
+          <ProfileMenu profile={profile ?? null} onLogout={logout} lastSyncedAt={onSync ? lastSyncedAt : undefined} />
         </div>
       </div>
     </header>

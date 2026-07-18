@@ -12,6 +12,7 @@ import AdminDashboard from "@/components/AdminDashboard";
 const NAV_LINKS: NavLink[] = [
   { label: "Dashboard", href: "/admin" },
   { label: "Districts", href: "/admin/districts" },
+  { label: "Unlock Requests", href: "/admin/unlock-requests" },
   { label: "Audit Log", href: "/admin/audit" },
 ];
 

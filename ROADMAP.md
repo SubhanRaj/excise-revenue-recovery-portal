@@ -787,7 +787,15 @@ tooling only.
 - [x] No schema/migration change — this is entirely `frontend/lib/export.ts`, reading the same
       `rc_details` JSON already synced client-side.
 
-## Milestone 28 (planned, not started) — DEO self-service unlock requests
+## Milestone 28 (code shipped; R2 bucket provisioning pending) — DEO self-service unlock requests
+
+All schema/routes/frontend below are implemented and pushed — see CLAUDE.md's "DEO self-service
+unlock requests" section for how the shipped system works. **Not yet fully live**: R2 wasn't
+enabled on the Cloudflare account, so `wrangler r2 bucket create
+excise-revenue-recovery-attachments` failed with `[code: 10042]`; the `r2_buckets` binding is
+already in `api/wrangler.jsonc` (`ATTACHMENTS`) and `wrangler types` picked it up, but the
+bucket itself doesn't exist yet. Once R2 is enabled via the Dashboard, run that `wrangler r2
+bucket create` command and redeploy — everything else (migration, routes, UI) is already live.
 
 **Problem**: today a locked-out DEO's only option is to contact an Admin outside the app (phone/
 email) and ask them to unlock the district manually via `promptUnlockReason()` on

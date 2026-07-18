@@ -12,6 +12,7 @@ import Select from "@/components/ui/Select";
 const NAV_LINKS: NavLink[] = [
   { label: "Dashboard", href: "/admin" },
   { label: "Districts", href: "/admin/districts" },
+  { label: "Unlock Requests", href: "/admin/unlock-requests" },
   { label: "Audit Log", href: "/admin/audit" },
 ];
 
@@ -32,6 +33,9 @@ const EVENT_LABELS: Record<string, string> = {
   district_locked: "District locked",
   district_unlocked: "District unlocked",
   deo_provisioned: "DEO(s) provisioned",
+  unlock_requested: "Unlock requested (DEO)",
+  unlock_request_approved: "Unlock request approved",
+  unlock_request_denied: "Unlock request denied",
 };
 
 function describeMetadata(row: AuditRow): string {

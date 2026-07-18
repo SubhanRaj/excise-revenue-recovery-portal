@@ -517,6 +517,60 @@ and repeated print headers. Use ExcelJS's `argb` (8-digit, alpha first) for colo
 6-digit `rgb`. Cell-style helpers (`styleTitleCell`, `styleSubtitleCell`, `styleHeaderCell`,
 `styleTotalCell`) apply to `Cell` objects, not raw style props on plain data.
 
+## DEO self-service unlock requests (`unlock_requests` table)
+
+A locked-out DEO can request an unlock in-app instead of only contacting an Admin outside the
+portal — see ROADMAP.md's Milestone 28 for the full design rationale/security analysis; this
+section documents the shipped shape.
+
+- **Schema**: `unlock_requests` (`api/db/schema.ts`) — `districtId` FK, plaintext `reason`,
+  optional `attachmentKey`/`attachmentFilename` (R2), `status` (`pending`/`approved`/`denied`),
+  `requestedAt`/`resolvedAt`/`resolvedBy`/`adminNote`. "Only one pending request per district" is
+  an application-level check-then-insert in the route (no partial unique index), not a DB
+  constraint — same posture as everything else in this schema that isn't safety-critical.
+- **`POST /api/deo/request-unlock` is the first multipart/`FormData` route in this codebase** —
+  every other route reads `req.json()`. Don't copy this pattern for a route with no actual file
+  upload. Magic-byte check (`%PDF-` header, not the client-reported `Content-Type`) and a 2MB
+  size cap are both re-verified server-side, zero-trust per the Validation rules section above.
+  The R2 object key is always server-generated (`unlock-requests/{districtId}/{timestamp}.pdf`)
+  — the client's original filename is stored only as a display string, never used to build the
+  key or a path.
+- **R2 bucket** `excise-revenue-recovery-attachments`, bound as `ATTACHMENTS` in
+  `api/wrangler.jsonc` — private, no public access/CORS/`R2.dev` URL. The only read path is
+  `GET /api/admin/unlock-requests/attachment?id=`, which takes the request `id` (never a raw R2
+  key from the client) and looks up `attachmentKey` server-side.
+- **`GET /api/auth/me?role=deo`** (not a separate polling endpoint) also returns
+  `pendingUnlockRequest: { requestedAt, reason } | null` — this route is already the DEO page's
+  single source of truth for lock state, re-fetched on every load, so the pending-request flag
+  belongs there.
+- **`POST /api/admin/unlock-requests/resolve`** requires a `note: string` on both `approve` and
+  `deny` — the admin always types their own reason; the DEO's submitted `reason` is shown for
+  context but never auto-copied into `adminNote`/`districts.unlockReason`. Re-checks the row is
+  still `"pending"` before writing, to avoid a double-resolve race. Approve mirrors the existing
+  `POST /api/admin/unlock/route.ts` district update, batched with the `unlock_requests` row
+  update and an audit-log insert.
+- **In-browser PDF preview, not a forced download**: `components/ui/PdfPreviewModal.tsx` fetches
+  the attachment as a blob via `apiFetchBlob()` (this app has no cookies — see Auth above — so a
+  plain `<iframe src="...">` can't attach the Bearer token itself) and renders it through the
+  **browser's own native PDF viewer** via `URL.createObjectURL()`. Any script embedded in the
+  PDF runs inside that native viewer's own sandbox, not as page-level JS — this is why the
+  attachment route sets `Content-Disposition: inline` (not `attachment`) plus
+  `X-Content-Type-Options: nosniff`. Revoke the object URL on modal close. First non-SweetAlert2
+  modal in the app — an `<iframe>` doesn't fit Swal's HTML-string API, same reasoning as the
+  DEO-side form below.
+- **DEO-side UI**: a plain inline form on the existing "Data Already Locked" card
+  (`deo-data-entry/page.tsx`), not SweetAlert2 — a `<textarea>` + `<input type="file">` doesn't
+  fit Swal's API either. Client-side PDF validation (type + 2MB) is never trusted alone.
+- **Admin-side UI**: new top-level nav page `/admin/unlock-requests` (added to every
+  `AppHeader.navLinks` array — Dashboard/Districts/**Unlock Requests**/Audit Log, duplicated
+  per-page same as the other three links), reusing the `promptUnlockReason()`-style single-
+  textarea SweetAlert2 pattern for the required approve/deny note.
+- **Audit events**: `unlock_requested`, `unlock_request_approved`, `unlock_request_denied`,
+  following the existing `noun_pastverb` convention.
+- **`AppHeader`'s "Synced: <time>" text moved into `ProfileMenu`'s dropdown** (beneath "DEO
+  Provisioning", admin-only, plain text not a link) to free up header width for the added nav
+  link — `ProfileMenu` now takes an optional `lastSyncedAt` prop for this.
+
 ## Bulk DEO provisioning
 
 See [README.md](./README.md)'s App flow → Bulk DEO provisioning for the overview. Implementation
