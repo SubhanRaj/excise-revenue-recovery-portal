@@ -88,6 +88,7 @@ function DistrictSearch({ districts }: { districts: SearchableDistrict[] }) {
 export default function AppHeader({ title, role, profile, navLinks, onSync, syncing, lastSyncedAt, districts }: Props) {
   const router = useRouter();
   const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   async function logout() {
     if (!(await confirmLogout())) return;
@@ -141,10 +142,43 @@ export default function AppHeader({ title, role, profile, navLinks, onSync, sync
               <span className="hidden md:inline">{syncing ? "Syncing..." : "Sync"}</span>
             </button>
           )}
+          {/* Nav links are hidden below `sm` (no room to fit 4 of them on a phone header) — this
+              hamburger is the only mobile entry point to them, so it must exist whenever navLinks
+              does; without it a phone user has no way to reach Districts/Audit Log/etc at all. */}
+          {navLinks && (
+            <button
+              type="button"
+              onClick={() => setMobileOpen((v) => !v)}
+              aria-expanded={mobileOpen}
+              aria-label="Open navigation menu"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 sm:hidden dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+            >
+              <i className={`ti ${mobileOpen ? "ti-x" : "ti-menu-2"} text-lg`} />
+            </button>
+          )}
           <ThemeToggle />
           <ProfileMenu profile={profile ?? null} onLogout={logout} lastSyncedAt={onSync ? lastSyncedAt : undefined} />
         </div>
       </div>
+
+      {navLinks && mobileOpen && (
+        <nav className="flex flex-col gap-1 border-t border-slate-200 px-4 py-2 sm:hidden dark:border-slate-800">
+          {navLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={() => setMobileOpen(false)}
+              className={`rounded-md px-3 py-2 text-sm font-medium ${
+                pathname === link.href
+                  ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                  : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+              }`}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+      )}
     </header>
   );
 }

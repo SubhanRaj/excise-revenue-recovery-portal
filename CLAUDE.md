@@ -460,11 +460,17 @@ never a `?id=`/`?status=` URL query string — this app is a static export
 keep showing the same district). `setNavStatusFilter()`/`consumeNavStatusFilter()` are
 consume-on-read — landing on `/admin/districts` via the regular nav link should default to "all".
 
-All five pages share `frontend/lib/useAdminData.ts` (session guard, Dexie cache, `sync()`,
+All admin pages share `frontend/lib/useAdminData.ts` (session guard, Dexie cache, `sync()`,
 `unlock()`). `AppHeader` takes `navLinks`, `onSync`/`syncing`, `lastSyncedAt` (persisted to
 `localStorage` as `excise-portal:admin-last-sync`), and an optional `districts` prop that renders
 a global "jump to a district" search. `AppHeader.navLinks` is still just Dashboard/Districts/
-Audit Log — DEO Provisioning isn't in it, by design (see above). Logout lives inside
+Unlock Requests/Audit Log — DEO Provisioning isn't in it, by design (see above). Below the `sm`
+breakpoint the inline `navLinks` row (`hidden sm:flex`) disappears, so a hamburger button
+(`sm:hidden`, `ti-menu-2`/`ti-x`) toggles a stacked nav panel across the header's full width —
+this is the *only* mobile entry point to those links, so it must exist any time `navLinks` is
+passed; don't remove it as "redundant" with the inline row, the two are mutually exclusive by
+breakpoint, not actually duplicated. `DistrictSearch` stays desktop-only (`hidden lg:block`,
+unchanged) — jump-to-district is a power-user shortcut, not core mobile navigation. Logout lives inside
 `ProfileMenu`'s dropdown, not as a top-level header button, for both Admin and DEO headers.
 `ProfileMenu`'s `NavLink`/`{ label, href }` shape has no dropdown/submenu concept — the "DEO
 Provisioning" entry is a one-off `Link` in that menu's JSX, not a reusable nav-dropdown
