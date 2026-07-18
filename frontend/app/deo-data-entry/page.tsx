@@ -106,8 +106,6 @@ export default function EntryPage() {
   const [pendingRequest, setPendingRequest] = useState<{ requestedAt: string; reason: string } | null>(null);
   const [requestFormOpen, setRequestFormOpen] = useState(false);
   const [requestReason, setRequestReason] = useState("");
-  const [requestFile, setRequestFile] = useState<File | null>(null);
-  const [requestFileError, setRequestFileError] = useState<string | null>(null);
   const [requestSubmitting, setRequestSubmitting] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
 
@@ -257,21 +255,13 @@ export default function EntryPage() {
     router.replace("/login");
   }
 
-  const REQUEST_UNLOCK_FILE_ERROR =
-    "Attachment must be a PDF file, 2MB or smaller. / अनुलग्नक PDF फ़ाइल होनी चाहिए, अधिकतम 2MB।";
-
-  function onRequestFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0] ?? null;
-    if (f && (f.type !== "application/pdf" || f.size > 2 * 1024 * 1024)) {
-      setRequestFileError(REQUEST_UNLOCK_FILE_ERROR);
-      setRequestFile(null);
-      e.target.value = "";
-      return;
-    }
-    setRequestFileError(null);
-    setRequestFile(f);
-  }
-
+  // PDF attachment upload has no UI here for now — R2 (its storage backend) needs a payment
+  // method on file to enable, even on Cloudflare's free tier, which isn't set up yet. The
+  // provision stays intact server-side (POST /api/deo/request-unlock still accepts an optional
+  // `attachment` field, the R2 binding/admin PdfPreviewModal/attachment route are all live) —
+  // once R2 is enabled, re-add a `<input type="file" accept="application/pdf">` here (2MB cap,
+  // client + server validated) and append it to the FormData below as `attachment`. Until then,
+  // requests are reason-only.
   async function submitUnlockRequest() {
     const reason = requestReason.trim();
     if (!reason) return notifyToast({ icon: "error", title: BLANK_FIELD_TITLE, text: BLANK_FIELD_TEXT });
@@ -281,12 +271,10 @@ export default function EntryPage() {
     try {
       const form = new FormData();
       form.append("reason", reason);
-      if (requestFile) form.append("attachment", requestFile);
       await apiFetchForm("/api/deo/request-unlock", form, "deo");
       setPendingRequest({ requestedAt: new Date().toISOString(), reason });
       setRequestFormOpen(false);
       setRequestReason("");
-      setRequestFile(null);
     } catch (err) {
       setRequestError(err instanceof ApiError ? err.message : "Request failed.");
     } finally {
@@ -444,13 +432,7 @@ export default function EntryPage() {
                     className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                   />
                 </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Attach a letter (optional, PDF only, max 2MB)
-                  </label>
-                  <input type="file" accept="application/pdf" onChange={onRequestFileChange} className="text-sm" />
-                  {requestFileError && <p className="mt-1 text-sm font-bold text-red-600 dark:text-red-400">{requestFileError}</p>}
-                </div>
+                {/* No PDF attachment input yet — see the comment on submitUnlockRequest() above. */}
                 {requestError && <p className="text-sm font-bold text-red-600 dark:text-red-400">{requestError}</p>}
                 <div className="flex gap-2">
                   <Button variant="dark" size="sm" className="flex-1" onClick={submitUnlockRequest} disabled={requestSubmitting}>
@@ -462,8 +444,6 @@ export default function EntryPage() {
                     onClick={() => {
                       setRequestFormOpen(false);
                       setRequestReason("");
-                      setRequestFile(null);
-                      setRequestFileError(null);
                       setRequestError(null);
                     }}
                     disabled={requestSubmitting}

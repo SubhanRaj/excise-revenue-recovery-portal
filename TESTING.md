@@ -140,14 +140,13 @@ Then:
    confirmation popup (logout is the only thing to do here, unlike the profile menu's Logout
    elsewhere, which does still confirm).
 3a. **Self-service unlock request, same locked DEO session**: click **Request Unlock** — an
-    inline form opens on the card (not a SweetAlert2 popup): a reason textarea (try submitting
-    blank — blocked with the same bilingual blank-field toast as any other field) and an
-    optional PDF attachment input (try a non-PDF file or one over 2MB — blocked with an inline
-    bilingual error under the input, no request sent). Attach a real small PDF, fill in a
-    reason, submit — the form should replace itself with "Request pending since `<IST
-    timestamp>`" and your reason text; reload the page and confirm that pending state persists
-    (it's read from `GET /api/auth/me?role=deo`, not local-only state). Try requesting again —
-    there's no button to do so while a request is pending.
+    inline form opens on the card (not a SweetAlert2 popup): a reason textarea only, no file
+    input (PDF attachment upload is deliberately not shown right now — pending R2, see
+    ROADMAP.md's Milestone 28). Submitting blank — blocked with the same bilingual blank-field
+    toast as any other field. Fill in a reason and submit — the form should replace itself with
+    "Request pending since `<IST timestamp>`" and your reason text; reload the page and confirm
+    that pending state persists (it's read from `GET /api/auth/me?role=deo`, not local-only
+    state). Try requesting again — there's no button to do so while a request is pending.
 4. **Back to Admin → Districts** → Sync → the district now shows "Locked" with real numbers,
    including its own Opening Balance/Net Recoverable columns for the currently-selected FY —
    these are now read straight from `pac_data` (computed server-side at submit time), not
@@ -167,11 +166,11 @@ Then:
    district's RC rows — confirm the header row's filter dropdowns (AutoFilter) let you narrow to
    one District/FY/Stayed value.
 4a. **Admin → Unlock Requests** (top nav): the pending request from step 3a should appear —
-    district, requested-at (IST), reason, a "View" link on the Attachment column if a PDF was
-    attached. Click **View** — a modal opens (not a download prompt) showing the PDF rendered
-    inline via the browser's native viewer; confirm the **Download** button in the modal saves a
-    local copy, and closing the modal (✕ or clicking outside) doesn't leave it open. Click
-    **Deny** on a *different* pending request (or resubmit one first) — a SweetAlert2 prompt
+    district, requested-at (IST), reason, and `—` in the Attachment column (no PDF was attached
+    — that field is currently unreachable from the DEO UI, see step 3a). The PDF preview path
+    (`PdfPreviewModal.tsx`, native-viewer iframe + Download button) isn't exercisable in this
+    script until the DEO-side file input is re-added — not a bug if it stays untested for now.
+    Click **Deny** on a *different* pending request (or resubmit one first) — a SweetAlert2 prompt
     requires a note (blank rejected); confirm it moves to "denied" status with your note shown,
     the district stays locked. Click **Approve** on the original request — same required-note
     prompt; confirm the district unlocks (check Districts page shows it unlocked) and the row's

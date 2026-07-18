@@ -559,8 +559,18 @@ section documents the shipped shape.
   modal in the app — an `<iframe>` doesn't fit Swal's HTML-string API, same reasoning as the
   DEO-side form below.
 - **DEO-side UI**: a plain inline form on the existing "Data Already Locked" card
-  (`deo-data-entry/page.tsx`), not SweetAlert2 — a `<textarea>` + `<input type="file">` doesn't
-  fit Swal's API either. Client-side PDF validation (type + 2MB) is never trusted alone.
+  (`deo-data-entry/page.tsx`), not SweetAlert2 — a `<textarea>` (+ eventually `<input
+  type="file">`) doesn't fit Swal's API either. **Reason-only for now — no PDF attachment field
+  is rendered.** R2 (its storage backend) needs a payment method on file to enable, even on the
+  free tier, and D1 was ruled out as a fallback (its 2MB per-row/BLOB cap sits right at this
+  feature's size limit, and a scanned letter can realistically exceed it). The server-side
+  provision stays fully live — `POST /api/deo/request-unlock` still accepts an optional
+  `attachment` field with magic-byte/size validation, the `ATTACHMENTS` R2 binding is in
+  `api/wrangler.jsonc`, and the admin attachment route + `PdfPreviewModal.tsx` both still work —
+  so re-enabling this is a **frontend-only** change (re-add the file input; see the comment on
+  `submitUnlockRequest()`) once R2 is actually provisioned — see
+  [R2_PDF_ATTACHMENT_REPROVISIONING.md](./R2_PDF_ATTACHMENT_REPROVISIONING.md) for the exact,
+  copy-paste-ready steps and code.
 - **Admin-side UI**: new top-level nav page `/admin/unlock-requests` (added to every
   `AppHeader.navLinks` array — Dashboard/Districts/**Unlock Requests**/Audit Log, duplicated
   per-page same as the other three links), reusing the `promptUnlockReason()`-style single-

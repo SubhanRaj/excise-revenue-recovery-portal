@@ -787,15 +787,29 @@ tooling only.
 - [x] No schema/migration change — this is entirely `frontend/lib/export.ts`, reading the same
       `rc_details` JSON already synced client-side.
 
-## Milestone 28 (code shipped; R2 bucket provisioning pending) — DEO self-service unlock requests
+## Milestone 28 (shipped, reason-only for now) — DEO self-service unlock requests
 
 All schema/routes/frontend below are implemented and pushed — see CLAUDE.md's "DEO self-service
-unlock requests" section for how the shipped system works. **Not yet fully live**: R2 wasn't
-enabled on the Cloudflare account, so `wrangler r2 bucket create
-excise-revenue-recovery-attachments` failed with `[code: 10042]`; the `r2_buckets` binding is
-already in `api/wrangler.jsonc` (`ATTACHMENTS`) and `wrangler types` picked it up, but the
-bucket itself doesn't exist yet. Once R2 is enabled via the Dashboard, run that `wrangler r2
-bucket create` command and redeploy — everything else (migration, routes, UI) is already live.
+unlock requests" section for how the shipped system works.
+
+**PDF attachment upload has no DEO-facing UI right now, by decision.** R2 wasn't enabled on the
+Cloudflare account (`wrangler r2 bucket create excise-revenue-recovery-attachments` failed with
+`[code: 10042]` — Cloudflare requires a payment method on file to enable R2 at all, even for
+free-tier usage). Storing the PDFs directly as a D1 `BLOB` instead was considered and rejected:
+D1 caps any single BLOB/row at 2,000,000 bytes, right at this feature's 2MB cap, and a scanned
+letter (image-based PDF, not text) can realistically blow past that — D1 isn't a safe fit for
+this content type at this size. Decision: ship reason-only requests now (no attachment field
+anywhere in the DEO UI), keep the **entire R2-based provision live and untouched** server-side —
+the `r2_buckets` binding in `api/wrangler.jsonc` (`ATTACHMENTS`), `POST
+/api/deo/request-unlock`'s magic-byte/size-validated attachment handling, the admin attachment
+route, and `PdfPreviewModal.tsx` — so turning it back on later is a **frontend-only** change
+(re-add a `<input type="file" accept="application/pdf">` to the request form in
+`deo-data-entry/page.tsx`, see the comment on `submitUnlockRequest()` there for exactly where).
+Once the department confirms R2 is worth setting up (card on file) or an alternative PDF store
+is chosen, revisit — this note is the trigger to do so, not a permanent decision. See
+[R2_PDF_ATTACHMENT_REPROVISIONING.md](./R2_PDF_ATTACHMENT_REPROVISIONING.md) for the complete,
+copy-paste-ready checklist (exact commands + exact code to re-add) — no need to re-derive any of
+this from the codebase when the time comes.
 
 **Problem**: today a locked-out DEO's only option is to contact an Admin outside the app (phone/
 email) and ask them to unlock the district manually via `promptUnlockReason()` on
