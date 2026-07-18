@@ -59,9 +59,16 @@ since they need to hook into React render/event cycles rather than run as passiv
   a join. `financial_year` is one of `"2021-22" .. "2025-26"` (`FINANCIAL_YEARS`). Standard `id`
   primary key and a `created_at` (row-insert timestamp, not shown in any UI — distinct from
   `locked_at`) round out the table.
-- **`audit_log`** — one row per login/logout, district lock/unlock, or DEO-provisioning batch:
-  `id`, `event_type`, `actor_role`, `actor_email`, `district_name`, `metadata` (JSON string),
-  `created_at`. Pruned to the last 30 days on read.
+- **`audit_log`** — one row per login/logout, district lock/unlock, DEO-provisioning batch, or
+  unlock-request event: `id`, `event_type`, `actor_role`, `actor_email`, `district_name`,
+  `metadata` (JSON string), `created_at`. Pruned to the last 30 days on read.
+- **`unlock_requests`** — a locked-out DEO's self-service request to be unlocked: `id`,
+  `district_id`, `reason` (plaintext), `attachment_key`/`attachment_filename` (optional PDF,
+  stored in R2 — key is server-generated, filename is display-only), `status`
+  (`pending`/`approved`/`denied`), `requested_at`, `resolved_at`/`resolved_by`/`admin_note`. An
+  Admin resolving "approve" flips `districts.lock_status` the same way the existing manual
+  Unlock button does; both approve and deny require the Admin to type their own note. See
+  [CLAUDE.md](./CLAUDE.md)'s "DEO self-service unlock requests" section.
 
 ### Migrations (`api/drizzle/`)
 
@@ -74,6 +81,7 @@ since they need to hook into React render/event cycles rather than run as passiv
 | `0004_white_songbird` | `audit_log` table |
 | `0005_married_landau` | `pac_data.opening_balance` / `net_recoverable` |
 | `0006_numerous_marten_broadcloak` | `pac_data.rc_details` |
+| `0007_woozy_maelstrom` | `unlock_requests` table |
 
 ### Net Recoverable (cumulative running balance)
 
@@ -118,18 +126,22 @@ Balance/Net Recoverable, flips `lock_status`, and ends the session.
 
 A returning DEO lands in one of three states, decided by the server's current lock status:
 
-1. **Still locked** — read-only "Data Already Locked" screen.
+1. **Still locked** — read-only "Data Already Locked" screen, with a **Request Unlock** option
+   (plaintext reason + optional PDF letter, `POST /api/deo/request-unlock`) if no request is
+   already pending for that district.
 2. **Unlocked after a previous submission** — Master View pre-filled with the real submitted
    figures (re-fetched from the API), ready to edit and resubmit.
 3. **Unlocked, never submitted** — the ordinary 5-step form, resuming any local draft.
 
 ### Admin
 
-Five pages: **Dashboard** (KPI cards + charts, totals across all 5 years), **Districts**
+Six pages: **Dashboard** (KPI cards + charts, totals across all 5 years), **Districts**
 (sortable/searchable table, lock/unlock, exports), **district detail** (one district's full
-5-year figures), **DEO Provisioning** (bulk DEO login upload/download, reached via the profile
-menu rather than the main nav), **Audit Log** (login/lock/unlock history). All five share one
-Dexie-backed cache with a manual Sync button.
+5-year figures), **Unlock Requests** (queue of DEO self-service unlock requests, approve/deny
+with a required note, in-browser PDF preview for attachments), **DEO Provisioning** (bulk DEO
+login upload/download, reached via the profile menu rather than the main nav), **Audit Log**
+(login/lock/unlock/unlock-request history). All six share one Dexie-backed cache with a manual
+Sync button.
 
 ### Bulk DEO provisioning
 
@@ -140,9 +152,9 @@ there's no DEO browser involved to hash it first. The server hashes it before st
 
 ## System flow
 
-Auth (both routes), the DEO's five-year entry-to-lock journey, and the Admin surface, down to
-the exact API route and D1 table each step touches. Snapshot as of this build — regenerate by
-hand if the flow changes materially (e.g. the planned per-RC detail breakdown in ROADMAP.md).
+Auth (both routes), the DEO's five-year entry-to-lock journey, the self-service unlock-request
+loop, and the Admin surface, down to the exact API route, D1 table, and R2 bucket each step
+touches. Snapshot as of this build — regenerate by hand if the flow changes materially.
 
 ```mermaid
 flowchart TD
@@ -166,7 +178,11 @@ flowchart TD
     subgraph DEO["DEO — /deo-data-entry"]
         direction TD
         DeoMe --> LockCheck{"lockStatus"}
-        LockCheck -->|"locked"| LockedScreen["Data Already Locked<br/>(read-only, Logout only)"]
+        LockCheck -->|"locked"| LockedScreen["Data Already Locked<br/>(read-only)"]
+        LockedScreen --> PendingCheck{"pendingUnlockRequest?"}
+        PendingCheck -->|"yes"| PendingShown["Request pending since …<br/>(no resubmit until resolved)"]
+        PendingCheck -->|"no"| RequestForm["Request Unlock form<br/>reason + optional PDF<br/>(magic-byte/size re-checked server-side)"]
+        RequestForm --> RequestApi["POST /api/deo/request-unlock"]
         LockCheck -->|"unlocked, previously submitted"| FetchMine["GET /api/pac-data/mine"]
         FetchMine --> MasterViewPre["Master View<br/>(prefilled from D1)"]
         LockCheck -->|"unlocked, never submitted"| DraftResume["Resume local draft<br/>(Dexie draftYears)"]
@@ -187,7 +203,11 @@ flowchart TD
         Districts --> Detail["/admin/districts/detail<br/>field × year table, one district"]
         Districts --> UnlockAction["Unlock (reason required)<br/>POST /api/admin/unlock"]
         Districts --> ExportAction["Export Excel Workbook /<br/>Export SQL backup"]
-        Dashboard --> AuditPage["/admin/audit<br/>login / lock / unlock history"]
+        Dashboard --> UnlockQueue["/admin/unlock-requests<br/>GET /api/admin/unlock-requests"]
+        UnlockQueue --> PdfPreview["View attachment →<br/>PdfPreviewModal (native<br/>viewer iframe, blob: URL)"]
+        PdfPreview --> AttachmentApi["GET .../attachment?id=<br/>(id → attachmentKey lookup,<br/>never a raw R2 key from client)"]
+        UnlockQueue --> ResolveAction["Approve / Deny<br/>(note always required)<br/>POST .../resolve"]
+        Dashboard --> AuditPage["/admin/audit<br/>login / lock / unlock /<br/>unlock-request history"]
         Dashboard -. "available on every admin page header" .-> ProfileMenu["Profile menu (Admin)"]
         ProfileMenu --> Provision["/admin/districts/provisioning<br/>Download Template /<br/>Upload DEO Data<br/>POST /api/admin/provision-deos"]
     end
@@ -196,6 +216,8 @@ flowchart TD
     UnlockAction -. "district_unlocked" .-> AuditLog
     VerifyCug -. "login_cug" .-> AuditLog
     VerifyMagic -. "login_magic_link" .-> AuditLog
+    RequestApi -. "unlock_requested" .-> AuditLog
+    ResolveAction -. "unlock_request_approved /<br/>unlock_request_denied" .-> AuditLog
 
     SubmitApi -. writes .-> PacData[("pac_data")]
     Detail -. reads .-> PacData
@@ -204,6 +226,12 @@ flowchart TD
     Provision -. writes .-> Users[("users")]
     UnlockAction -. writes .-> DistrictsTbl[("districts")]
     Districts -. reads .-> DistrictsTbl
+    RequestApi -. writes .-> UnlockReqTbl[("unlock_requests")]
+    UnlockQueue -. reads .-> UnlockReqTbl
+    ResolveAction -. writes .-> UnlockReqTbl
+    ResolveAction -. "approve only" .-> DistrictsTbl
+    RequestApi -. "optional PDF" .-> PdfR2[("R2: ATTACHMENTS<br/>unlock-requests/{districtId}/…")]
+    AttachmentApi -. reads .-> PdfR2
 ```
 
 ## Getting started
