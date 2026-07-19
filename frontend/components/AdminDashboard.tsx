@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Chart } from "chart.js";
 import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, isMoneyField, plainLabel } from "@/lib/pac-fields";
-import { setNavDistrictId } from "@/lib/adminNav";
+import { setNavDistrictId, setNavStatusFilter } from "@/lib/adminNav";
 import type { CachedDistrict } from "@/lib/db";
 
 type Row = CachedDistrict & Record<(typeof PAC_FIELD_ORDER)[number], number> & { netRecoverable: number };
@@ -186,18 +186,25 @@ function KpiCard({
   icon,
   color,
   href,
+  onClick,
 }: {
   label: string;
   value: string;
   icon: string;
   color: keyof typeof KPI_COLORS;
   href?: string;
+  // Alternative to `href` for cards that need to set sessionStorage nav state (see
+  // lib/adminNav.ts) before navigating — a plain <Link href> can't carry that side effect,
+  // since this app's cross-page filter state travels via sessionStorage, never a URL query
+  // string (static export, no server to resolve dynamic paths — see CLAUDE.md).
+  onClick?: () => void;
 }) {
   const c = KPI_COLORS[color];
+  const isNavigable = Boolean(href || onClick);
   const content = (
     <div
-      className={`group rounded-lg border p-4 transition-all ${c.card} ${
-        href ? "cursor-pointer hover:-translate-y-0.5 hover:shadow-md" : ""
+      className={`group rounded-lg border p-4 text-left transition-all ${c.card} ${
+        isNavigable ? "cursor-pointer hover:-translate-y-0.5 hover:shadow-md" : ""
       }`}
     >
       <div className="flex items-center gap-2.5">
@@ -207,13 +214,20 @@ function KpiCard({
         <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
           {label}
         </span>
-        {href && (
+        {isNavigable && (
           <i className="ti ti-chevron-right ml-auto text-slate-300 transition-transform group-hover:translate-x-0.5 dark:text-slate-600" />
         )}
       </div>
       <p className="mt-2 break-words text-lg font-semibold tabular-nums text-slate-900 sm:text-xl dark:text-slate-100">{value}</p>
     </div>
   );
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className="w-full">
+        {content}
+      </button>
+    );
+  }
   return href ? <Link href={href}>{content}</Link> : content;
 }
 
@@ -242,13 +256,25 @@ export default function AdminDashboard({ rows }: { rows: Row[] }) {
         <KpiCard label="Districts" value={String(totalDistricts)} icon="ti-map-pin" color="blue" href="/admin/districts" />
         {/* Green = Locked, red = Unlocked — see LOCKED_COLOR/UNLOCKED_COLOR above for why this
             is inverted from the usual "red is bad" reading. */}
-        <KpiCard label="Locked" value={String(locked)} icon="ti-lock" color="emerald" href="/admin/districts?status=locked" />
+        <KpiCard
+          label="Locked"
+          value={String(locked)}
+          icon="ti-lock"
+          color="emerald"
+          onClick={() => {
+            setNavStatusFilter("locked");
+            router.push("/admin/districts");
+          }}
+        />
         <KpiCard
           label="Unlocked"
           value={String(unlocked)}
           icon="ti-lock-open"
           color="red"
-          href="/admin/districts?status=unlocked"
+          onClick={() => {
+            setNavStatusFilter("unlocked");
+            router.push("/admin/districts");
+          }}
         />
         <KpiCard label="Gross Arrears" value={formatMoney(sums.grossArrears)} icon="ti-report-money" color="amber" href="/admin/districts" />
         <KpiCard label="Net Recoverable" value={formatMoney(netRecoverableTotal)} icon="ti-cash" color="violet" href="/admin/districts" />

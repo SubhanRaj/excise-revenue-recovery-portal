@@ -38,12 +38,25 @@ const EVENT_LABELS: Record<string, string> = {
   unlock_request_denied: "Unlock request denied",
 };
 
+// Raw metadata JSON keys, as actually written across every `auditLog` insert in api/app/api/**
+// (submittedByName, reason, note, inserted/updated/errors/totalRows) — human labels for display,
+// falling back to the raw key for anything not yet mapped.
+const METADATA_KEY_LABELS: Record<string, string> = {
+  submittedByName: "Locked by",
+  reason: "Reason",
+  note: "Note",
+  inserted: "Added",
+  updated: "Updated",
+  errors: "Errors",
+  totalRows: "Total rows",
+};
+
 function describeMetadata(row: AuditRow): string {
   if (!row.metadata) return "—";
   try {
     const m = JSON.parse(row.metadata) as Record<string, unknown>;
     return Object.entries(m)
-      .map(([k, v]) => `${k}: ${v}`)
+      .map(([k, v]) => `${METADATA_KEY_LABELS[k] ?? k}: ${v}`)
       .join(", ");
   } catch {
     return row.metadata;

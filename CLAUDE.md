@@ -425,7 +425,16 @@ separate routes, not an in-page toggle:
   overflow; KPI card values are `break-words` (a long ₹ figure has no natural wrap point
   otherwise, which can force the whole grid past the viewport width); the "All fields" `dl` is
   `grid-cols-1 sm:grid-cols-2` for the same reason, stacking on phones instead of squeezing two
-  money columns into half the width each.
+  money columns into half the width each. The **Locked**/**Unlocked** KPI cards navigate via an
+  `onClick` (`setNavStatusFilter()` + `router.push()`), not a plain `href`, since this app's
+  cross-page filter state is `sessionStorage`-only (`adminNav.ts`) and never a URL query string —
+  a `?status=locked` `href` here would be dead weight the destination page never reads. The other
+  three cards (Districts/Gross Arrears/Net Recoverable) have no filter to carry, so they stay
+  plain `href="/admin/districts"` links.
+- **`/admin/audit`**'s `describeMetadata()` renders each `audit_log.metadata` JSON key through
+  `METADATA_KEY_LABELS` (e.g. `submittedByName` → "Locked by") instead of the raw camelCase key —
+  add a new entry there whenever a route starts writing a new metadata key, so it doesn't show up
+  unlabeled in the log.
 - **`/admin/districts`** — sortable/searchable/pinned-column table (`getPaginationRowModel`,
   25/50/75/100 rows/page), a Locked/Unlocked/All status filter, Lock/Unlock, and two export
   buttons. Column headers use `englishLabel()` only, no bilingual tooltip. Container padding

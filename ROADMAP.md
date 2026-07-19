@@ -1002,6 +1002,27 @@ just extended to also require one on deny.
   (app-level check) bounds how much a single DEO account can generate; no rate limiting beyond
   that is planned, same posture as the rest of this app (internal users, not public-facing).
 
+## Milestone 29 — Audit Log metadata labels, Dashboard KPI card filter fix (done)
+
+- [x] `/admin/audit`'s `describeMetadata()` was rendering raw JSON keys straight from
+      `audit_log.metadata` (e.g. `submittedByName: RAKESH BAHADUR SINGH`) — added
+      `METADATA_KEY_LABELS` mapping every key actually written across `api/app/api/**`
+      (`submittedByName` → "Locked by", `reason` → "Reason", `note` → "Note", `inserted`/
+      `updated`/`errors`/`totalRows` → "Added"/"Updated"/"Errors"/"Total rows"), falling back to
+      the raw key for anything unmapped.
+- [x] Fixed a real bug: the Dashboard's **Locked**/**Unlocked** KPI cards linked to
+      `/admin/districts?status=locked`/`?status=unlocked` — a URL query string the destination
+      page never reads, since this app's cross-page nav state is `sessionStorage`-only
+      (`lib/adminNav.ts`'s `setNavStatusFilter()`/`consumeNavStatusFilter()`), consistent with
+      this being a static export with no server to resolve query-driven state and a deliberate
+      choice to keep no app state in the URL bar (smaller attack surface — the magic-link token
+      is the one intentional exception). `KpiCard` gained an `onClick` alternative to `href`; the
+      two cards now call `setNavStatusFilter()` before `router.push("/admin/districts")`, same
+      pattern the top-5-districts bar chart already used for `setNavDistrictId()`. The other three
+      cards (Districts/Gross Arrears/Net Recoverable) keep a plain `href`, since they carry no
+      filter state.
+- [x] No schema/migration/API change — both fixes are frontend-only display/navigation bugs.
+
 ## Backlog / not started
 
 - [ ] Real domain + DNS, and (optional) collapse `/frontend` + `/api` onto one zone via a
