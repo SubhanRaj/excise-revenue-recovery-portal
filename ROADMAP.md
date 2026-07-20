@@ -1038,6 +1038,37 @@ just extended to also require one on deny.
 
 ## Backlog / not started
 
+- [ ] **Archive previous PAC data on resubmission-after-unlock** — today, when a DEO resubmits
+      after an Admin unlock, `POST /api/pac-data/submit` deletes the district's old 5 `pac_data`
+      rows and inserts the new 5 (required to satisfy the `(district_id, financial_year)` unique
+      index — see CLAUDE.md's Data model section); the old figures are gone the instant the new
+      ones land. `districts.unlockedAt/unlockReason/unlockedBy` only ever holds the *latest*
+      unlock event, not a full history (already flagged in a schema comment). Planned fix, fully
+      designed (full plan on file, ready to implement when picked back up):
+      - New table `pac_data_history` (`api/db/schema.ts`) — append-only mirror of `pacData`'s
+        columns (no unique index, since the same district+FY can be archived more than once
+        across repeated unlock/resubmit cycles), plus `archivedAt`/`unlockReason`/`unlockedBy`
+        carried from the `districts` row at the moment of archiving. One plain `CREATE TABLE`
+        migration (`0008_...sql`), additive only — no existing table/column touched.
+      - `api/app/api/pac-data/submit/route.ts` — right before the existing
+        `db.batch([db.delete(pacData)...` (the only place that already deletes a district's
+        prior locked data), `SELECT` the current 5 `pac_data` rows and, if any exist (i.e. this
+        is a resubmission, not a first-ever submit), insert them into `pac_data_history` as
+        additional statements in the same atomic batch, ahead of the delete. A first-ever submit
+        (no existing rows) archives nothing, unchanged from today.
+      - `GET /api/admin/districts` also returns `pacDataHistory` (small, rare-growth dataset) —
+        reuses the existing bulk-sync-to-Dexie pattern (`useAdminData()`) rather than a new
+        on-demand endpoint; `frontend/lib/db.ts` gets a `db.version(2)` Dexie bump adding
+        `adminPacDataHistory` (auto-upgrades existing browsers' IndexedDB, no data loss).
+      - Admin district detail page gets a new "Previous Submissions" section below the live
+        Field × FY table — native `<details>` disclosures grouped by `archivedAt`, newest first,
+        each showing who/when the archived data was originally locked and why the district was
+        unlocked, plus a compact read-only Field × FY table for that archived batch (RC-details
+        per-RC breakdown omitted there for simplicity — aggregate RC Count/Amount still shown).
+      - Rollout order: `db:generate` → `db:migrate:local` → `tsc --noEmit` both apps → manual
+        local unlock/resubmit test (verify old data lands in `pac_data_history`, new data in
+        `pac_data`, first-ever submits archive nothing) → `db:migrate:remote` → deploy → verify
+        live per DEPLOY.md.
 - [ ] Real domain + DNS, and (optional) collapse `/frontend` + `/api` onto one zone via a
       Worker Route or Pages Function — **at that point, switch auth back from a Bearer token to
       `HttpOnly` cookies** (`SameSite=Lax`/`Strict` becomes possible once same-site), since
