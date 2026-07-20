@@ -464,6 +464,13 @@ separate routes, not an in-page toggle:
   occasional bulk-ops task, not something an admin needs on every visit to the districts table).
   Not on the flat Dashboard/Districts/Audit Log nav — reached via `ProfileMenu`'s "Admin"
   dropdown (a new `Link` there, admin-role-only) instead, alongside Logout.
+- **Admin identity display** — `users.name`/`users.designation` (nullable) let `ProfileMenu.tsx`
+  show a real name and job title (e.g. "Excise Commissioner") instead of the generic "Admin"
+  label; the email row shows the name instead when set, with the raw email moved to a `title`
+  hover tooltip. Both fields are admin-only in practice — DEOs don't have them set, so their
+  `ProfileMenu` rendering is unchanged. Provisioning an additional admin (beyond the original
+  bootstrap account) is still a direct D1 insert (`role: 'admin'`, plus `name`/`designation` if
+  wanted) — no self-service UI yet.
 - **`/admin/audit`** — paginated (100/page), newest-first, auto-pruned to 30 days on read. A
   "Filter by event" `<select>` and a separate sort button (`ti-sort-descending`/`ti-sort-
   ascending`) both apply only to the currently-loaded page in memory — no extra request. Uses the

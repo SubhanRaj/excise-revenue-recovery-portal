@@ -1036,6 +1036,30 @@ just extended to also require one on deny.
       updated to list all of them.
 - [x] No schema/migration/API change — frontend-only, `pnpm exec tsc --noEmit` passed clean.
 
+## Milestone 31 — Sender domain verified, admin name/designation display (done)
+
+- [x] `mail.exciseup.in` verified in Resend; `FROM_EMAIL` Worker secret set to
+      `noreply@mail.exciseup.in` (previously the shared sandbox sender). Same domain/address
+      shared with the sibling `up-excise-spatial-revenue-optimizer` project's own
+      `RESEND_FROM_EMAIL` secret (same Resend account). `resend.emails.send()`'s `from` field
+      now carries a display name (`"Excise Revenue Recovery Portal <noreply@mail.exciseup.in>"`)
+      rather than a bare address, so inboxes show a readable sender instead of "noreply".
+- [x] Added `users.name`/`users.designation` (migration `0008_unknown_mentor.sql`, both
+      nullable, additive `ALTER TABLE` — applied to prod D1 before the code deploy so the
+      already-live worker never queried a column that didn't exist yet). `GET /api/auth/me`
+      returns both.
+- [x] `ProfileMenu.tsx`'s dropdown: the role label ("Admin") is now the person's designation
+      when set (falls back to "Admin"), and the email row now shows their name when set (falls
+      back to the raw email) with the email moved to a `title` tooltip on hover. DEO profiles
+      are unaffected — both fields are simply undefined for them and every fallback resolves to
+      the prior behavior.
+- [x] Multiple admin accounts (department officials beyond the original bootstrap admin) are
+      now supported the same way — a `role: 'admin'` row with name/designation set, still
+      provisioned by direct D1 insert (no self-service UI yet, same gap noted in the sibling
+      project's roadmap).
+- [x] Verified against the exact CI steps before pushing: `pnpm exec tsc --noEmit` and
+      `pnpm run build` (full `next build`, Turbopack) for both `api` and `frontend`, all clean.
+
 ## Backlog / not started
 
 - [ ] **Archive previous PAC data on resubmission-after-unlock** — today, when a DEO resubmits
