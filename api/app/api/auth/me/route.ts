@@ -56,11 +56,18 @@ export const GET = withErrorHandling("auth/me", async (req: NextRequest) => {
     pendingUnlockRequest = pending ?? null;
   }
 
+  // OWNER_EMAIL gates owner-only actions (currently: DEO Provisioning — see
+  // /admin/districts/provisioning) that shouldn't be available to every admin, only the one
+  // who actually runs provisioning. Computed server-side so the frontend never needs to know
+  // or compare the raw address itself, only this boolean.
+  const isOwner = role === "admin" && !!row?.email && row.email === process.env.OWNER_EMAIL;
+
   return NextResponse.json({
     ...session,
     email: row?.email ?? null,
     name: row?.name ?? null,
     designation: row?.designation ?? null,
+    isOwner,
     districtName: row?.districtName ?? null,
     lockStatus: row?.lockStatus ?? null,
     lockedAt: row?.lockedAt ?? null,

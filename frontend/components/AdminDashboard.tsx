@@ -77,7 +77,7 @@ function LockStatusDonut({ locked, unlocked }: { locked: number; unlocked: numbe
 }
 
 // Vertical bar chart (Chart.js default 'bar' orientation — category names along the x-axis,
-// values as bar height) replacing the old plain-CSS horizontal progress-bar list, so the top-5
+// values as bar height) replacing the old plain-CSS horizontal progress-bar list, so the top-10
 // districts get the same real-chart treatment as the lock-status donut instead of looking like a
 // lesser, hand-rolled version next to it.
 function TopDistrictsBarChart({
@@ -248,7 +248,7 @@ export default function AdminDashboard({ rows }: { rows: Row[] }) {
   const topDues = [...rows]
     .map((r) => ({ id: r.id, name: r.districtName, dues: r.netRecoverable }))
     .sort((a, b) => b.dues - a.dues)
-    .slice(0, 5);
+    .slice(0, 10);
 
   return (
     <div className="space-y-6">
@@ -285,7 +285,7 @@ export default function AdminDashboard({ rows }: { rows: Row[] }) {
       <div className="space-y-4">
         <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
           <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
-            Top 5 districts by Net Recoverable — as of 31 March 2026
+            Top 10 districts by Net Recoverable — as of 31 March 2026
           </h3>
           <TopDistrictsBarChart
             districts={topDues}

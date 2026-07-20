@@ -43,7 +43,11 @@ export const POST = withErrorHandling("admin/unlock-requests/resolve", async (re
     return NextResponse.json({ error: "This request was already resolved" }, { status: 409 });
   }
 
-  const [admin] = await db.select({ email: users.email }).from(users).where(eq(users.id, session.userId)).limit(1);
+  const [admin] = await db
+    .select({ email: users.email, name: users.name, designation: users.designation })
+    .from(users)
+    .where(eq(users.id, session.userId))
+    .limit(1);
   const [district] = await db
     .select({ districtName: districts.districtName })
     .from(districts)
@@ -51,16 +55,17 @@ export const POST = withErrorHandling("admin/unlock-requests/resolve", async (re
     .limit(1);
 
   const resolvedAt = new Date().toISOString();
+  const resolvedByDisplay = admin?.name ?? admin?.email ?? null;
   const statements = [
     db
       .update(unlockRequests)
-      .set({ status: action === "approve" ? "approved" : "denied", resolvedAt, resolvedBy: admin?.email ?? null, adminNote: trimmedNote })
+      .set({ status: action === "approve" ? "approved" : "denied", resolvedAt, resolvedBy: resolvedByDisplay, adminNote: trimmedNote })
       .where(eq(unlockRequests.id, id)),
     ...(action === "approve"
       ? [
           db
             .update(districts)
-            .set({ lockStatus: 0, unlockedAt: resolvedAt, unlockReason: trimmedNote, unlockedBy: admin?.email ?? null })
+            .set({ lockStatus: 0, unlockedAt: resolvedAt, unlockReason: trimmedNote, unlockedBy: resolvedByDisplay })
             .where(eq(districts.id, request.districtId)),
         ]
       : []),
@@ -68,6 +73,8 @@ export const POST = withErrorHandling("admin/unlock-requests/resolve", async (re
       eventType: action === "approve" ? "unlock_request_approved" : "unlock_request_denied",
       actorRole: "admin",
       actorEmail: admin?.email,
+      actorName: admin?.name,
+      actorDesignation: admin?.designation,
       districtName: district?.districtName,
       metadata: { note: trimmedNote },
     }),

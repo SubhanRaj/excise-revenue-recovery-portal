@@ -22,6 +22,10 @@ export const GET = withErrorHandling("admin/districts", async (req: NextRequest)
       unlockReason: districts.unlockReason,
       unlockedBy: districts.unlockedBy,
       deoEmail: users.email,
+      // Distinct from deoEmail — a CUG-only-provisioned DEO has no email, so deoEmail alone
+      // can't tell "no DEO yet" apart from "DEO exists but hasn't got an email set". Used to
+      // filter DEO Provisioning's template to only still-unprovisioned districts.
+      deoUserId: users.id,
     })
     .from(districts)
     .leftJoin(users, eq(districts.id, users.districtId)),

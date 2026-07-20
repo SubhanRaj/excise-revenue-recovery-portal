@@ -20,6 +20,9 @@ export const POST = withErrorHandling("auth/verify-cug", async (req: NextRequest
     .select({
       id: users.id,
       role: users.role,
+      email: users.email,
+      name: users.name,
+      designation: users.designation,
       districtId: users.districtId,
       districtName: districts.districtName,
     })
@@ -38,9 +41,14 @@ export const POST = withErrorHandling("auth/verify-cug", async (req: NextRequest
     districtId: row.districtId,
   });
 
+  // actorEmail/Name/Designation stay null for DEO logins by design (see audit_log's schema
+  // comment) — only meaningful for the rare admin-via-CUG case.
   await auditLogInsert(db, {
     eventType: "login_cug",
     actorRole: row.role as "deo" | "admin",
+    actorEmail: row.role === "admin" ? row.email : null,
+    actorName: row.role === "admin" ? row.name : null,
+    actorDesignation: row.role === "admin" ? row.designation : null,
     districtName: row.districtName,
   });
 

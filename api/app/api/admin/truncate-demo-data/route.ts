@@ -35,7 +35,11 @@ export const POST = withErrorHandling("admin/truncate-demo-data", async (req: Ne
     return NextResponse.json({ error: "No Demo District found — nothing to truncate." }, { status: 404 });
   }
 
-  const [admin] = await db.select({ email: users.email }).from(users).where(eq(users.id, session.userId)).limit(1);
+  const [admin] = await db
+    .select({ email: users.email, name: users.name, designation: users.designation })
+    .from(users)
+    .where(eq(users.id, session.userId))
+    .limit(1);
 
   await db.batch([
     db.delete(pacData).where(eq(pacData.districtId, demo.id)),
@@ -45,6 +49,8 @@ export const POST = withErrorHandling("admin/truncate-demo-data", async (req: Ne
       eventType: "demo_data_truncated",
       actorRole: "admin",
       actorEmail: admin?.email,
+      actorName: admin?.name,
+      actorDesignation: admin?.designation,
       districtName: DEMO_DISTRICT_NAME,
     }),
   ] as unknown as Parameters<typeof db.batch>[0]);

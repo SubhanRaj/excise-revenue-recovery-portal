@@ -34,6 +34,7 @@ export type CachedDistrict = {
   unlockReason: string | null;
   unlockedBy: string | null;
   deoEmail?: string | null;
+  deoUserId?: number | null;
 };
 
 export type CachedPacData = {

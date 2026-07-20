@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getDb } from "@/lib/db";
-import { districts, unlockRequests, users } from "@/db/schema";
+import { districts, unlockRequests } from "@/db/schema";
 import { requireSession } from "@/lib/auth-guard";
 import { auditLogInsert } from "@/lib/audit";
 import { withErrorHandling } from "@/lib/with-error-handling";
@@ -79,8 +79,6 @@ export const POST = withErrorHandling("deo/request-unlock", async (req: NextRequ
     await env.ATTACHMENTS.put(attachmentKey, buf, { httpMetadata: { contentType: "application/pdf" } });
   }
 
-  const [deo] = await db.select({ email: users.email }).from(users).where(eq(users.id, session.userId)).limit(1);
-
   await db.batch([
     db.insert(unlockRequests).values({
       districtId: district.id,
@@ -90,10 +88,11 @@ export const POST = withErrorHandling("deo/request-unlock", async (req: NextRequ
       status: "pending",
       requestedAt: new Date().toISOString(),
     }),
+    // No actorEmail — DEO events never log PII (see audit_log's schema comment); the frontend
+    // falls back to "DEO {district}" for display, same as every other DEO-actor event.
     auditLogInsert(db, {
       eventType: "unlock_requested",
       actorRole: "deo",
-      actorEmail: deo?.email,
       districtName: district.districtName,
       metadata: { reason },
     }),

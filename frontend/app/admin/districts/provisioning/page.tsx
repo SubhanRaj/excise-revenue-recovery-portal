@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ApiError, apiFetch } from "@/lib/api";
 import { notifyToast } from "@/lib/alerts";
 import { downloadDeoTemplate, parseDeoTemplateFile } from "@/lib/export";
@@ -18,9 +19,21 @@ const NAV_LINKS: NavLink[] = [
 ];
 
 export default function DeoProvisioningPage() {
+  const router = useRouter();
   const { ready, profile, districts, sync, syncing, lastSyncedAt, error, setError } = useAdminData();
   const [provisioning, setProvisioning] = useState(false);
   const deoFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Hiding the ProfileMenu link is UX only — the actual boundary is the API route's own
+  // OWNER_EMAIL check. This redirect just stops a non-owner admin who has the URL from seeing
+  // a page that would fail every action anyway.
+  useEffect(() => {
+    if (ready && profile && !profile.isOwner) router.replace("/admin");
+  }, [ready, profile, router]);
+
+  // A district counts as "not yet provisioned" if no users row exists for it at all — deoEmail
+  // alone can't tell that apart from a CUG-only DEO with no email set (see api's districts route).
+  const unprovisioned = districts.filter((d) => !d.deoUserId);
 
   async function handleDeoFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -60,7 +73,7 @@ export default function DeoProvisioningPage() {
     }
   }
 
-  if (!ready) {
+  if (!ready || !profile?.isOwner) {
     return (
       <div className="flex min-h-full flex-1 flex-col bg-slate-50 p-6 dark:bg-slate-950">
         <div className="h-8 w-64 animate-pulse rounded-md bg-slate-200 dark:bg-slate-800" />
@@ -103,25 +116,34 @@ export default function DeoProvisioningPage() {
           </h2>
           <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-400">
             Download the template, fill in CUG mobile numbers and/or emails for the districts
-            you want to provision, then upload the same file back.
+            you want to provision, then upload the same file back. The template only lists
+            districts with no DEO login yet ({unprovisioned.length} of {districts.length}) —
+            already-provisioned districts aren&apos;t offered here, so a routine
+            download-fill-upload can&apos;t accidentally overwrite an existing DEO&apos;s login.
           </p>
-          <div className="mt-5 flex flex-wrap items-center gap-2.5">
-            <Button variant="blue" onClick={() => void downloadDeoTemplate(districts)}>
-              <i className="ti ti-download text-base" />
-              DEO Template
-            </Button>
-            <input
-              ref={deoFileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleDeoFileSelected}
-              className="hidden"
-            />
-            <Button variant="amber" onClick={() => deoFileInputRef.current?.click()} disabled={provisioning}>
-              <i className={`ti ti-upload text-base ${provisioning ? "animate-pulse" : ""}`} />
-              {provisioning ? "Uploading..." : "Upload DEO Data"}
-            </Button>
-          </div>
+          {unprovisioned.length === 0 ? (
+            <div className="mt-5">
+              <Banner variant="success">All districts already have a DEO login provisioned.</Banner>
+            </div>
+          ) : (
+            <div className="mt-5 flex flex-wrap items-center gap-2.5">
+              <Button variant="blue" onClick={() => void downloadDeoTemplate(unprovisioned)}>
+                <i className="ti ti-download text-base" />
+                DEO Template
+              </Button>
+              <input
+                ref={deoFileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleDeoFileSelected}
+                className="hidden"
+              />
+              <Button variant="amber" onClick={() => deoFileInputRef.current?.click()} disabled={provisioning}>
+                <i className={`ti ti-upload text-base ${provisioning ? "animate-pulse" : ""}`} />
+                {provisioning ? "Uploading..." : "Upload DEO Data"}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -46,6 +46,8 @@ export const POST = withErrorHandling("auth/verify-magic-link", async (req: Next
     eventType: "login_magic_link",
     actorRole: user.role as "deo" | "admin",
     actorEmail: user.email,
+    actorName: user.name,
+    actorDesignation: user.designation,
   });
 
   return NextResponse.json({ ok: true, role: user.role, districtId: user.districtId, token: sessionToken });

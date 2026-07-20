@@ -1060,6 +1060,40 @@ just extended to also require one on deny.
 - [x] Verified against the exact CI steps before pushing: `pnpm exec tsc --noEmit` and
       `pnpm run build` (full `next build`, Turbopack) for both `api` and `frontend`, all clean.
 
+## Milestone 32 — Admin identity everywhere, owner-only DEO Provisioning, dashboard chart (done)
+
+- [x] Fixed a leftover from Milestone 31: the post-login toast (`useAdminData.ts`) and
+      `ProfileMenu`'s collapsed pill both still showed the raw email / a bare "Admin" label
+      instead of the new name/designation fields. Toast now reads `Welcome, {name}`; the pill
+      shows the person's designation (falls back to "Admin").
+- [x] Added `audit_log.actor_name`/`actor_designation` (migration `0009_volatile_blink.sql`,
+      nullable additive columns, applied to prod D1 before this deploy). Captured at write
+      time in every admin-actor audit event (login, logout, unlock, unlock-request
+      resolution, DEO provisioning, demo-data truncation) rather than resolved via a live
+      join — an admin's later name change shouldn't rewrite what already happened. The
+      `/admin/audit` Actor column now shows `Name (Designation)` for admins, same spirit as
+      the existing "DEO {district}" display for DEO events.
+- [x] Fixed a DEO-privacy regression this surfaced: `deo/request-unlock` was setting
+      `actorEmail` on a DEO-actor audit row, which both violated the "no PII for DEO events"
+      convention already documented on the `audit_log` schema and made the Actor column show
+      the DEO's raw email instead of falling through to "DEO {district}". Removed.
+- [x] `districts.unlocked_by` (shown on the district detail page, exported to Excel/SQL) now
+      stores the resolving admin's name instead of their email, matching how `submitted_by_name`
+      already stores a DEO's name rather than an identifier — falls back to email if name unset.
+- [x] **DEO Provisioning restricted to one owner account.** Added `OWNER_EMAIL` Worker secret;
+      `GET /api/auth/me` computes `isOwner` server-side against it. `ProfileMenu`'s "DEO
+      Provisioning" link only renders for `isOwner` (hiding it from the department-official
+      admin accounts added in Milestone 31, who shouldn't run bulk DEO provisioning). The real
+      boundary is server-side: `POST /api/admin/provision-deos` now 403s for any non-owner
+      admin who hits it directly, and the page itself redirects a non-owner away. Also added
+      `deoUserId` to `GET /api/admin/districts`' join (distinct from `deoEmail`, which alone
+      can't tell "no DEO yet" apart from "DEO exists but is CUG-only with no email") and used
+      it to filter the downloadable DEO template to only still-unprovisioned districts, so a
+      routine download-fill-upload can't accidentally overwrite an existing DEO's login.
+- [x] Admin Dashboard's district bar chart: top 5 → top 10 districts by Net Recoverable.
+- [x] Verified against the exact CI steps before pushing: `pnpm exec tsc --noEmit` and
+      `pnpm run build` for both `api` and `frontend`, all clean.
+
 ## Backlog / not started
 
 - [ ] **Archive previous PAC data on resubmission-after-unlock** — today, when a DEO resubmits

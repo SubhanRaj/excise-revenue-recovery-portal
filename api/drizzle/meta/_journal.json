@@ -64,6 +64,13 @@
       "when": 1784537228684,
       "tag": "0008_unknown_mentor",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1784538379069,
+      "tag": "0009_volatile_blink",
+      "breakpoints": true
     }
   ]
 }

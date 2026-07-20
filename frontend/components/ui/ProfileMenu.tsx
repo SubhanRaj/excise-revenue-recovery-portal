@@ -13,6 +13,9 @@ export type Profile = {
   // display stays district-driven. Falls back to the role label / raw email when absent.
   name?: string | null;
   designation?: string | null;
+  // Admin-only, computed server-side (GET /api/auth/me) against the OWNER_EMAIL Worker secret
+  // — gates DEO Provisioning below, which only the owner should run, not every admin.
+  isOwner?: boolean;
   // Only meaningful for role "deo" — null for admin profiles. Lets deo-data-entry/page.tsx tell
   // a still-locked district apart from a freshly-unlocked one right after login.
   lockStatus?: number | null;
@@ -57,8 +60,10 @@ export default function ProfileMenu({
         aria-label="Account details"
         className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
       >
-        <span className="flex h-7 items-center justify-center rounded-full bg-blue-100 px-3 text-xs font-semibold text-blue-700 dark:bg-blue-900 dark:text-blue-300">
-          {profile.role === "admin" ? "Admin" : profile.districtName ? `DEO ${profile.districtName}` : "DEO"}
+        <span className="flex h-7 items-center justify-center whitespace-nowrap rounded-full bg-blue-100 px-3 text-xs font-semibold text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+          {profile.role === "admin"
+            ? (profile.designation ?? "Admin")
+            : profile.districtName ? `DEO ${profile.districtName}` : "DEO"}
         </span>
         <i className={`ti ti-chevron-down text-sm transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -89,7 +94,7 @@ export default function ProfileMenu({
               <span className="truncate">{profile.name ?? profile.email}</span>
             </div>
           )}
-          {profile.role === "admin" && (
+          {profile.role === "admin" && profile.isOwner && (
             <Link
               href="/admin/districts/provisioning"
               onClick={() => setOpen(false)}

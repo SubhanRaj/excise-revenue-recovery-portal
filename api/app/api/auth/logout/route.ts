@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth-guard";
 import { getDb } from "@/lib/db";
 import { auditLogInsert } from "@/lib/audit";
-import { districts } from "@/db/schema";
+import { districts, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { withErrorHandling } from "@/lib/with-error-handling";
 
@@ -19,12 +19,25 @@ export const POST = withErrorHandling("auth/logout", async (req: NextRequest) =>
   const session = await requireSession(req, role);
   if (session) {
     let districtName = null;
+    let actorEmail: string | null = null;
+    let actorName: string | null = null;
+    let actorDesignation: string | null = null;
     const db = getDb();
     if (session.role === "deo" && session.districtId) {
       const [d] = await db.select().from(districts).where(eq(districts.id, session.districtId)).limit(1);
       districtName = d?.districtName ?? null;
     }
-    await auditLogInsert(db, { eventType: "logout", actorRole: role, districtName }).catch(() => {});
+    if (session.role === "admin") {
+      const [u] = await db
+        .select({ email: users.email, name: users.name, designation: users.designation })
+        .from(users)
+        .where(eq(users.id, session.userId))
+        .limit(1);
+      actorEmail = u?.email ?? null;
+      actorName = u?.name ?? null;
+      actorDesignation = u?.designation ?? null;
+    }
+    await auditLogInsert(db, { eventType: "logout", actorRole: role, actorEmail, actorName, actorDesignation, districtName }).catch(() => {});
   }
 
   return NextResponse.json({ ok: true });

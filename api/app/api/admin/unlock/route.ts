@@ -21,7 +21,11 @@ export const POST = withErrorHandling("admin/unlock", async (req: NextRequest) =
   }
 
   const db = getDb();
-  const [admin] = await db.select({ email: users.email }).from(users).where(eq(users.id, session.userId)).limit(1);
+  const [admin] = await db
+    .select({ email: users.email, name: users.name, designation: users.designation })
+    .from(users)
+    .where(eq(users.id, session.userId))
+    .limit(1);
   const [district] = await db.select({ districtName: districts.districtName }).from(districts).where(eq(districts.id, districtId)).limit(1);
 
   await db.batch([
@@ -31,13 +35,15 @@ export const POST = withErrorHandling("admin/unlock", async (req: NextRequest) =
         lockStatus: 0,
         unlockedAt: new Date().toISOString(),
         unlockReason: reason.trim(),
-        unlockedBy: admin?.email ?? null,
+        unlockedBy: admin?.name ?? admin?.email ?? null,
       })
       .where(eq(districts.id, districtId)),
     auditLogInsert(db, {
       eventType: "district_unlocked",
       actorRole: "admin",
       actorEmail: admin?.email,
+      actorName: admin?.name,
+      actorDesignation: admin?.designation,
       districtName: district?.districtName,
       metadata: { reason: reason.trim() },
     }),

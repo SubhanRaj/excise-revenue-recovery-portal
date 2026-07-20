@@ -105,6 +105,11 @@ export const auditLog = sqliteTable("audit_log", {
   eventType: text("event_type").notNull(),
   actorRole: text("actor_role"), // "admin" | "deo" | null (system-level events)
   actorEmail: text("actor_email"), // admin's email; null for DEO events (no PII to log)
+  // Captured at write time (like districtName below), not resolved via a live join against
+  // users — an admin's later name/designation change shouldn't rewrite what already happened.
+  // Admin-only in practice, same as users.name/designation; null for DEO events.
+  actorName: text("actor_name"),
+  actorDesignation: text("actor_designation"),
   districtName: text("district_name"),
   metadata: text("metadata"), // JSON string, event-specific extra detail (e.g. unlock reason)
   createdAt: text("created_at").notNull(),

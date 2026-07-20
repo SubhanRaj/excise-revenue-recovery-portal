@@ -75,6 +75,7 @@ openssl rand -base64 48 | pnpm exec wrangler secret put JWT_SECRET
 echo "re_xxxxxxxxxxxxxxxxxxxxxxxxxxxx" | pnpm exec wrangler secret put RESEND_API_KEY
 echo "https://excise-revenue-recovery-portal.pages.dev" | pnpm exec wrangler secret put FRONTEND_URL
 echo "noreply@mail.exciseup.in" | pnpm exec wrangler secret put FROM_EMAIL
+echo "the-owners-actual-login-email@example.com" | pnpm exec wrangler secret put OWNER_EMAIL
 ```
 
 - `JWT_SECRET` — signs both the admin and DEO session tokens (`api/lib/session.ts`), returned in
@@ -90,6 +91,10 @@ echo "noreply@mail.exciseup.in" | pnpm exec wrangler secret put FROM_EMAIL
   uses the same domain under its own `RESEND_FROM_EMAIL` secret name). Falls back to Resend's
   shared sandbox sender (`onboarding@resend.dev`) in code if this secret is ever unset — see
   `api/app/api/auth/request-magic-link/route.ts`.
+- `OWNER_EMAIL` — the one admin account allowed to run DEO Provisioning
+  (`/admin/districts/provisioning`; see `api/app/api/auth/me/route.ts`'s `isOwner` and
+  `api/app/api/admin/provision-deos/route.ts`'s server-side check). Every other admin account
+  (department officials) has the link hidden and gets a 403 if they hit the API route directly.
 
 List what's set (values are never shown) with `pnpm exec wrangler secret list`. There is no
 `db:seed`-equivalent "put a secret for every DEO" step — DEO accounts (`cug_hash`, one row

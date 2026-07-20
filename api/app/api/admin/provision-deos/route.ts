@@ -23,12 +23,26 @@ export const POST = withErrorHandling("admin/provision-deos", async (req: NextRe
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const db = getDb();
+  const [admin] = await db
+    .select({ email: users.email, name: users.name, designation: users.designation })
+    .from(users)
+    .where(eq(users.id, session.userId))
+    .limit(1);
+
+  // Hiding the "DEO Provisioning" link (ProfileMenu.tsx) from non-owner admins is UX, not
+  // security — this is the actual boundary. Only the owner runs bulk DEO provisioning; other
+  // admins (department officials) don't need it and shouldn't be able to overwrite DEO logins
+  // by hitting this route directly.
+  if (!admin?.email || admin.email !== process.env.OWNER_EMAIL) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const { rows } = (await req.json()) as { rows?: InputRow[] };
   if (!Array.isArray(rows) || rows.length === 0) {
     return NextResponse.json({ error: "rows must be a non-empty array" }, { status: 400 });
   }
 
-  const db = getDb();
   const results: RowResult[] = [];
 
   for (const raw of rows) {
@@ -91,7 +105,6 @@ export const POST = withErrorHandling("admin/provision-deos", async (req: NextRe
     }
   }
 
-  const [admin] = await db.select({ email: users.email }).from(users).where(eq(users.id, session.userId)).limit(1);
   const inserted = results.filter((r) => r.status === "inserted").length;
   const updated = results.filter((r) => r.status === "updated").length;
   const errors = results.filter((r) => r.status === "error").length;
@@ -99,6 +112,8 @@ export const POST = withErrorHandling("admin/provision-deos", async (req: NextRe
     eventType: "deo_provisioned",
     actorRole: "admin",
     actorEmail: admin?.email,
+    actorName: admin?.name,
+    actorDesignation: admin?.designation,
     metadata: { inserted, updated, errors, totalRows: rows.length },
   });
 

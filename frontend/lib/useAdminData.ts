@@ -69,7 +69,7 @@ export function useAdminData() {
         const p = await apiFetch<Profile>("/api/auth/me?role=admin", undefined, "admin");
         setProfile(p);
         if (consumeJustAuthed()) {
-          notifyToast({ icon: "success", title: `Welcome, ${p.email ?? "Admin"}` });
+          notifyToast({ icon: "success", title: `Welcome, ${p.name ?? p.designation ?? "Admin"}` });
         }
       } catch {
         clearClientSession("admin");
@@ -94,7 +94,7 @@ export function useAdminData() {
 
   async function unlock(districtId: number, reason: string) {
     await apiFetch("/api/admin/unlock", { method: "POST", body: JSON.stringify({ districtId, reason }) }, "admin");
-    const patch = { lockStatus: 0, unlockedAt: new Date().toISOString(), unlockReason: reason, unlockedBy: profile?.email ?? null };
+    const patch = { lockStatus: 0, unlockedAt: new Date().toISOString(), unlockReason: reason, unlockedBy: profile?.name ?? profile?.email ?? null };
     setDistricts((prev) => prev.map((d) => (d.id === districtId ? { ...d, ...patch } : d)));
     await db.adminDistricts.update(districtId, patch);
   }

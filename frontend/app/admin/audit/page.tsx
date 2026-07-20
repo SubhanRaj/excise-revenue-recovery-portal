@@ -21,6 +21,8 @@ type AuditRow = {
   eventType: string;
   actorRole: "admin" | "deo" | null;
   actorEmail: string | null;
+  actorName: string | null;
+  actorDesignation: string | null;
   districtName: string | null;
   metadata: string | null;
   createdAt: string;
@@ -50,6 +52,18 @@ const METADATA_KEY_LABELS: Record<string, string> = {
   errors: "Errors",
   totalRows: "Total rows",
 };
+
+// Name/designation are captured at write time (see api/lib/audit.ts) — an admin's later name
+// change doesn't rewrite past rows. Falls back through email, then the same "DEO {district}"
+// shape the DEO side already used, matching how this page treats DEO identity.
+function describeActor(row: AuditRow): string {
+  if (row.actorName) return row.actorDesignation ? `${row.actorName} (${row.actorDesignation})` : row.actorName;
+  if (row.actorDesignation) return row.actorDesignation;
+  if (row.actorEmail) return row.actorEmail;
+  if (row.actorRole === "deo" && row.districtName) return `DEO ${row.districtName}`;
+  if (row.actorRole) return `(${row.actorRole})`;
+  return "—";
+}
 
 function describeMetadata(row: AuditRow): string {
   if (!row.metadata) return "—";
@@ -241,7 +255,7 @@ export default function AuditLogPage() {
                       {EVENT_LABELS[row.eventType] ?? row.eventType}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-slate-800 dark:text-slate-200">
-                      {row.actorEmail ?? (row.actorRole === "deo" && row.districtName ? `DEO ${row.districtName}` : row.actorRole ? `(${row.actorRole})` : "—")}
+                      {describeActor(row)}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-slate-800 dark:text-slate-200">
                       {row.districtName ?? "—"}

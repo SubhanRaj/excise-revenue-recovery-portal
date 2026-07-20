@@ -465,12 +465,22 @@ separate routes, not an in-page toggle:
   Not on the flat Dashboard/Districts/Audit Log nav — reached via `ProfileMenu`'s "Admin"
   dropdown (a new `Link` there, admin-role-only) instead, alongside Logout.
 - **Admin identity display** — `users.name`/`users.designation` (nullable) let `ProfileMenu.tsx`
-  show a real name and job title (e.g. "Excise Commissioner") instead of the generic "Admin"
-  label; the email row shows the name instead when set, with the raw email moved to a `title`
-  hover tooltip. Both fields are admin-only in practice — DEOs don't have them set, so their
-  `ProfileMenu` rendering is unchanged. Provisioning an additional admin (beyond the original
-  bootstrap account) is still a direct D1 insert (`role: 'admin'`, plus `name`/`designation` if
-  wanted) — no self-service UI yet.
+  show a real name and job title (e.g. "Excise Commissioner") everywhere an admin's identity
+  appears: the dropdown's role label, the collapsed pill badge, the email row (name shown
+  instead, raw email moved to a `title` hover tooltip), the post-login welcome toast, the
+  `/admin/audit` Actor column (`audit_log.actor_name`/`actor_designation`, captured at write
+  time — see the Audit Log entry below), and `districts.unlocked_by`. Both fields are
+  admin-only in practice — DEOs don't have them set, so their own identity display (name via
+  `submitted_by_name`, "DEO {district}" everywhere else) is unchanged. Provisioning an
+  additional admin (beyond the original bootstrap account) is still a direct D1 insert
+  (`role: 'admin'`, plus `name`/`designation` if wanted) — no self-service UI yet.
+- **DEO Provisioning is owner-only.** `OWNER_EMAIL` Worker secret + `GET /api/auth/me`'s
+  `isOwner` gate which admin account can see/use `/admin/districts/provisioning` — every other
+  admin (the department officials above) has the link hidden in `ProfileMenu` and gets a 403
+  from `POST /api/admin/provision-deos` directly. The downloadable DEO template only lists
+  districts with no DEO yet (`GET /api/admin/districts`'s `deoUserId`, distinct from
+  `deoEmail` since a CUG-only DEO has no email) — a routine download-fill-upload can't
+  accidentally overwrite an existing DEO's login.
 - **`/admin/audit`** — paginated (100/page), newest-first, auto-pruned to 30 days on read. A
   "Filter by event" `<select>` and a separate sort button (`ti-sort-descending`/`ti-sort-
   ascending`) both apply only to the currently-loaded page in memory — no extra request. Uses the

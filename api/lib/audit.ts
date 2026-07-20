@@ -5,6 +5,8 @@ type AuditEntry = {
   eventType: string;
   actorRole?: "admin" | "deo" | null;
   actorEmail?: string | null;
+  actorName?: string | null;
+  actorDesignation?: string | null;
   districtName?: string | null;
   metadata?: Record<string, unknown>;
 };
@@ -17,6 +19,8 @@ export function auditLogInsert(db: ReturnType<typeof getDb>, entry: AuditEntry) 
     eventType: entry.eventType,
     actorRole: entry.actorRole ?? null,
     actorEmail: entry.actorEmail ?? null,
+    actorName: entry.actorName ?? null,
+    actorDesignation: entry.actorDesignation ?? null,
     districtName: entry.districtName ?? null,
     metadata: entry.metadata ? JSON.stringify(entry.metadata) : null,
     createdAt: new Date().toISOString(),
