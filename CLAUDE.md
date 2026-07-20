@@ -512,14 +512,24 @@ deliberately different from the DEO side, which stays verbose/hand-holding on pu
 
 ### Excel export
 
-`exportDistrictsToXlsx()` (`frontend/lib/export.ts`, ExcelJS) is one workbook, **eight** sheets: a
-**Summary** cover sheet, one sheet per financial year (districts × the 6 PAC fields plus
-Opening Balance/Net Recoverable, read straight off the synced `pac_data` row), and a trailing
-**RC Details** sheet. FY sheets are named `FY 2021-22`, etc. Each FY sheet carries two merged
-banner rows (`SITE_TITLE_EN`, that sheet's own `dataPeriodForFY(fy)`) above the header row —
-`TITLE_ROWS` in `export.ts` is the single source of truth for how many rows that offsets the
+`exportDistrictsToXlsx()` (`frontend/lib/export.ts`, ExcelJS) is one workbook, **nine** sheets: a
+**Summary** cover sheet, a **Master** sheet, one sheet per financial year (districts × the 6 PAC
+fields plus Opening Balance/Net Recoverable, read straight off the synced `pac_data` row), and a
+trailing **RC Details** sheet. FY sheets are named `FY 2021-22`, etc. Each FY sheet carries two
+merged banner rows (`SITE_TITLE_EN`, that sheet's own `dataPeriodForFY(fy)`) above the header row
+— `TITLE_ROWS` in `export.ts` is the single source of truth for how many rows that offsets the
 header/data/freeze-pane/print-titles math; update it, not individual call sites, if another
 banner row is added. Every column header is English-only (`englishLabel()`).
+
+**Master** is one row per district, covering the full 5-year data period (1 April 2021 – 31 March
+2026) in a single view: District, then each of the 6 PAC fields **summed across all 5
+`FINANCIAL_YEARS`** (these are fresh per-year figures, so summing is legitimate — same convention
+as the Summary sheet's Gross Arrears/Recovered Amount totals), then a trailing Net Recoverable
+column. Net Recoverable is **not** summed across years here either — same rule as everywhere else
+in this workbook/the Admin Dashboard (see the Data model section above): each FY's value already
+carries forward every prior year's balance, so this column instead carries each district's FY
+2025-26 value only. Has its own TOTAL footer row (`styleTotalCell()`), same pattern as the FY
+sheets. Listed in the Summary sheet's "Sheets in this workbook" row.
 
 Each FY sheet also shows that year's own per-RC breakdown in place: every district row is
 immediately followed by one sub-row per RC it has in that FY (indented `↳ RC number — Stayed` in

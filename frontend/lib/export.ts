@@ -183,7 +183,10 @@ export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData
   const recoveredRow = summaryWs.addRow(["Total Recovered Amount (all 5 years)", totalRecovered]);
   const netRow = summaryWs.addRow(["Total Net Recoverable (as of 31 March 2026)", totalNetRecoverable]);
   summaryWs.addRow([]);
-  summaryWs.addRow(["Sheets in this workbook", FINANCIAL_YEARS.map((fy) => `FY ${fy}`).join(", ")]);
+  summaryWs.addRow([
+    "Sheets in this workbook",
+    ["Master", ...FINANCIAL_YEARS.map((fy) => `FY ${fy}`), "RC Details"].join(", "),
+  ]);
 
   summaryWs.mergeCells(1, 1, 1, 2);
   summaryWs.mergeCells(2, 1, 2, 2);
@@ -196,6 +199,56 @@ export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData
   for (const row of [grossRow, recoveredRow, netRow]) {
     row.getCell(2).numFmt = RUPEE_FORMAT;
   }
+
+  // Master sheet: one row per district, each of the 6 PAC fields summed across all 5
+  // FINANCIAL_YEARS (1 Apr 2021 – 31 Mar 2026) — these are fresh per-year figures so summing is
+  // legitimate (same convention as the Summary sheet's Gross Arrears/Recovered Amount totals
+  // above). Net Recoverable is NOT summed across years (each FY's value already carries forward
+  // every prior year's balance — see CLAUDE.md's Data model section) — this column instead
+  // carries each district's FY 2025-26 value, "total outstanding as of 31 March 2026," same as
+  // the Summary sheet's own Net Recoverable metric.
+  const masterHeader = ["District", ...PAC_FIELD_ORDER.map((f) => englishLabel(PAC_FIELD_LABELS[f])), "Net Recoverable"];
+  const masterNetRecoverableCol0 = masterHeader.length - 1;
+  const masterMoneyCols0 = [
+    ...PAC_FIELD_ORDER.map((field, i) => (isMoneyField(field) ? i + 1 : -1)).filter((c) => c >= 0),
+    masterNetRecoverableCol0,
+  ];
+  const masterRows: (string | number)[][] = sortedDistricts.map((d) => {
+    const fieldTotals = PAC_FIELD_ORDER.map((field) =>
+      FINANCIAL_YEARS.reduce((sum, fy) => {
+        const match = pacData.find((p) => p.districtId === d.id && p.financialYear === fy);
+        return sum + (match?.[field] ?? 0);
+      }, 0)
+    );
+    const finalYearMatch = pacData.find((p) => p.districtId === d.id && p.financialYear === finalFy);
+    return [d.districtName, ...fieldTotals, finalYearMatch?.netRecoverable ?? 0];
+  });
+  const masterTotalValues: (string | number)[] = ["TOTAL"];
+  for (let col = 1; col < masterHeader.length; col++) {
+    masterTotalValues.push(masterRows.reduce((sum, row) => sum + (Number(row[col]) || 0), 0));
+  }
+
+  const masterWs = wb.addWorksheet("Master", {
+    views: [{ state: "frozen", ySplit: TITLE_ROWS + 1 }],
+    pageSetup: { ...PAGE_SETUP, printTitlesRow: `1:${TITLE_ROWS + 1}` },
+  });
+  masterWs.columns = [{ width: 22 }, ...PAC_FIELD_ORDER.map(() => ({ width: 18 })), { width: 18 }];
+  masterWs.addRow([`${SITE_TITLE_EN} — Master (All Districts, All Years)`]);
+  masterWs.addRow([DATA_PERIOD_EN]);
+  const masterHeaderRow = masterWs.addRow(masterHeader);
+  const masterDataRows = masterRows.map((row) => masterWs.addRow(row));
+  const masterTotalRow = masterWs.addRow(masterTotalValues);
+
+  masterWs.mergeCells(1, 1, 1, masterHeader.length);
+  masterWs.mergeCells(2, 1, 2, masterHeader.length);
+  styleTitleCell(masterWs.getCell(1, 1));
+  styleSubtitleCell(masterWs.getCell(2, 1));
+  masterHeaderRow.eachCell((cell) => styleHeaderCell(cell));
+  for (const row of masterDataRows) {
+    for (const c of masterMoneyCols0) row.getCell(c + 1).numFmt = RUPEE_FORMAT;
+  }
+  for (const c of masterMoneyCols0) masterTotalRow.getCell(c + 1).numFmt = RUPEE_FORMAT;
+  masterTotalRow.eachCell((cell) => styleTotalCell(cell));
 
   for (const fy of FINANCIAL_YEARS) {
     const rows: (string | number)[][] = sortedDistricts.map((d) => {

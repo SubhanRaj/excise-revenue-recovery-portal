@@ -1023,6 +1023,19 @@ just extended to also require one on deny.
       filter state.
 - [x] No schema/migration/API change — both fixes are frontend-only display/navigation bugs.
 
+## Milestone 30 — Master sheet in the Excel export (done)
+
+- [x] Added a **Master** sheet to `exportDistrictsToXlsx()` (`frontend/lib/export.ts`), one row
+      per district covering the full 5-year data period (1 April 2021 – 31 March 2026) in a
+      single view: District, then each of the 6 PAC fields summed across all 5
+      `FINANCIAL_YEARS`, then a trailing Net Recoverable column carrying each district's FY
+      2025-26 value only (not summed across years, same rule as the Summary sheet/Admin
+      Dashboard — see CLAUDE.md's Data model section). Has its own TOTAL footer row, frozen
+      header, and print titles, same pattern as the FY sheets. Workbook is now 9 sheets total
+      (Summary, Master, 5× FY sheets, RC Details); Summary sheet's "Sheets in this workbook" row
+      updated to list all of them.
+- [x] No schema/migration/API change — frontend-only, `pnpm exec tsc --noEmit` passed clean.
+
 ## Backlog / not started
 
 - [ ] Real domain + DNS, and (optional) collapse `/frontend` + `/api` onto one zone via a
