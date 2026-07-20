@@ -31,9 +31,7 @@ export const POST = withErrorHandling("auth/request-magic-link", async (req: Nex
   const verifyUrl = `${process.env.FRONTEND_URL}/verify?token=${token}`;
 
   await resend.emails.send({
-    // ponytail: mail.upexciseonline.co isn't a verified Resend domain yet, so this falls
-    // back to Resend's shared sandbox sender — switch FROM_EMAIL once the domain is verified.
-    from: process.env.FROM_EMAIL ?? "onboarding@resend.dev",
+    from: `Excise Revenue Recovery Portal <${process.env.FROM_EMAIL ?? "onboarding@resend.dev"}>`,
     to: email,
     subject: "Excise Revenue Recovery Portal — Login Link",
     html: magicLinkHtml(verifyUrl, TOKEN_TTL_MINUTES),
