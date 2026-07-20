@@ -74,6 +74,7 @@ cd api
 openssl rand -base64 48 | pnpm exec wrangler secret put JWT_SECRET
 echo "re_xxxxxxxxxxxxxxxxxxxxxxxxxxxx" | pnpm exec wrangler secret put RESEND_API_KEY
 echo "https://excise-revenue-recovery-portal.pages.dev" | pnpm exec wrangler secret put FRONTEND_URL
+echo "noreply@mail.exciseup.in" | pnpm exec wrangler secret put FROM_EMAIL
 ```
 
 - `JWT_SECRET` — signs both the admin and DEO session tokens (`api/lib/session.ts`), returned in
@@ -83,6 +84,12 @@ echo "https://excise-revenue-recovery-portal.pages.dev" | pnpm exec wrangler sec
 - `FRONTEND_URL` — must exactly match the Pages production origin. Used both as the
   magic-link redirect target and as the sole allowed CORS origin in `api/middleware.ts` —
   get this wrong and every `/api/*` call from the frontend fails CORS, not just auth.
+- `FROM_EMAIL` — sender address for magic-link email, `noreply@mail.exciseup.in`. `mail.exciseup.in`
+  is verified in Resend and this same address is reused across all UP Excise projects on the same
+  Resend account (see the sibling `up-excise-spatial-revenue-optimizer` project's DEPLOY.md, which
+  uses the same domain under its own `RESEND_FROM_EMAIL` secret name). Falls back to Resend's
+  shared sandbox sender (`onboarding@resend.dev`) in code if this secret is ever unset — see
+  `api/app/api/auth/request-magic-link/route.ts`.
 
 List what's set (values are never shown) with `pnpm exec wrangler secret list`. There is no
 `db:seed`-equivalent "put a secret for every DEO" step — DEO accounts (`cug_hash`, one row

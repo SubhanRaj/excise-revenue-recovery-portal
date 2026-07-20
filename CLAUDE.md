@@ -689,5 +689,8 @@ rules:
 - No real domain/DNS yet; collapsing `/frontend` + `/api` onto one zone (which would let auth
   switch back from a Bearer token to more-secure `HttpOnly` cookies — see CLAUDE.md's Auth
   section) is deferred until one exists.
-- `mail.upexciseonline.co` (or the chosen domain) is not yet verified in Resend; `FROM_EMAIL`
-  stays on the shared sandbox sender until it is.
+- ~~`mail.upexciseonline.co` (or the chosen domain) is not yet verified in Resend~~ — resolved:
+  `mail.exciseup.in` is verified, `FROM_EMAIL` is `noreply@mail.exciseup.in` (same domain/address
+  shared with the sibling `up-excise-spatial-revenue-optimizer` project — see DEPLOY.md). This is
+  only the email-sending domain — the "no real domain/DNS yet" gap above, about this project's own
+  frontend/api hosting and the Bearer-token-vs-cookie tradeoff, is unrelated and still open.

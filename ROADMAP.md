@@ -1075,8 +1075,10 @@ just extended to also require one on deny.
       cookies are the more secure option whenever same-site is actually achievable. This does
       not require standing up a separate server — a Worker Route/Pages Function on the same zone
       as a purchased domain is enough to make both apps same-site.
-- [ ] Verify `mail.upexciseonline.co` (or chosen domain) in Resend and switch `FROM_EMAIL`
-      off the shared sandbox sender
+- [x] ~~Verify `mail.upexciseonline.co` (or chosen domain) in Resend and switch `FROM_EMAIL`
+      off the shared sandbox sender~~ — Done. `mail.exciseup.in` verified in Resend; `FROM_EMAIL`
+      Worker secret set to `noreply@mail.exciseup.in`, same domain/address shared with the sibling
+      `up-excise-spatial-revenue-optimizer` project (its `RESEND_FROM_EMAIL` secret, same value).
 - [ ] **SMS OTP login for DEOs**, replacing (or added alongside) the current CUG-hash login —
       the department already has an SMS API procured for other portals; vendor can provide
       access, and DoT template approval for a simple login-OTP text is described as routine, not
