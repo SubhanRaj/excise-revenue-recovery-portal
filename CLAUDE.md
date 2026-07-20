@@ -512,10 +512,10 @@ deliberately different from the DEO side, which stays verbose/hand-holding on pu
 
 ### Excel export
 
-`exportDistrictsToXlsx()` (`frontend/lib/export.ts`, ExcelJS) is one workbook, **nine** sheets: a
-**Summary** cover sheet, a **Master** sheet, one sheet per financial year (districts × the 6 PAC
-fields plus Opening Balance/Net Recoverable, read straight off the synced `pac_data` row), and a
-trailing **RC Details** sheet. FY sheets are named `FY 2021-22`, etc. Each FY sheet carries two
+`exportDistrictsToXlsx()` (`frontend/lib/export.ts`, ExcelJS) is one workbook, **ten** sheets: a
+**Summary** cover sheet, a **Master** sheet, a **Lock Status** sheet, one sheet per financial year
+(districts × the 6 PAC fields plus Opening Balance/Net Recoverable, read straight off the synced
+`pac_data` row), and a trailing **RC Details** sheet. FY sheets are named `FY 2021-22`, etc. Each FY sheet carries two
 merged banner rows (`SITE_TITLE_EN`, that sheet's own `dataPeriodForFY(fy)`) above the header row
 — `TITLE_ROWS` in `export.ts` is the single source of truth for how many rows that offsets the
 header/data/freeze-pane/print-titles math; update it, not individual call sites, if another
@@ -530,6 +530,15 @@ in this workbook/the Admin Dashboard (see the Data model section above): each FY
 carries forward every prior year's balance, so this column instead carries each district's FY
 2025-26 value only. Has its own TOTAL footer row (`styleTotalCell()`), same pattern as the FY
 sheets. Listed in the Summary sheet's "Sheets in this workbook" row.
+
+**Lock Status** lists which of the 75 districts have locked (submitted final data) and which
+haven't, for an Admin sending reminders. Two stacked tables in one sheet: **Locked Districts**
+(District, Locked At, Locked By — the DEO name, read off any of that district's `pac_data` rows'
+`submittedByName`/`lockedAt`, identical across all 5 since they're written once at final lock) and
+**Unlocked Districts — Not Yet Submitted** (District, Last Unlocked At/Reason/Unlocked By, off
+`districts.unlockedAt`/`unlockReason`/`unlockedBy` — blank for a district that's never been
+locked at all). Filtered purely off `districts.lockStatus` and the already-synced `pacData`
+argument — no separate audit-log fetch, since `pac_data` already carries who/when locked.
 
 Each FY sheet also shows that year's own per-RC breakdown in place: every district row is
 immediately followed by one sub-row per RC it has in that FY (indented `↳ RC number — Stayed` in

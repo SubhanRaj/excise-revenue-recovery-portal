@@ -185,7 +185,7 @@ export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData
   summaryWs.addRow([]);
   summaryWs.addRow([
     "Sheets in this workbook",
-    ["Master", ...FINANCIAL_YEARS.map((fy) => `FY ${fy}`), "RC Details"].join(", "),
+    ["Master", "Lock Status", ...FINANCIAL_YEARS.map((fy) => `FY ${fy}`), "RC Details"].join(", "),
   ]);
 
   summaryWs.mergeCells(1, 1, 1, 2);
@@ -249,6 +249,43 @@ export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData
   }
   for (const c of masterMoneyCols0) masterTotalRow.getCell(c + 1).numFmt = RUPEE_FORMAT;
   masterTotalRow.eachCell((cell) => styleTotalCell(cell));
+
+  // Lock Status sheet: which districts have locked (submitted final data) vs which haven't —
+  // an Admin uses this list to know who still needs a reminder. Locked-by/at come straight off
+  // pac_data (submittedByName/lockedAt, written once at final lock and identical across all 5 of
+  // a district's rows) — that's already in this function's `pacData` argument, so no separate
+  // audit-log fetch is needed here.
+  const lockedDistricts = sortedDistricts.filter((d) => d.lockStatus === 1);
+  const unlockedDistricts = sortedDistricts.filter((d) => d.lockStatus !== 1);
+
+  const lockWs = wb.addWorksheet("Lock Status", { pageSetup: PAGE_SETUP });
+  lockWs.columns = [{ width: 26 }, { width: 22 }, { width: 26 }, { width: 40 }];
+  lockWs.addRow([`${SITE_TITLE_EN} — Lock Status`]);
+  lockWs.addRow([DATA_PERIOD_EN]);
+  lockWs.mergeCells(1, 1, 1, 4);
+  lockWs.mergeCells(2, 1, 2, 4);
+  styleTitleCell(lockWs.getCell(1, 1));
+  styleSubtitleCell(lockWs.getCell(2, 1));
+  lockWs.addRow([]);
+
+  lockWs.addRow([`Locked Districts (${lockedDistricts.length})`]).getCell(1).font = { bold: true, size: 12 };
+  const lockedHeaderRow = lockWs.addRow(["District", "Locked At (IST)", "Locked By (DEO Name)", ""]);
+  lockedHeaderRow.eachCell((cell) => styleHeaderCell(cell));
+  for (const d of lockedDistricts) {
+    const match = pacData.find((p) => p.districtId === d.id);
+    lockWs.addRow([d.districtName, match?.lockedAt ? formatIST(match.lockedAt) : "", match?.submittedByName ?? "", ""]);
+  }
+  lockWs.addRow([]);
+
+  lockWs.addRow([`Unlocked Districts — Not Yet Submitted (${unlockedDistricts.length})`]).getCell(1).font = {
+    bold: true,
+    size: 12,
+  };
+  const unlockedHeaderRow = lockWs.addRow(["District", "Last Unlocked At (IST)", "Last Unlock Reason", "Unlocked By (Admin)"]);
+  unlockedHeaderRow.eachCell((cell) => styleHeaderCell(cell));
+  for (const d of unlockedDistricts) {
+    lockWs.addRow([d.districtName, d.unlockedAt ? formatIST(d.unlockedAt) : "", d.unlockReason ?? "", d.unlockedBy ?? ""]);
+  }
 
   for (const fy of FINANCIAL_YEARS) {
     const rows: (string | number)[][] = sortedDistricts.map((d) => {
