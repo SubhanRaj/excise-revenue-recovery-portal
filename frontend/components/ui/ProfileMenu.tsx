@@ -9,6 +9,10 @@ export type Profile = {
   districtId: number | null;
   districtName: string | null;
   email: string | null;
+  // Admin-only (see db/schema.ts's users.name/designation) — null for DEOs, whose profile
+  // display stays district-driven. Falls back to the role label / raw email when absent.
+  name?: string | null;
+  designation?: string | null;
   // Only meaningful for role "deo" — null for admin profiles. Lets deo-data-entry/page.tsx tell
   // a still-locked district apart from a freshly-unlocked one right after login.
   lockStatus?: number | null;
@@ -66,7 +70,9 @@ export default function ProfileMenu({
         >
           <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
             <i className="ti ti-shield-check text-base" />
-            <span className="font-medium">{profile.role === "admin" ? "Admin" : "District Excise Officer"}</span>
+            <span className="font-medium">
+              {profile.role === "admin" ? (profile.designation ?? "Admin") : "District Excise Officer"}
+            </span>
           </div>
           {profile.districtName && (
             <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
@@ -75,9 +81,12 @@ export default function ProfileMenu({
             </div>
           )}
           {profile.email && (
-            <div className="flex items-center gap-1.5 truncate text-slate-700 dark:text-slate-300">
-              <i className="ti ti-mail text-base text-slate-400" />
-              <span className="truncate">{profile.email}</span>
+            <div
+              className="flex items-center gap-1.5 truncate text-slate-700 dark:text-slate-300"
+              title={profile.name ? profile.email : undefined}
+            >
+              <i className={`ti ${profile.name ? "ti-user" : "ti-mail"} text-base text-slate-400`} />
+              <span className="truncate">{profile.name ?? profile.email}</span>
             </div>
           )}
           {profile.role === "admin" && (

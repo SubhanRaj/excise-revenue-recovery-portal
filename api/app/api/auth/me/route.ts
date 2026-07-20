@@ -31,6 +31,8 @@ export const GET = withErrorHandling("auth/me", async (req: NextRequest) => {
   const [row] = await db
     .select({
       email: users.email,
+      name: users.name,
+      designation: users.designation,
       districtName: districts.districtName,
       lockStatus: districts.lockStatus,
       lockedAt: users.lockedAt,
@@ -57,6 +59,8 @@ export const GET = withErrorHandling("auth/me", async (req: NextRequest) => {
   return NextResponse.json({
     ...session,
     email: row?.email ?? null,
+    name: row?.name ?? null,
+    designation: row?.designation ?? null,
     districtName: row?.districtName ?? null,
     lockStatus: row?.lockStatus ?? null,
     lockedAt: row?.lockedAt ?? null,

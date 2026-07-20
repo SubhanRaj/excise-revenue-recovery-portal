@@ -23,6 +23,11 @@ export const users = sqliteTable("users", {
   lockedAt: text("locked_at"), // ISO datetime, set when DEO submits & locks
   submittedByName: text("submitted_by_name"), // DEO's name captured on final lock
   createdAt: text("created_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
+  // Both nullable, admin-only in practice (ProfileMenu shows designation where "Admin" used to
+  // sit, name where the email used to sit, email moved to a title-attribute tooltip on the
+  // name) — not used for DEOs, whose profile display is district-driven instead.
+  name: text("name"),
+  designation: text("designation"),
 });
 
 export const magicLinkTokens = sqliteTable("magic_link_tokens", {
