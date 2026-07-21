@@ -1115,6 +1115,17 @@ just extended to also require one on deny.
       how Excel's own "totals outside the filtered range" convention reads.
 - [x] Admin Dashboard's district bar chart: top 10 → top 15 districts by Net Recoverable.
 
+## Milestone 34 — "(Principal + Interest)" dropped from the Gross Arrears label (done)
+
+- [x] `PAC_FIELD_LABELS.grossArrears` (`frontend/lib/pac-fields.ts`) shortened from "2. Gross
+      Arrears (Principal + Interest) / सकल बकाया धनराशि (मूल धन + ब्याज)" to "2. Gross Arrears /
+      सकल बकाया धनराशि" — this one constant feeds every user-facing surface (`YearStepForm`,
+      `MasterView`, `AdminDashboard`'s Field × FY table, and both the Summary/Master sheet headers
+      in the Excel export via `englishLabel()`), so the change is a single-file fix. README's field
+      table updated to match. `api/db/schema.ts`'s column comment (line 48) still says "(मूल धन +
+      ब्याज)" and Milestone 28's changelog entry above is left untouched — DB-internal, not user
+      facing.
+
 ## Backlog / not started
 
 - [ ] **Archive previous PAC data on resubmission-after-unlock** — today, when a DEO resubmits

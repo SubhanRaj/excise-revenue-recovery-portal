@@ -40,7 +40,7 @@ since they need to hook into React render/event cycles rather than run as passiv
 
   | Field             | Hindi label                                                                 | Type    |
   | ----------------- | ---------------------------------------------------------------------------- | ------- |
-  | `grossArrears`    | 2. सकल बकाया धनराशि (मूल धन + ब्याज) — Gross Arrears (Principal + Interest)   | money   |
+  | `grossArrears`    | 2. सकल बकाया धनराशि — Gross Arrears                                          | money   |
   | `rcCount`         | 3. (i) जारी आर.सी. (R.C.) की संख्या — No. of RCs Issued                      | integer |
   | `rcAmount`        | 3. (ii) आर.सी. में निहित धनराशि                                              | money   |
   | `recoveredAmount` | 4. वसूल की गयी धनराशि                                                       | money   |

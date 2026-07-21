@@ -32,7 +32,7 @@ export const PAC_FIELD_ORDER: PacField[] = [
 // first in every view (YearStepForm, MasterView, admin district detail, admin districts table,
 // Excel export), so it takes the first number and everything else shifts down one.
 export const PAC_FIELD_LABELS: Record<PacField, string> = {
-  grossArrears: "2. Gross Arrears (Principal + Interest) / सकल बकाया धनराशि (मूल धन + ब्याज)",
+  grossArrears: "2. Gross Arrears / सकल बकाया धनराशि",
   rcCount: "3. (i) No. of RCs Issued / जारी आर.सी. (R.C.) की संख्या",
   rcAmount: "3. (ii) RC Amount / आर.सी. में निहित धनराशि",
   recoveredAmount: "4. Recovered Amount / वसूल की गयी धनराशि",
