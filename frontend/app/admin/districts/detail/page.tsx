@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { FINANCIAL_YEARS, PAC_FIELD_ORDER, PAC_FIELD_LABELS, OPENING_BALANCE_LABEL, englishLabel, isMoneyField } from "@/lib/pac-fields";
 import { formatIST } from "@/lib/format";
-import { getNavDistrictId } from "@/lib/adminNav";
+import { getNavDistrictId, onNavDistrictIdChange } from "@/lib/adminNav";
 import { ApiError } from "@/lib/api";
 import { notifyToast, promptUnlockReason } from "@/lib/alerts";
 import { useAdminData } from "@/lib/useAdminData";
@@ -54,6 +54,9 @@ export default function DistrictDetailPage() {
 
   useEffect(() => {
     setDistrictId(getNavDistrictId());
+    // Jumping to a different district while already on this page doesn't navigate (same URL,
+    // no remount) — this keeps the page in sync with the header's district-jump search.
+    return onNavDistrictIdChange(setDistrictId);
   }, []);
 
   const district = districts.find((d) => d.id === districtId);

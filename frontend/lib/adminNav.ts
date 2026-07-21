@@ -3,9 +3,16 @@
 // the destination page" shape as markJustAuthed()/consumeJustAuthed() in session.ts.
 const DISTRICT_ID_KEY = "excise-portal:nav-district-id";
 const STATUS_FILTER_KEY = "excise-portal:nav-status-filter";
+const NAV_DISTRICT_EVENT = "excise-portal:nav-district-id-changed";
 
+// router.push("/admin/districts/detail") is a no-op when already on that route (same URL, no
+// remount), so the detail page's mount-only useEffect never re-reads sessionStorage — jumping
+// to a new district while already viewing one silently kept showing the old district until a
+// full page reload. Dispatching this event lets the already-mounted detail page update its
+// state directly, without relying on a route change happening at all.
 export function setNavDistrictId(id: number) {
   sessionStorage.setItem(DISTRICT_ID_KEY, String(id));
+  window.dispatchEvent(new CustomEvent<number>(NAV_DISTRICT_EVENT, { detail: id }));
 }
 
 // Not consumed on read: a reload of the detail page should keep showing the same district,
@@ -13,6 +20,12 @@ export function setNavDistrictId(id: number) {
 export function getNavDistrictId(): number | null {
   const v = sessionStorage.getItem(DISTRICT_ID_KEY);
   return v ? Number(v) : null;
+}
+
+export function onNavDistrictIdChange(cb: (id: number) => void): () => void {
+  const handler = (e: Event) => cb((e as CustomEvent<number>).detail);
+  window.addEventListener(NAV_DISTRICT_EVENT, handler);
+  return () => window.removeEventListener(NAV_DISTRICT_EVENT, handler);
 }
 
 export type StatusFilter = "locked" | "unlocked";

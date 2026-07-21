@@ -393,6 +393,7 @@ export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData
   rcHeaderRow.eachCell((cell) => styleHeaderCell(cell));
 
   let totalRcCount = 0;
+  let totalRcAmount = 0;
   for (const d of sortedDistricts) {
     const districtRcRows: (string | number)[][] = [];
     for (const fy of FINANCIAL_YEARS) {
@@ -410,12 +411,23 @@ export async function exportDistrictsToXlsx(districts: CachedDistrict[], pacData
     for (const row of districtRcRows) {
       const detailRow = rcWs.addRow(row);
       detailRow.getCell(4).numFmt = RUPEE_FORMAT;
+      totalRcAmount += Number(row[3]) || 0;
     }
   }
   if (totalRcCount === 0) {
     rcWs.addRow(["No RCs recorded across any district/FY."]);
   }
+  // AutoFilter's range ends at the last detail/summary row, deliberately excluding the grand
+  // TOTAL row added below — same convention as Excel's own "totals outside the filtered range."
   rcWs.autoFilter = { from: { row: TITLE_ROWS + 1, column: 1 }, to: { row: rcWs.rowCount, column: rcHeader.length } };
+
+  if (totalRcCount > 0) {
+    // Grand total across every district/FY — same styleTotalCell() blue-tint convention as the
+    // Master sheet and every FY sheet's own TOTAL footer row.
+    const grandTotalRow = rcWs.addRow(["TOTAL", "", `${totalRcCount} RC(s)`, totalRcAmount, ""]);
+    grandTotalRow.getCell(4).numFmt = RUPEE_FORMAT;
+    grandTotalRow.eachCell({ includeEmpty: true }, (cell) => styleTotalCell(cell));
+  }
 
   await downloadWorkbook(wb, `excise-revenue-recovery-${istFilenameStamp()}.xlsx`);
 }

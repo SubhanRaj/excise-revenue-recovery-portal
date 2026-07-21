@@ -405,7 +405,7 @@ See [README.md](./README.md)'s App flow → Admin for a one-line summary of each
 separate routes, not an in-page toggle:
 
 - **`/admin`** (`AdminDashboard.tsx`) — colorful clickable KPI cards (Districts/Locked/Unlocked/
-  Gross Arrears/Net Recoverable, each its own accent color), a top-5-districts Chart.js bar
+  Gross Arrears/Net Recoverable, each its own accent color), a top-15-districts Chart.js bar
   chart, and a Chart.js lock-status donut, stacked as two full-width rows. **Locked is green,
   Unlocked is red** (`LOCKED_COLOR`/`UNLOCKED_COLOR` in `AdminDashboard.tsx`) — inverted from the
   usual convention, because the portal's goal is 100% locked, so unlocked is what needs

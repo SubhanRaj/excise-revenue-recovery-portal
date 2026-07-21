@@ -1094,6 +1094,27 @@ just extended to also require one on deny.
 - [x] Verified against the exact CI steps before pushing: `pnpm exec tsc --noEmit` and
       `pnpm run build` for both `api` and `frontend`, all clean.
 
+## Milestone 33 — Same-page district-jump bug fix, RC Details grand total, dashboard top-15 (done)
+
+- [x] **Fixed a real UI bug**: using `AppHeader`'s "jump to district" search while already on
+      `/admin/districts/detail` left the page stuck showing the previously open district until a
+      full page reload. Root cause: `router.push("/admin/districts/detail")` is a no-op when
+      already on that exact route (same URL, no remount, no route-change event), but the detail
+      page's `districtId` state was only ever set inside a mount-only `useEffect` reading
+      `sessionStorage` once (see the "Which district to show travels via sessionStorage" section
+      in CLAUDE.md). Fixed at the source in `lib/adminNav.ts`: `setNavDistrictId()` now also
+      dispatches a `CustomEvent`, and a new `onNavDistrictIdChange()` subscriber lets the
+      already-mounted detail page update its `districtId` state directly regardless of whether a
+      route change actually happens. Generic fix — covers any future same-page district jump, not
+      just this one call site.
+- [x] **RC Details sheet grand total**: the Excel export's "RC Details" sheet (grouped per
+      district, one bold summary row + its RC rows) previously had no cross-district total. Added
+      a trailing `TOTAL` row (same `styleTotalCell()` blue-tint convention as the Master/FY sheets'
+      own TOTAL rows) summing RC count and RC Amount across every district and FY. Placed after
+      the `autoFilter` range so it doesn't get swept into District/FY/Stayed filtering, matching
+      how Excel's own "totals outside the filtered range" convention reads.
+- [x] Admin Dashboard's district bar chart: top 10 → top 15 districts by Net Recoverable.
+
 ## Backlog / not started
 
 - [ ] **Archive previous PAC data on resubmission-after-unlock** — today, when a DEO resubmits
