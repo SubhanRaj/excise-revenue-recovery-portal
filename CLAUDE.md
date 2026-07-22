@@ -130,21 +130,24 @@ exceptions; when adding a new route, wrap it from the start rather than adding t
 ## Auth (`api/lib/session.ts`, `api/lib/auth-guard.ts`, `api/middleware.ts`, `frontend/lib/session.ts`)
 
 See [README.md](./README.md)'s App flow → Auth for the CUG/magic-link flow overview. Session
-auth is a **Bearer token, not a cookie** — this was a deliberate migration away from cookies
-(see "Why not cookies" below); don't reintroduce `Set-Cookie`/`req.cookies` for session auth
-without re-reading that section first. Rules an agent must preserve:
+auth is an **`HttpOnly`/`Secure`/`SameSite=Lax` cookie, not a Bearer token** — this is the
+result of Rollout 2 in ROADMAP.md's Milestone 36, reverting a Milestone-21-era
+Bearer-token detour once `excisebakaya.exciseup.in` made frontend and API a true single origin
+(see "Why cookies again" below for the full history of both migrations). Rules an agent must
+preserve:
 
-- **Two separate token slots**, keyed by role in `frontend/lib/session.ts`'s `localStorage`
-  (`excise-portal:session:admin` / `excise-portal:session:deo`) — never merge back into one.
+- **Two separate cookies**, keyed by role (`__admin_session` / `__deo_session`, named in
+  `api/lib/session.ts`'s `cookieName()`) — never merge back into one shared cookie.
   `POST /api/auth/verify-cug` and `POST /api/auth/verify-magic-link` return `{ role,
-  districtId, token }` in the JSON body (not a `Set-Cookie` header); the frontend stores it via
-  `saveClientSession()` and attaches it on every subsequent call via `apiFetch(path, init,
-  role)`'s third argument, which reads `getToken(role)` and sets `Authorization: Bearer
-  <token>`. Every API route that needs a session calls `requireSession(req, "admin" | "deo")`
-  (`api/lib/auth-guard.ts`), which reads that header — **never add `req.cookies` back into
-  `requireSession`**. The frontend still passes `?role=admin`/`?role=deo` on `GET
-  /api/auth/me` and `POST /api/auth/logout` (the query param picks which role's session to
-  check/log; the header carries which role's token actually gets sent).
+  districtId }` in the JSON body (no `token` field) and set the cookie via
+  `setSessionCookie()` on the response (`HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`,
+  matching `SESSION_TTL_SECONDS`, no `Domain=` attribute so it can't leak to sibling subdomains
+  like `sro.exciseup.in`). Every API route that needs a session calls
+  `requireSession(req, "admin" | "deo")` (`api/lib/auth-guard.ts`), which reads
+  `req.cookies.get(cookieName(role))?.value` — **never add an `Authorization`/Bearer-header read
+  back into `requireSession`**. The frontend still passes `?role=admin`/`?role=deo` on `GET
+  /api/auth/me` and `POST /api/auth/logout` (the query param picks which role's cookie to
+  check/clear; the browser attaches whichever cookies exist automatically, same-origin).
 - Real CUG numbers start with `94544`; `app/login/page.tsx` gates on this prefix before
   hashing/sending, and the error is the same generic "Invalid user" a real auth failure shows —
   never name the prefix rule in the message. The one demo account is matched against a
@@ -153,61 +156,72 @@ without re-reading that section first. Rules an agent must preserve:
 - `frontend/app/verify/page.tsx` requires an explicit button click (POST, not GET) so email
   prefetchers can't burn the magic-link token.
 - `GET /api/auth/me?role=admin|deo` is the source of truth for `{role, districtId}` on every
-  gated page load — call it directly (with that role's token attached), never gate a page on
-  the `excise-portal:last-role` hint in `frontend/lib/session.ts` (that hint is shared across
-  the whole browser and only exists for `/`'s first-paint redirect guess — it goes stale the
-  instant the other role logs in on any tab, and carries no token of its own). A 401 here means
-  "not logged in as this role," full stop — an expired token and a missing one look identical to
-  the frontend, which is correct: there's no server-side revocation list to consult either way
-  (see below). `GET /api/auth/me?role=deo` also returns `lockStatus`/`lockedAt`/
-  `submittedByName`, re-asked on every load (never cached) since an Admin unlock can happen at
-  any time.
+  gated page load — call it directly, never gate a page on the `excise-portal:last-role` hint in
+  `frontend/lib/session.ts` (`getLastRole()`/`markLastRole()`/`clearLastRole()` — that hint is
+  shared across the whole browser and only exists for `/`'s first-paint redirect guess; it goes
+  stale the instant the other role logs in on any tab, and it isn't the credential — the cookie
+  is, and frontend JS can't read it by design). A 401 here means "not logged in as this role,"
+  full stop — an expired cookie and a missing one look identical to the frontend, which is
+  correct: there's no server-side revocation list to consult either way (see below). `GET
+  /api/auth/me?role=deo` also returns `lockStatus`/`lockedAt`/`submittedByName`, re-asked on
+  every load (never cached) since an Admin unlock can happen at any time.
 - Session tokens are **stateless JWTs with no server-side revocation** — logout and "lock kills
-  the session" are both purely client-side now (there is no `denylist`/`revoked_tokens` table,
-  and adding one would be a real feature, not a bug fix — don't add it speculatively). `POST
-  /api/auth/logout?role=` only records an audit-log event; the frontend discards its own stored
-  token immediately after that call (`AppHeader.logout()`, `deo-data-entry/page.tsx`'s
-  `logoutLocked()`). Submitting a DEO's final payload atomically locks the district in D1; the
-  frontend then calls `clearClientSession("deo")` right after a successful submit (an Admin
-  session in the same browser is untouched, since it's a different token slot) — the DEO can
-  still technically use that same token until it expires (7 days) if they somehow kept a copy
-  outside the app, same residual-validity trade-off any stateless-JWT design accepts.
+  the session" both just clear the cookie client-side (there is no `denylist`/`revoked_tokens`
+  table, and adding one would be a real feature, not a bug fix — don't add it speculatively).
+  `POST /api/auth/logout?role=` records an audit-log event and calls `clearSessionCookie()` on
+  the response; the frontend also calls `clearLastRole()` right after
+  (`AppHeader.logout()`, `deo-data-entry/page.tsx`'s `logoutLocked()`). Submitting a DEO's final
+  payload atomically locks the district in D1; the frontend then calls `clearLastRole("deo")`
+  right after a successful submit (an Admin session in the same browser is untouched, since it's
+  a different cookie) — the underlying JWT is still technically valid until it expires (7 days)
+  since there's no revocation list, same residual-validity trade-off any stateless-JWT design
+  accepts; the district lock itself, not the cookie, is what actually stops re-entry.
+- **`api/middleware.ts` is now a no-op** — same-origin means no CORS preflight/OPTIONS handling
+  is needed. Kept as an empty passthrough file, not deleted, only because `api/middleware.ts`
+  (not `proxy.ts`) is a load-bearing filename under this Next.js version (see DEPLOY.md's
+  redeploy section).
+- **Known local-dev gap**: `next dev` (`:3000`) and `wrangler dev` (`:8787`) are genuinely
+  cross-origin ports. `SameSite=Lax` cookies aren't sent on the `fetch()` calls between them
+  (`Lax` only covers top-level navigations cross-site), so a manual local login will appear to
+  succeed and then 401 on the next `/api/auth/me` call. Not solved (a local single-origin dev
+  proxy is more setup than warranted) — the e2e suite exercises the real deployed domain instead
+  (`playwright.config.ts`'s default `baseURL`), unaffected by this gap.
 
-### Why not cookies
+### Why cookies again
 
-The original design used two `HttpOnly; Secure; SameSite=None` cookies (`__admin_session`,
-`__deo_session`), which is the standard secure pattern for a session — but only when the
-browser cooperates. `/frontend` (Pages, `*.pages.dev`) and `/api` (Worker, `*.workers.dev`) are
-different public-suffix domains in production, so that cookie is a **third-party cookie** by
-definition, and this repeatedly broke real logins: Safari ITP blocks it outright, and it
+Two migrations happened here, in opposite directions, each correct for its own constraint at
+the time:
+
+**Cookies → Bearer token (Milestone 21).** The original design used two `HttpOnly; Secure;
+SameSite=None` cookies, which is the standard secure pattern for a session — but only when the
+browser cooperates. `/frontend` (Pages, `*.pages.dev`) and `/api` (Worker, `*.workers.dev`) were
+different public-suffix domains at the time, so that cookie was a **third-party cookie** by
+definition, and this repeatedly broke real logins: Safari ITP blocked it outright, and it
 started intermittently failing in plain **Chrome** too (Incognito blocks third-party cookies by
 default; a locked-down/managed profile can too) — reproduced live during a demo as "enter CUG,
-page just reloads back to the login screen" (the CUG POST succeeds, the cookie silently never
-sticks, the next page's `/api/auth/me` 401s, and the app bounces back). No CORS header fixes
-this — it's enforced entirely by the browser's own cookie policy before any response header is
-even read.
+page just reloads back to the login screen." No CORS header fixes that — it's enforced entirely
+by the browser's own cookie policy before any response header is even read. A Bearer token isn't
+a cookie, so no browser's cross-site-cookie policy applied to it at all — that was the actual
+fix for that era, not a workaround. Trade-off accepted at the time: a token in `localStorage` is
+readable by same-origin JS, so an XSS bug in the frontend could steal it (unlike an `HttpOnly`
+cookie) — assessed as acceptable because there was (and still is) no path where DEO-entered or
+admin-entered data is rendered as raw HTML anywhere (the only `dangerouslySetInnerHTML` in the
+frontend is a static, hardcoded dark-mode bootstrap script in `app/layout.tsx`, not user data).
 
-A Bearer token isn't a cookie, so no browser's cross-site-cookie policy applies to it at all —
-that's the actual fix, not a workaround. `api/middleware.ts` now sends
-`Access-Control-Allow-Origin: *` (no `Access-Control-Allow-Credentials`, since there's no cookie
-credential to protect) — this is safe specifically *because* there's no ambient credential a
-malicious page could piggyback on; a wildcard origin can't make the browser attach a token that
-was never automatically sent in the first place. Trade-off accepted deliberately: a token in
-`localStorage` is readable by same-origin JS, so an XSS bug in the frontend could steal it
-(unlike an `HttpOnly` cookie). Assessed as acceptable for this app because there is currently no
-path where DEO-entered or admin-entered data is rendered as raw HTML anywhere (checked: the only
-`dangerouslySetInnerHTML` in the frontend is a static, hardcoded dark-mode bootstrap script in
-`app/layout.tsx`, not user data) — if that ever changes (someone adds a `dangerouslySetInnerHTML`
-on user-controlled input), re-assess this trade-off before shipping it.
+**Bearer token → cookies (Milestone 35, Rollout 2).** `excisebakaya.exciseup.in` (Milestone 35,
+Rollout 1) put frontend and API on a true single origin — a path-scoped Worker Route for
+`/api/*` alongside Pages serving everything else, not a domain merge (see ROADMAP.md's Milestone 35).
+That removes the third-party-cookie problem entirely: same-origin requests always carry
+same-origin cookies regardless of `SameSite`, and `SameSite=Lax` is real CSRF hardening the old
+cross-origin design could never use. `HttpOnly` also closes the XSS-token-theft trade-off
+Milestone 21 had explicitly accepted as a concession, not a preference. This is why the switch
+back happened now and not speculatively — the exact condition CLAUDE.md had flagged ("if this
+app ever gets a custom domain, switch back to cookies") was met.
 
-**If this app ever gets a custom domain — and it doesn't strictly need a separate server for
-that, just a Cloudflare Worker Route or Pages Function on the same zone fronting both
-`/frontend` and `/api` under one registrable domain — switch back to `HttpOnly` cookies
-(`SameSite=Lax` or `Strict` becomes possible once same-site) instead of a Bearer token.**
-Cookies are the more secure option (immune to XSS token theft) whenever same-site is actually
-achievable; the Bearer-token design here is a deliberate concession to the two-separate-origins
-constraint, not a general recommendation. See DEPLOY.md's "Known deployment constraints" and
-ROADMAP.md's Backlog for the standing reminder to revisit this if a domain shows up.
+If a future infra change ever reintroduces a genuine cross-origin split between frontend and
+API (e.g. reverting the custom domain, or serving one of the two apps from a different zone),
+re-read this whole section before touching auth — that's exactly the condition that made
+Milestone 21's Bearer-token detour necessary the first time.
 
 ## Portal identity strings (`frontend/lib/site.ts`)
 

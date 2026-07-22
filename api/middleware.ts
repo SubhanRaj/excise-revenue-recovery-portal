@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 // No-op now: frontend and API are a true single origin (excisebakaya.exciseup.in — see
-// DOMAIN_MIGRATION.md), so no cross-origin request ever reaches this Worker and no CORS
+// ROADMAP.md's Milestone 35), so no cross-origin request ever reaches this Worker and no CORS
 // headers/OPTIONS preflight handling is needed. Session auth moved from a Bearer token to an
 // HttpOnly cookie in the same rollout (lib/session.ts / lib/auth-guard.ts). Kept as an empty
 // file (not deleted) only because `api/middleware.ts` — not `proxy.ts` — is a load-bearing

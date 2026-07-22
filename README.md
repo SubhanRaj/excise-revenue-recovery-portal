@@ -13,10 +13,11 @@ Two completely decoupled apps, deployed as separate Cloudflare resources:
 | `/frontend` | Next.js App Router, `output: "export"` — behaves as a static SPA        | Cloudflare Pages         |
 | `/api`      | Next.js App Router, native `app/api/**/route.ts` only (no Hono/Express) | Cloudflare Worker (via [OpenNext](https://opennext.js.org/cloudflare)) + D1 |
 
-They talk over plain `fetch`, cross-origin, authenticated via a Bearer token rather than a
-cookie (see [CLAUDE.md](./CLAUDE.md) for the CORS/auth setup and why). There is no shared
-package — types that overlap (financial years, PAC field order) are intentionally duplicated in
-each app.
+They talk over plain `fetch`, same-origin in production (`excisebakaya.exciseup.in`, a Pages
+custom domain plus a path-scoped Worker Route for `/api/*`), authenticated via an `HttpOnly`
+cookie (see [CLAUDE.md](./CLAUDE.md)'s Auth section for the setup and its history). There is no
+shared package — types that overlap (financial years, PAC field order) are intentionally
+duplicated in each app.
 
 Client-side libraries (SweetAlert2, SheetJS, Tabler Icons, Google Fonts, Tailwind CSS v4,
 Chart.js) load from the jsDelivr CDN in `frontend/app/layout.tsx` rather than being bundled —
@@ -100,21 +101,21 @@ for a DEO's own not-yet-submitted draft.
 
 - **DEO (CUG)**: frontend hashes a 10-digit mobile number client-side (Web Crypto), server
   matches it against `users.cug_hash` — the raw number is never sent, except during bulk
-  provisioning (see below). Session: a Bearer token stored under a `deo`-keyed localStorage slot.
+  provisioning (see below). Session: an `HttpOnly` cookie, `__deo_session`.
 - **Admin (magic link)**: Admin requests a link by email, clicks through a 15-minute token,
-  server verifies and issues a session. Session: a Bearer token stored under an `admin`-keyed
-  localStorage slot. The two slots are independent, so a DEO and an Admin session can coexist in
-  the same browser.
-- Both are 7-day JWTs, issued in the verify response body (not a cookie) and sent back as
-  `Authorization: Bearer <token>` on every subsequent request. This was a Bearer-token, not a
-  cookie, by design: the two apps are cross-origin (different public-suffix domains) in
-  production, and a `SameSite=None` session cookie there is a third-party cookie that Safari ITP
-  blocks outright and that Chrome blocks too under common conditions (Incognito, a locked-down
-  profile) — this broke real logins in production. See [CLAUDE.md](./CLAUDE.md)'s Auth section
-  for the full incident and the trade-off accepted (a token in localStorage is XSS-readable,
-  unlike an `HttpOnly` cookie; judged acceptable since no user-entered data is ever rendered as
-  raw HTML anywhere in this app). If a custom domain ever puts both apps on one zone, cookies
-  become the better option again and should replace this.
+  server verifies and issues a session. Session: an `HttpOnly` cookie, `__admin_session`. The two
+  cookies are independent, so a DEO and an Admin session can coexist in the same browser.
+- Both are 7-day JWTs, set on the verify response as `HttpOnly; Secure; SameSite=Lax` cookies —
+  the browser attaches them automatically on every subsequent same-origin request, no
+  `Authorization` header needed. This app briefly ran a Bearer-token-in-localStorage design
+  instead (Milestone 21) back when frontend and API were cross-origin (different public-suffix
+  domains) in production, since a `SameSite=None` cookie there is a third-party cookie that
+  Safari ITP blocks outright and that Chrome blocks too under common conditions — that broke
+  real logins in production. Once a custom domain (`excisebakaya.exciseup.in`) made both apps a
+  true single origin, the design reverted to `HttpOnly` cookies — the more secure option (immune
+  to XSS token theft, unlike `localStorage`) — since the cross-origin constraint that justified
+  Bearer tokens no longer applies. See [CLAUDE.md](./CLAUDE.md)'s Auth section ("Why cookies
+  again") for the full history of both migrations.
 
 ### DEO data entry
 
@@ -168,11 +169,11 @@ flowchart TD
     EmailSent --> VerifyPage["/verify?token=...<br/>(explicit 'Verify &amp; Continue' click)"]
     VerifyPage --> VerifyMagic["POST /api/auth/verify-magic-link"]
 
-    VerifyCug --> Token["{ role, districtId, token }<br/>Bearer JWT — stored per-role<br/>in localStorage, not a cookie"]
+    VerifyCug --> Token["{ role, districtId }<br/>+ Set-Cookie: __*_session<br/>(HttpOnly, 7-day JWT)"]
     VerifyMagic --> Token
 
     Token --> RoleCheck{"role"}
-    RoleCheck -->|"deo"| DeoMe["GET /api/auth/me?role=deo<br/>Authorization: Bearer …"]
+    RoleCheck -->|"deo"| DeoMe["GET /api/auth/me?role=deo<br/>cookie attached automatically"]
     RoleCheck -->|"admin"| AdminMe["GET /api/auth/me?role=admin"]
 
     subgraph DEO["DEO — /deo-data-entry"]
@@ -192,7 +193,7 @@ flowchart TD
         MasterView --> Confirm1["confirmFinalSubmit()"]
         Confirm1 --> Confirm2["promptDeoNameAndLock()"]
         Confirm2 --> SubmitApi["POST /api/pac-data/submit"]
-        SubmitApi --> LockedNow["Atomic: delete + insert 5 years,<br/>compute Opening Balance /<br/>Net Recoverable, lock_status = 1,<br/>discard local token"]
+        SubmitApi --> LockedNow["Atomic: delete + insert 5 years,<br/>compute Opening Balance /<br/>Net Recoverable, lock_status = 1,<br/>clear last-role hint client-side"]
         LockedNow --> BackToLogin(["Redirect to /login"])
     end
 

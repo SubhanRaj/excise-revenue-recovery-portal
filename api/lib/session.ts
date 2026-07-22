@@ -39,7 +39,7 @@ export function cookieName(role: "deo" | "admin"): string {
 
 // HttpOnly so frontend JS never touches the token; Secure + SameSite=Lax is real CSRF hardening
 // now that frontend and API are a true single origin (excisebakaya.exciseup.in — see
-// DOMAIN_MIGRATION.md). No Domain= attribute: a host-only cookie can't leak to sibling
+// ROADMAP.md's Milestone 35). No Domain= attribute: a host-only cookie can't leak to sibling
 // subdomains like sro.exciseup.in.
 export function setSessionCookie(res: NextResponse, role: "deo" | "admin", token: string) {
   res.cookies.set(cookieName(role), token, {

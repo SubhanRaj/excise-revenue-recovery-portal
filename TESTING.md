@@ -4,9 +4,12 @@
 
 `frontend/e2e/login.spec.ts` drives the actual installed Chrome browser (not Playwright's
 bundled Chromium) against the **live production deployment** by default — not a local dev
-server. This is deliberate: the bug this suite exists to catch (cross-origin cookies
-between Pages and the Worker) only reproduces against the real deployed origins, not
-`localhost`.
+server. Originally deliberate because the bug this suite existed to catch (cross-origin cookies
+between Pages and the Worker) only reproduced against the real deployed origins, not
+`localhost`; still true today for a different reason post-Milestone-36 — frontend and API are
+same-origin in production (`excisebakaya.exciseup.in`) but genuinely cross-origin ports in local
+`next dev`/`wrangler dev` (`:3000` vs `:8787`), so `SameSite=Lax` cookies won't be sent locally
+either (see CLAUDE.md's Auth section).
 
 ```bash
 cd frontend
@@ -38,12 +41,13 @@ often driven from a sandboxed/non-interactive environment with no window server 
    `/api/auth/request-magic-link` for the real superadmin, reads the freshly issued token
    straight out of production D1 (`wrangler d1 execute --remote`, read-only `SELECT`), then
    drives the browser through `/verify?token=...` → click "Verify & Continue" → asserts
-   the browser actually lands on `/admin` (not bounced back to `/login`) and that a session
-   token is stored in `localStorage` (`excise-portal:session:admin` — session auth is a Bearer
-   token, not a cookie, see CLAUDE.md's Auth section for why). This test exists because that
-   exact bounce-with-no-error was reported as a live bug — see "Incidents" below for what it
-   actually was, and for the later incident that changed this from a cookie check to a
-   localStorage check.
+   the browser actually lands on `/admin` (not bounced back to `/login`) and that an
+   `__admin_session` `HttpOnly` cookie is present in the browser context (session auth is an
+   `HttpOnly` cookie again as of Milestone 36 — see CLAUDE.md's Auth section, "Why cookies
+   again"). This test exists because that exact bounce-with-no-error was reported as a live
+   bug — see "Incidents" below for the original cookie incident, the Bearer-token migration that
+   followed, and the later Milestone 36 migration back to cookies once a custom domain existed
+   (each change updated this test's assertion to match: cookie → `localStorage` → cookie again).
 
 ### Why this needs `api/` sibling access
 

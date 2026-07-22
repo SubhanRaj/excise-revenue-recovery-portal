@@ -1151,10 +1151,47 @@ just extended to also require one on deny.
       `excisebakaya.exciseup.in/api/auth/me?role=admin` (401, expected unauthenticated) both
       resolve correctly, and confirmed the old `*.pages.dev`/`*.workers.dev` URLs still serve
       identically (untouched, by design — not deleted).
-- [x] Full plan documented in [DOMAIN_MIGRATION.md](./DOMAIN_MIGRATION.md) before implementation,
-      including the still-pending Rollout 2 (Bearer token → `HttpOnly` cookies, tracked in the
-      Backlog entry below — not done in this milestone). DEO SMS OTP work stayed explicitly out of
-      scope throughout.
+- [x] Full plan documented in a standalone `DOMAIN_MIGRATION.md` before implementation (same
+      pattern as `R2_PDF_ATTACHMENT_REPROVISIONING.md`), including the then-still-pending
+      Rollout 2 (Bearer token → `HttpOnly` cookies, shipped as Milestone 36 below). DEO SMS OTP
+      work stayed explicitly out of scope throughout. That plan doc has since been folded into
+      this changelog and CLAUDE.md's Auth section per its own stated intent, then deleted.
+
+## Milestone 36 — Rollout 2: Bearer token → `HttpOnly` cookies (done)
+
+- [x] `api/lib/session.ts` gained `cookieName(role)` (`__admin_session`/`__deo_session`),
+      `setSessionCookie()`/`clearSessionCookie()` (`HttpOnly; Secure; SameSite=Lax; Path=/;
+      Max-Age=604800`, matching the existing `SESSION_TTL_SECONDS`, no `Domain=` attribute so it
+      stays host-only). `api/lib/auth-guard.ts`'s `requireSession()` now reads
+      `req.cookies.get(cookieName(role))?.value` instead of an `Authorization` header.
+      `verify-cug`/`verify-magic-link` set the cookie on the response instead of returning a
+      `token` field; `logout` clears it in addition to its existing audit-log write.
+- [x] `api/middleware.ts` stripped to a no-op passthrough (no cross-origin request ever reaches
+      this Worker anymore, so the CORS/OPTIONS handling was dead code) — kept as an empty file,
+      not deleted, since `middleware.ts` (not `proxy.ts`) is a load-bearing filename under this
+      Next.js version.
+- [x] Frontend dropped all client-side token storage: `frontend/lib/session.ts`'s
+      `ClientSession`/`saveClientSession`/`readClientSession`/`getToken`/`clearClientSession` were
+      replaced with `markLastRole`/`getLastRole`/`clearLastRole` — a non-authoritative hint for
+      `/`'s first-paint redirect guess only (same purpose the old `LAST_ROLE_KEY` already served
+      alongside the token). `frontend/lib/api.ts`'s `apiFetch`/`apiFetchForm`/`apiFetchBlob`
+      dropped the `Authorization` header entirely (same-origin `fetch()` already includes cookies
+      by default) — the `role` parameter stayed on all three functions' signatures (now unused)
+      to avoid touching every call site across 10 files.
+- [x] `frontend/e2e/login.spec.ts` swapped its `localStorage` token assertion for a
+      `page.context().cookies()` check (`__admin_session` present, `httpOnly: true`).
+      `playwright.config.ts`'s default `baseURL` and the test's `API_URL` both moved from the old
+      `*.pages.dev`/`*.workers.dev` URLs to `excisebakaya.exciseup.in`, since the whole point of
+      this rollout is exercising real same-origin cookie behavior.
+- [x] Deployed both apps together (cookie support in the API and no-more-Bearer-header in the
+      frontend aren't independently useful) — this was a hard cutover, every admin logged in at
+      deploy time was forced to re-login. Verified live: `verify-cug` with a bad hash still 401s
+      cleanly, `GET /api/auth/me?role=admin` 401s with no cookie, and both old
+      `*.pages.dev`/`*.workers.dev` URLs kept serving identically throughout (untouched, per the
+      original plan's "don't delete anything" requirement).
+- [x] CLAUDE.md's Auth section rewritten in place ("Why cookies again" replaces "Why not
+      cookies", documenting both migrations and why each was correct for its own constraint);
+      DEPLOY.md's secrets/known-constraints/verification sections updated to match.
 
 ## Backlog / not started
 
@@ -1193,14 +1230,7 @@ just extended to also require one on deny.
       Worker Route or Pages Function~~ — Done (Milestone 35): `excisebakaya.exciseup.in` custom
       domain live, `/frontend` and `/api` kept as separate deployments unified via a path-scoped
       Worker Route (not merged into one Worker).
-- [ ] **Rollout 2 of DOMAIN_MIGRATION.md — switch auth back from a Bearer token to `HttpOnly`
-      cookies**, now that the custom domain (Milestone 35) makes frontend and API a true single
-      origin (`SameSite=Lax` becomes possible and is real CSRF hardening, unlike the old
-      cross-origin design). Full file-by-file plan already written in DOMAIN_MIGRATION.md
-      (two cookie names `__admin_session`/`__deo_session`, `api/lib/auth-guard.ts`,
-      `api/middleware.ts` CORS cleanup, `frontend/lib/session.ts`/`api.ts` token removal, etc.) —
-      this is a hard cutover (every logged-in admin is forced to re-login the instant it deploys),
-      to be scheduled for a low-traffic window, not done speculatively alongside Milestone 35.
+- [x] ~~Rollout 2: switch auth back from a Bearer token to `HttpOnly` cookies~~ — Done (Milestone 36).
 - [x] ~~Verify `mail.upexciseonline.co` (or chosen domain) in Resend and switch `FROM_EMAIL`
       off the shared sandbox sender~~ — Done. `mail.exciseup.in` verified in Resend; `FROM_EMAIL`
       Worker secret set to `noreply@mail.exciseup.in`, same domain/address shared with the sibling

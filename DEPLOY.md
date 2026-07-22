@@ -11,7 +11,7 @@ there) and [CLAUDE.md](./CLAUDE.md) for how the system itself works.
 | Resource        | Value                                                                 |
 | ---------------- | ---------------------------------------------------------------------- |
 | Cloudflare account | `Subhan` (`4d93d751987b8d9ff101445570e72711`)                       |
-| Custom domain (primary) | https://excisebakaya.exciseup.in — Pages custom domain + a path-scoped Worker Route for `/api/*` (see DOMAIN_MIGRATION.md) |
+| Custom domain (primary) | https://excisebakaya.exciseup.in — Pages custom domain + a path-scoped Worker Route for `/api/*` (see ROADMAP.md's Milestone 35) |
 | API Worker        | `excise-revenue-recovery-api` — https://excise-revenue-recovery-api.shubhanraj2002.workers.dev (still live, kept via `workers_dev: true` in `api/wrangler.jsonc`) |
 | Pages project      | `excise-revenue-recovery-portal` — https://excise-revenue-recovery-portal.pages.dev (still live) |
 | D1 database        | `excise-revenue-recovery-db` (id `4f3e37fd-006a-4bce-b2d3-4bfb8bb16248`), region APAC |
@@ -84,14 +84,11 @@ echo "noreply@mail.exciseup.in" | pnpm exec wrangler secret put FROM_EMAIL
 echo "the-owners-actual-login-email@example.com" | pnpm exec wrangler secret put OWNER_EMAIL
 ```
 
-- `JWT_SECRET` — signs both the admin and DEO session tokens (`api/lib/session.ts`), returned in
-  the verify response body and sent back as `Authorization: Bearer <token>` (not a cookie — see
-  CLAUDE.md's Auth section for why). Rotating it invalidates every active session.
+- `JWT_SECRET` — signs both the admin and DEO session tokens (`api/lib/session.ts`), set as an
+  `HttpOnly`/`Secure`/`SameSite=Lax` cookie on the verify response (`__admin_session`/
+  `__deo_session` — see CLAUDE.md's Auth section). Rotating it invalidates every active session.
 - `RESEND_API_KEY` — sends magic-link emails (`api/app/api/auth/request-magic-link/route.ts`).
-- `FRONTEND_URL` — the magic-link redirect target (`https://excisebakaya.exciseup.in` as of the
-  custom-domain rollout, see DOMAIN_MIGRATION.md). Also still checked as the allowed CORS origin
-  in `api/middleware.ts` — get this wrong and every `/api/*` call from the frontend fails CORS,
-  not just auth.
+- `FRONTEND_URL` — the magic-link redirect target, `https://excisebakaya.exciseup.in`.
 - `FROM_EMAIL` — sender address for magic-link email, `noreply@mail.exciseup.in`. `mail.exciseup.in`
   is verified in Resend and this same address is reused across all UP Excise projects on the same
   Resend account (see the sibling `up-excise-spatial-revenue-optimizer` project's DEPLOY.md, which
@@ -142,7 +139,7 @@ pnpm run pages:deploy   # = wrangler pages deploy out --project-name ... --branc
 ```
 
 `NEXT_PUBLIC_API_URL=""` is correct now that frontend and API share an origin
-(`excisebakaya.exciseup.in`, via a path-scoped Worker Route — see DOMAIN_MIGRATION.md):
+(`excisebakaya.exciseup.in`, via a path-scoped Worker Route — see ROADMAP.md's Milestone 35):
 `apiFetch` resolves `/api/...` relative to whatever host served the page. Only local dev
 (`http://localhost:8787`, genuinely a different port) needs the fallback in
 `frontend/lib/config.ts`.
@@ -173,11 +170,7 @@ FRONT=https://excisebakaya.exciseup.in
 # API=https://excise-revenue-recovery-api.shubhanraj2002.workers.dev
 # FRONT=https://excise-revenue-recovery-portal.pages.dev
 
-curl -s -o /dev/null -w "%{http_code}\n" "$API/api/auth/me"   # expect 401, no Authorization header sent
-
-curl -s -i -X OPTIONS "$API/api/auth/request-magic-link" \
-  -H "Origin: $FRONT" -H "Access-Control-Request-Method: POST" \
-  | grep -i access-control                                    # expect the Pages origin echoed back
+curl -s -o /dev/null -w "%{http_code}\n" "$API/api/auth/me?role=admin"   # expect 401, no cookie sent
 
 curl -s -i "$FRONT/login" | head -1                            # expect HTTP/2 200, not 503
 ```
@@ -219,18 +212,15 @@ curl -s -o /dev/null -w "%{http_code}\n" "$API/api/admin/unlock-requests"    # e
 
 ## Known deployment constraints
 
-- **Custom domain is now live (`excisebakaya.exciseup.in`), but auth is still Bearer-token —
-  Rollout 1 of DOMAIN_MIGRATION.md, not yet Rollout 2.** Frontend and API were cross-origin
-  (`*.pages.dev` vs `*.workers.dev`) when the Bearer-token design was adopted (session auth used
-  to be two `SameSite=None; Secure` cookies, which is exactly the shape Safari ITP blocks and
-  Chrome blocks under common conditions — this broke real logins in production, see TESTING.md's
-  Incidents section — so auth was migrated to a Bearer token instead, `api/lib/session.ts`,
-  `frontend/lib/session.ts`, CLAUDE.md's Auth section). `api/middleware.ts` still sends
-  `Access-Control-Allow-Origin: *` with no credentials mode. Now that a true single origin exists
-  (a path-scoped Worker Route puts both apps on one hostname — see DOMAIN_MIGRATION.md), the
-  condition that was always the trigger for switching back to `HttpOnly` cookies is met; that
-  switch is planned as Rollout 2 in DOMAIN_MIGRATION.md and has **not shipped yet** — don't assume
-  cookies are in place until that doc/CLAUDE.md say so.
+- **Custom domain + cookie auth are both live** (ROADMAP.md's Milestones 35 and 36). Session
+  auth is an `HttpOnly`/`Secure`/`SameSite=Lax` cookie again, not
+  a Bearer token — see CLAUDE.md's Auth section ("Why cookies again") for the full history of
+  both migrations. `api/middleware.ts` is now a no-op (no cross-origin request ever reaches
+  this Worker, so no CORS/OPTIONS handling is needed) — kept as an empty passthrough file only
+  because `api/middleware.ts` (not `proxy.ts`) is a load-bearing filename under this Next.js
+  version (see the redeploy section above). Known gap: local `next dev`/`wrangler dev` are
+  genuinely cross-origin ports, so `SameSite=Lax` cookies won't be sent between them locally —
+  see CLAUDE.md's Auth section; the e2e suite exercises the real deployed domain instead.
 - **SheetJS export can't freeze panes** on the free CDN build used in `frontend/app/layout.tsx`
   — that's a SheetJS Pro feature. Not a deployment issue, just don't expect the exported
   `.xlsx` header row to actually freeze; see `frontend/lib/export.ts`.

@@ -2,7 +2,7 @@ export type Role = "deo" | "admin";
 
 // The real credential is an HttpOnly cookie now (see api/lib/session.ts) — invisible to this
 // frontend JS by design, and a true single origin (excisebakaya.exciseup.in) makes that safe
-// (see DOMAIN_MIGRATION.md). This file only keeps a same-purpose-as-before "last role" hint for
+// (see CLAUDE.md's Auth section). This file only keeps a same-purpose-as-before "last role" hint for
 // the root page's first-paint redirect guess (which of /admin or /deo-data-entry to send a bare
 // "/" visit to) — it is never a source of truth for anything gated. Every gated page still
 // calls GET /api/auth/me before trusting anything; a missing/expired cookie 401s there exactly

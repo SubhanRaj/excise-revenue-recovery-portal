@@ -71,7 +71,7 @@ test.describe("magic-link verify (live D1 round-trip)", () => {
     // The actual bug report: silently landing back on /login is a failure, not a pass-through.
     await page.waitForURL(/\/(admin|login)/, { timeout: 10_000 });
     // Session auth is an HttpOnly `__admin_session` cookie now (see api/lib/session.ts,
-    // DOMAIN_MIGRATION.md's Rollout 2) — not readable from page JS by design, so check via the
+    // ROADMAP.md's Milestone 36) — not readable from page JS by design, so check via the
     // browser context's cookie jar instead of localStorage.
     const cookies = await page.context().cookies();
     const adminCookie = cookies.find((c) => c.name === "__admin_session");
