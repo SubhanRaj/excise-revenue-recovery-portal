@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch, ApiError } from "@/lib/api";
-import { saveClientSession, markJustAuthed } from "@/lib/session";
+import { markLastRole, markJustAuthed } from "@/lib/session";
 import Button from "@/components/ui/Button";
 import Banner from "@/components/ui/Banner";
 
@@ -18,11 +18,11 @@ function VerifyForm() {
     setError(null);
     setBusy(true);
     try {
-      const res = await apiFetch<{ role: "deo" | "admin"; districtId: number | null; token: string }>(
+      const res = await apiFetch<{ role: "deo" | "admin"; districtId: number | null }>(
         "/api/auth/verify-magic-link",
         { method: "POST", body: JSON.stringify({ token }) }
       );
-      saveClientSession(res);
+      markLastRole(res.role);
       markJustAuthed();
       router.push(res.role === "admin" ? "/admin" : "/deo-data-entry");
     } catch (err) {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, eq, isNull } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { magicLinkTokens, users } from "@/db/schema";
-import { signSession } from "@/lib/session";
+import { signSession, setSessionCookie } from "@/lib/session";
 import { auditLogInsert } from "@/lib/audit";
 import { withErrorHandling } from "@/lib/with-error-handling";
 
@@ -50,5 +50,7 @@ export const POST = withErrorHandling("auth/verify-magic-link", async (req: Next
     actorDesignation: user.designation,
   });
 
-  return NextResponse.json({ ok: true, role: user.role, districtId: user.districtId, token: sessionToken });
+  const res = NextResponse.json({ ok: true, role: user.role, districtId: user.districtId });
+  setSessionCookie(res, user.role as "deo" | "admin", sessionToken);
+  return res;
 });

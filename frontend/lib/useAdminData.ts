@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { db, type CachedDistrict, type CachedPacData } from "@/lib/db";
 import { apiFetch, ApiError } from "@/lib/api";
-import { clearClientSession, consumeJustAuthed } from "@/lib/session";
+import { clearLastRole, consumeJustAuthed } from "@/lib/session";
 import { notifyToast } from "@/lib/alerts";
 import type { Profile } from "@/components/ui/ProfileMenu";
 
@@ -72,7 +72,7 @@ export function useAdminData() {
           notifyToast({ icon: "success", title: `Welcome, ${p.name ?? p.designation ?? "Admin"}` });
         }
       } catch {
-        clearClientSession("admin");
+        clearLastRole("admin");
         router.replace("/login");
         return;
       }

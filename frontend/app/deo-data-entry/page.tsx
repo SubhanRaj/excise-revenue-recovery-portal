@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { db, type DraftYear, type DraftRcDetail } from "@/lib/db";
 import { FINANCIAL_YEARS, PAC_FIELD_ORDER, computeNetRecoverableSeries } from "@/lib/pac-fields";
 import { apiFetch, apiFetchForm, ApiError } from "@/lib/api";
-import { clearClientSession, consumeJustAuthed } from "@/lib/session";
+import { clearLastRole, consumeJustAuthed } from "@/lib/session";
 import { formatIST } from "@/lib/format";
 import {
   confirmFinalSubmit,
@@ -123,7 +123,7 @@ export default function EntryPage() {
           notifyToast({ icon: "success", title: `Welcome, DEO ${p.districtName ?? ""}`.trim() });
         }
       } catch {
-        clearClientSession("deo");
+        clearLastRole("deo");
         router.replace("/login");
         return;
       }
@@ -251,7 +251,7 @@ export default function EntryPage() {
   // would just be an extra click in front of a choice with no other option.
   async function logoutLocked() {
     await apiFetch(`/api/auth/logout?role=deo`, { method: "POST" }, "deo").catch(() => {});
-    clearClientSession("deo");
+    clearLastRole("deo");
     notifyToast({ icon: "info", title: "Logged out" });
     router.replace("/login");
   }
@@ -348,9 +348,10 @@ export default function EntryPage() {
         "deo"
       );
       await db.draftYears.clear();
-      // Locked — no server-side session to revoke (stateless bearer token), so discard this
-      // DEO's token client-side right away instead.
-      clearClientSession("deo");
+      // Locked — no server-side session to revoke (stateless JWT cookie), so clear the
+      // last-role hint client-side right away instead; the district lock itself is what
+      // actually stops this DEO from re-entering.
+      clearLastRole("deo");
       setSubmitted(true);
       setTimeout(() => router.replace("/login"), 1800);
     } catch (err) {

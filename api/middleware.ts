@@ -1,25 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
-// Session auth travels as a Bearer token (Authorization header), not a cookie — see
-// lib/session.ts / lib/auth-guard.ts — so requests carry no ambient browser credential and
-// CORS has nothing sensitive to gate: a wildcard origin can't be used to steal a token that's
-// never automatically attached. This also sidesteps the old origin-echo dance breaking on
-// browsers/profiles that block third-party cookies (Safari ITP, Chrome Incognito, etc.),
-// which is what motivated dropping cookies in the first place. If this app ever moves to a
-// custom domain fronting both apps on one zone, cookies (HttpOnly, SameSite=Lax/Strict) would
-// become the more secure option again — see CLAUDE.md's Auth section.
-function withCors(res: NextResponse) {
-  res.headers.set("Access-Control-Allow-Origin", "*");
-  res.headers.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  return res;
-}
-
-export function middleware(req: NextRequest) {
-  if (req.method === "OPTIONS") {
-    return withCors(new NextResponse(null, { status: 204 }));
-  }
-  return withCors(NextResponse.next());
+// No-op now: frontend and API are a true single origin (excisebakaya.exciseup.in — see
+// DOMAIN_MIGRATION.md), so no cross-origin request ever reaches this Worker and no CORS
+// headers/OPTIONS preflight handling is needed. Session auth moved from a Bearer token to an
+// HttpOnly cookie in the same rollout (lib/session.ts / lib/auth-guard.ts). Kept as an empty
+// file (not deleted) only because `api/middleware.ts` — not `proxy.ts` — is a load-bearing
+// filename constraint under this Next.js version (see DEPLOY.md's redeploy section); there's
+// no other reason for this file to exist right now.
+export function middleware() {
+  return NextResponse.next();
 }
 
 export const config = { matcher: "/api/:path*" };

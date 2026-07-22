@@ -1,5 +1,5 @@
 import { API_BASE_URL } from "./config";
-import { getToken, type Role } from "./session";
+import type { Role } from "./session";
 
 export class ApiError extends Error {
   constructor(message: string, public status: number) {
@@ -7,17 +7,15 @@ export class ApiError extends Error {
   }
 }
 
-// `role` attaches that role's stored Bearer token (see session.ts) as the Authorization
-// header — omit it for pre-login calls (verify-cug, verify-magic-link, request-magic-link)
-// that have no token yet. Not a cookie, so no `credentials: "include"` needed and no browser
-// cross-site-cookie policy can block it.
-export async function apiFetch<T>(path: string, init?: RequestInit, role?: Role): Promise<T> {
-  const token = role ? getToken(role) : null;
+// Session auth is now an HttpOnly cookie (see api/lib/session.ts) — same-origin fetch()
+// attaches it automatically, no Authorization header or `credentials: "include"` needed. The
+// `role` parameter is kept (unused here) only to avoid touching every call site's signature;
+// it has no effect on the request itself anymore.
+export async function apiFetch<T>(path: string, init?: RequestInit, _role?: Role): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init?.headers,
     },
   });
@@ -33,13 +31,8 @@ export async function apiFetch<T>(path: string, init?: RequestInit, role?: Role)
 // sets Content-Type: application/json, which would break the multipart boundary the browser
 // needs to set itself for FormData. Same auth/error-shape handling as apiFetch, just without
 // that header.
-export async function apiFetchForm<T>(path: string, body: FormData, role: Role): Promise<T> {
-  const token = getToken(role);
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    body,
-  });
+export async function apiFetchForm<T>(path: string, body: FormData, _role: Role): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}${path}`, { method: "POST", body });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new ApiError(json.error ?? "Unknown error occurred.", res.status);
@@ -48,14 +41,11 @@ export async function apiFetchForm<T>(path: string, body: FormData, role: Role):
 }
 
 // For binary responses (the unlock-request PDF attachment) — apiFetch() above always calls
-// res.json(), which would fail on a PDF body. Needs the Bearer header itself since this app
-// has no cookies (see CLAUDE.md's Auth section), so a plain <iframe src="..."> or <a href="...">
-// can't hit the route directly; callers fetch the blob and hand it to URL.createObjectURL.
-export async function apiFetchBlob(path: string, role: Role): Promise<Blob> {
-  const token = getToken(role);
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-  });
+// res.json(), which would fail on a PDF body. The HttpOnly cookie is attached automatically by
+// the browser same as any other same-origin request; callers fetch the blob and hand it to
+// URL.createObjectURL since a plain <iframe src="..."> can't set headers itself anyway.
+export async function apiFetchBlob(path: string, _role: Role): Promise<Blob> {
+  const res = await fetch(`${API_BASE_URL}${path}`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new ApiError(body.error ?? "Unknown error occurred.", res.status);

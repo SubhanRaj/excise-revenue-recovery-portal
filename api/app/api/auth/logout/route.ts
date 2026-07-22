@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth-guard";
+import { clearSessionCookie } from "@/lib/session";
 import { getDb } from "@/lib/db";
 import { auditLogInsert } from "@/lib/audit";
 import { districts, users } from "@/db/schema";
@@ -7,9 +8,9 @@ import { eq } from "drizzle-orm";
 import { withErrorHandling } from "@/lib/with-error-handling";
 
 // Session tokens are stateless JWTs with no server-side revocation list, so there's nothing
-// to invalidate here — this endpoint just records the audit-log event; the frontend discards
-// its own stored token right after calling this. ?role= says which role's token that is, so
-// logging out of /admin doesn't touch a /deo-data-entry session in the same browser.
+// to invalidate server-side beyond clearing the cookie — this endpoint records the audit-log
+// event and clears that role's cookie. ?role= says which one, so logging out of /admin doesn't
+// touch a /deo-data-entry session in the same browser.
 export const POST = withErrorHandling("auth/logout", async (req: NextRequest) => {
   const role = req.nextUrl.searchParams.get("role");
   if (role !== "admin" && role !== "deo") {
@@ -40,5 +41,7 @@ export const POST = withErrorHandling("auth/logout", async (req: NextRequest) =>
     await auditLogInsert(db, { eventType: "logout", actorRole: role, actorEmail, actorName, actorDesignation, districtName }).catch(() => {});
   }
 
-  return NextResponse.json({ ok: true });
+  const res = NextResponse.json({ ok: true });
+  clearSessionCookie(res, role);
+  return res;
 });

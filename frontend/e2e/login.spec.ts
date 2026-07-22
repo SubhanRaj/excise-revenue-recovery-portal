@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 
-const API_URL = process.env.E2E_API_URL ?? "https://excise-revenue-recovery-api.shubhanraj2002.workers.dev";
+const API_URL = process.env.E2E_API_URL ?? "https://excisebakaya.exciseup.in";
 const SUPERADMIN_EMAIL = "shubhanraj2002@gmail.com";
 const API_DIR = path.resolve(__dirname, "../../api");
 
@@ -60,7 +60,7 @@ test.describe("magic-link verify (live D1 round-trip)", () => {
   test("clicking Verify & Continue signs in without bouncing back to /login", async ({ page, request }) => {
     // Issue a fresh token the same way the login page does, then read it back from D1.
     await request.post(`${API_URL}/api/auth/request-magic-link`, {
-      headers: { Origin: "https://excise-revenue-recovery-portal.pages.dev", "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       data: { email: SUPERADMIN_EMAIL },
     });
     const token = latestUnusedToken();
@@ -70,22 +70,23 @@ test.describe("magic-link verify (live D1 round-trip)", () => {
 
     // The actual bug report: silently landing back on /login is a failure, not a pass-through.
     await page.waitForURL(/\/(admin|login)/, { timeout: 10_000 });
-    // Session auth is a Bearer token in localStorage (see frontend/lib/session.ts), not a
-    // cookie — this test used to check for a `__admin_session` cookie, which is exactly the
-    // mechanism that got dropped after cross-site cookie blocking (Safari ITP, and eventually
-    // Chrome too) broke real logins in production.
-    const storedSession = await page.evaluate(() => localStorage.getItem("excise-portal:session:admin"));
+    // Session auth is an HttpOnly `__admin_session` cookie now (see api/lib/session.ts,
+    // DOMAIN_MIGRATION.md's Rollout 2) — not readable from page JS by design, so check via the
+    // browser context's cookie jar instead of localStorage.
+    const cookies = await page.context().cookies();
+    const adminCookie = cookies.find((c) => c.name === "__admin_session");
 
     if (page.url().includes("/login")) {
       const bannerText = await page.locator("body").innerText();
       throw new Error(
-        `Verify bounced back to /login instead of /admin. Stored admin session present: ${Boolean(
-          storedSession
+        `Verify bounced back to /login instead of /admin. Admin session cookie present: ${Boolean(
+          adminCookie
         )}. Page text: ${bannerText.slice(0, 500)}`
       );
     }
 
     expect(page.url()).toContain("/admin");
-    expect(storedSession, "admin session token should be stored after a successful verify").toBeTruthy();
+    expect(adminCookie, "__admin_session cookie should be set after a successful verify").toBeTruthy();
+    expect(adminCookie?.httpOnly).toBe(true);
   });
 });

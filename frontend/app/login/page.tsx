@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, ApiError } from "@/lib/api";
 import { sha256Hex } from "@/lib/crypto";
-import { saveClientSession, markJustAuthed } from "@/lib/session";
+import { markLastRole, markJustAuthed } from "@/lib/session";
 import Button from "@/components/ui/Button";
 import TextField from "@/components/ui/TextField";
 import Banner from "@/components/ui/Banner";
@@ -45,11 +45,11 @@ export default function LoginPage() {
         setBusy(false);
         return setError("Invalid user.");
       }
-      const res = await apiFetch<{ role: "deo" | "admin"; districtId: number | null; token: string }>(
+      const res = await apiFetch<{ role: "deo" | "admin"; districtId: number | null }>(
         "/api/auth/verify-cug",
         { method: "POST", body: JSON.stringify({ cugHash }) }
       );
-      saveClientSession(res);
+      markLastRole(res.role);
       markJustAuthed();
       router.push(res.role === "admin" ? "/admin" : "/deo-data-entry");
     } catch (err) {

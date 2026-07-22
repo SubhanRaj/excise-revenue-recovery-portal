@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { users, districts } from "@/db/schema";
-import { signSession } from "@/lib/session";
+import { signSession, setSessionCookie } from "@/lib/session";
 import { auditLogInsert } from "@/lib/audit";
 import { withErrorHandling } from "@/lib/with-error-handling";
 
@@ -52,5 +52,7 @@ export const POST = withErrorHandling("auth/verify-cug", async (req: NextRequest
     districtName: row.districtName,
   });
 
-  return NextResponse.json({ ok: true, role: row.role, districtId: row.districtId, token });
+  const res = NextResponse.json({ ok: true, role: row.role, districtId: row.districtId });
+  setSessionCookie(res, row.role as "deo" | "admin", token);
+  return res;
 });

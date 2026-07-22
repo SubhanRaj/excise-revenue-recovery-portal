@@ -2,16 +2,18 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { readClientSession } from "@/lib/session";
+import { getLastRole } from "@/lib/session";
 
 export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    const session = readClientSession();
-    if (!session) {
+    // Just a first-paint guess (see lib/session.ts) — the destination page re-verifies via
+    // GET /api/auth/me and bounces to /login itself if the cookie's missing/expired.
+    const role = getLastRole();
+    if (!role) {
       router.replace("/login");
-    } else if (session.role === "admin") {
+    } else if (role === "admin") {
       router.replace("/admin");
     } else {
       router.replace("/deo-data-entry");

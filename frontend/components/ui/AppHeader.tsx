@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
-import { clearClientSession } from "@/lib/session";
+import { clearLastRole } from "@/lib/session";
 import { confirmLogout, notifyToast } from "@/lib/alerts";
 import { setNavDistrictId } from "@/lib/adminNav";
 import ProfileMenu, { type Profile } from "./ProfileMenu";
@@ -96,7 +96,7 @@ export default function AppHeader({ title, role, profile, navLinks, onSync, sync
   async function logout() {
     if (!(await confirmLogout())) return;
     await apiFetch(`/api/auth/logout?role=${role}`, { method: "POST" }, role).catch(() => {});
-    clearClientSession(role);
+    clearLastRole(role);
     notifyToast({ icon: "info", title: "Logged out" });
     router.replace("/login");
   }
