@@ -1,9 +1,12 @@
 # Custom domain (`excisebakaya.exciseup.in`) + Bearer→Cookie auth switch — plan
 
-Standalone plan doc, same pattern as [R2_PDF_ATTACHMENT_REPROVISIONING.md](./R2_PDF_ATTACHMENT_REPROVISIONING.md)
-— not started yet, kept here so the reasoning doesn't need to be re-derived when picked up.
-Once executed, fold the outcome into CLAUDE.md/DEPLOY.md/ROADMAP.md per the "Docs to update"
-section below and this file can be deleted.
+Standalone plan doc, same pattern as [R2_PDF_ATTACHMENT_REPROVISIONING.md](./R2_PDF_ATTACHMENT_REPROVISIONING.md).
+
+**Rollout 1 is done** (see ROADMAP.md's Milestone 35) — `excisebakaya.exciseup.in` is live for
+both frontend and API, old `*.pages.dev`/`*.workers.dev` URLs untouched. **Rollout 2 (Bearer →
+cookie auth switch) is not started** — kept here so the reasoning doesn't need to be re-derived
+when picked up. Once Rollout 2 executes, fold its outcome into CLAUDE.md/DEPLOY.md/ROADMAP.md
+per the "Docs to update" section below and this file can be deleted.
 
 ## Context
 

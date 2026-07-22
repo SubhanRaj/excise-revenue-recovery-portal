@@ -1126,6 +1126,36 @@ just extended to also require one on deny.
       ब्याज)" and Milestone 28's changelog entry above is left untouched — DB-internal, not user
       facing.
 
+## Milestone 35 — Custom domain `excisebakaya.exciseup.in` (Rollout 1, no auth change yet)
+
+- [x] `exciseup.in`'s nameservers were already delegated to Cloudflare (used for the sibling
+      `sro.exciseup.in`/`docsrepo.exciseup.in` subdomains); `excisebakaya.exciseup.in` added as a
+      Custom Domain on the `excise-revenue-recovery-portal` Pages project via the Cloudflare
+      dashboard (no `wrangler` CLI support for this step exists).
+- [x] Kept `/frontend` (Pages) and `/api` (Worker) as two separate deployments rather than
+      merging into a single Worker like the sibling SRO project — that project was single-Worker
+      from day one; this one is more complex, carries real production data, and merging would
+      require dropping `output: "export"` for zero UX benefit (the "no full-page-reload"
+      navigation is Next App Router client-side routing, unrelated to static-export vs SSR
+      hosting). Single origin achieved instead via `api/wrangler.jsonc`'s new path-scoped
+      `routes: [{ pattern: "excisebakaya.exciseup.in/api/*", zone_name: "exciseup.in" }]`, with
+      `workers_dev: true` kept explicit (adding `routes` flips Wrangler's default for that key to
+      `false`, which would have silently killed the existing `*.workers.dev` URL).
+- [x] `frontend/lib/config.ts`'s production `NEXT_PUBLIC_API_URL` build value changed to `""`
+      (`.github/workflows/deploy.yml`) so `apiFetch` resolves `/api/...` relative to whatever
+      origin served the page — no domain hardcoded, stays correct if the domain changes again.
+      Local dev's `http://localhost:8787` fallback unchanged.
+- [x] `FRONTEND_URL` Worker secret updated to `https://excisebakaya.exciseup.in` (feeds the
+      magic-link email's `/verify?token=` URL).
+- [x] Deployed both apps, verified `excisebakaya.exciseup.in/login` (200) and
+      `excisebakaya.exciseup.in/api/auth/me?role=admin` (401, expected unauthenticated) both
+      resolve correctly, and confirmed the old `*.pages.dev`/`*.workers.dev` URLs still serve
+      identically (untouched, by design — not deleted).
+- [x] Full plan documented in [DOMAIN_MIGRATION.md](./DOMAIN_MIGRATION.md) before implementation,
+      including the still-pending Rollout 2 (Bearer token → `HttpOnly` cookies, tracked in the
+      Backlog entry below — not done in this milestone). DEO SMS OTP work stayed explicitly out of
+      scope throughout.
+
 ## Backlog / not started
 
 - [ ] **Archive previous PAC data on resubmission-after-unlock** — today, when a DEO resubmits
@@ -1159,12 +1189,18 @@ just extended to also require one on deny.
         local unlock/resubmit test (verify old data lands in `pac_data_history`, new data in
         `pac_data`, first-ever submits archive nothing) → `db:migrate:remote` → deploy → verify
         live per DEPLOY.md.
-- [ ] Real domain + DNS, and (optional) collapse `/frontend` + `/api` onto one zone via a
-      Worker Route or Pages Function — **at that point, switch auth back from a Bearer token to
-      `HttpOnly` cookies** (`SameSite=Lax`/`Strict` becomes possible once same-site), since
-      cookies are the more secure option whenever same-site is actually achievable. This does
-      not require standing up a separate server — a Worker Route/Pages Function on the same zone
-      as a purchased domain is enough to make both apps same-site.
+- [x] ~~Real domain + DNS, and (optional) collapse `/frontend` + `/api` onto one zone via a
+      Worker Route or Pages Function~~ — Done (Milestone 35): `excisebakaya.exciseup.in` custom
+      domain live, `/frontend` and `/api` kept as separate deployments unified via a path-scoped
+      Worker Route (not merged into one Worker).
+- [ ] **Rollout 2 of DOMAIN_MIGRATION.md — switch auth back from a Bearer token to `HttpOnly`
+      cookies**, now that the custom domain (Milestone 35) makes frontend and API a true single
+      origin (`SameSite=Lax` becomes possible and is real CSRF hardening, unlike the old
+      cross-origin design). Full file-by-file plan already written in DOMAIN_MIGRATION.md
+      (two cookie names `__admin_session`/`__deo_session`, `api/lib/auth-guard.ts`,
+      `api/middleware.ts` CORS cleanup, `frontend/lib/session.ts`/`api.ts` token removal, etc.) —
+      this is a hard cutover (every logged-in admin is forced to re-login the instant it deploys),
+      to be scheduled for a low-traffic window, not done speculatively alongside Milestone 35.
 - [x] ~~Verify `mail.upexciseonline.co` (or chosen domain) in Resend and switch `FROM_EMAIL`
       off the shared sandbox sender~~ — Done. `mail.exciseup.in` verified in Resend; `FROM_EMAIL`
       Worker secret set to `noreply@mail.exciseup.in`, same domain/address shared with the sibling

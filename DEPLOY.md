@@ -11,10 +11,16 @@ there) and [CLAUDE.md](./CLAUDE.md) for how the system itself works.
 | Resource        | Value                                                                 |
 | ---------------- | ---------------------------------------------------------------------- |
 | Cloudflare account | `Subhan` (`4d93d751987b8d9ff101445570e72711`)                       |
-| API Worker        | `excise-revenue-recovery-api` — https://excise-revenue-recovery-api.shubhanraj2002.workers.dev |
-| Pages project      | `excise-revenue-recovery-portal` — https://excise-revenue-recovery-portal.pages.dev |
+| Custom domain (primary) | https://excisebakaya.exciseup.in — Pages custom domain + a path-scoped Worker Route for `/api/*` (see DOMAIN_MIGRATION.md) |
+| API Worker        | `excise-revenue-recovery-api` — https://excise-revenue-recovery-api.shubhanraj2002.workers.dev (still live, kept via `workers_dev: true` in `api/wrangler.jsonc`) |
+| Pages project      | `excise-revenue-recovery-portal` — https://excise-revenue-recovery-portal.pages.dev (still live) |
 | D1 database        | `excise-revenue-recovery-db` (id `4f3e37fd-006a-4bce-b2d3-4bfb8bb16248`), region APAC |
 | Superadmin         | `shubhanraj2002@gmail.com` (role `admin`, signs in via Magic Link)   |
+
+The `*.pages.dev`/`*.workers.dev` URLs are kept live deliberately (not deleted) — the custom
+domain is additive, not a replacement. `FRONTEND_URL` now points at the custom domain (see
+Secrets below), so magic-link emails always resolve to `excisebakaya.exciseup.in` regardless of
+which URL a user is browsing from.
 
 Auth to Cloudflare: `pnpm exec wrangler whoami` (already logged in via OAuth on this machine).
 Re-auth elsewhere with `pnpm exec wrangler login`.
@@ -73,7 +79,7 @@ don't type it into a prompt that ends up in shell history):
 cd api
 openssl rand -base64 48 | pnpm exec wrangler secret put JWT_SECRET
 echo "re_xxxxxxxxxxxxxxxxxxxxxxxxxxxx" | pnpm exec wrangler secret put RESEND_API_KEY
-echo "https://excise-revenue-recovery-portal.pages.dev" | pnpm exec wrangler secret put FRONTEND_URL
+echo "https://excisebakaya.exciseup.in" | pnpm exec wrangler secret put FRONTEND_URL
 echo "noreply@mail.exciseup.in" | pnpm exec wrangler secret put FROM_EMAIL
 echo "the-owners-actual-login-email@example.com" | pnpm exec wrangler secret put OWNER_EMAIL
 ```
@@ -82,9 +88,10 @@ echo "the-owners-actual-login-email@example.com" | pnpm exec wrangler secret put
   the verify response body and sent back as `Authorization: Bearer <token>` (not a cookie — see
   CLAUDE.md's Auth section for why). Rotating it invalidates every active session.
 - `RESEND_API_KEY` — sends magic-link emails (`api/app/api/auth/request-magic-link/route.ts`).
-- `FRONTEND_URL` — must exactly match the Pages production origin. Used both as the
-  magic-link redirect target and as the sole allowed CORS origin in `api/middleware.ts` —
-  get this wrong and every `/api/*` call from the frontend fails CORS, not just auth.
+- `FRONTEND_URL` — the magic-link redirect target (`https://excisebakaya.exciseup.in` as of the
+  custom-domain rollout, see DOMAIN_MIGRATION.md). Also still checked as the allowed CORS origin
+  in `api/middleware.ts` — get this wrong and every `/api/*` call from the frontend fails CORS,
+  not just auth.
 - `FROM_EMAIL` — sender address for magic-link email, `noreply@mail.exciseup.in`. `mail.exciseup.in`
   is verified in Resend and this same address is reused across all UP Excise projects on the same
   Resend account (see the sibling `up-excise-spatial-revenue-optimizer` project's DEPLOY.md, which
@@ -130,9 +137,15 @@ pnpm run db:migrate:remote   # and db:migrate:local for your local D1 too
 
 ```bash
 cd frontend
-NEXT_PUBLIC_API_URL="https://excise-revenue-recovery-api.shubhanraj2002.workers.dev" pnpm run build
+NEXT_PUBLIC_API_URL="" pnpm run build
 pnpm run pages:deploy   # = wrangler pages deploy out --project-name ... --branch master
 ```
+
+`NEXT_PUBLIC_API_URL=""` is correct now that frontend and API share an origin
+(`excisebakaya.exciseup.in`, via a path-scoped Worker Route — see DOMAIN_MIGRATION.md):
+`apiFetch` resolves `/api/...` relative to whatever host served the page. Only local dev
+(`http://localhost:8787`, genuinely a different port) needs the fallback in
+`frontend/lib/config.ts`.
 
 A `--branch` matching the Pages project's production branch is required for a *Production*
 deployment with the stable `https://excise-revenue-recovery-portal.pages.dev` URL — anything
@@ -152,8 +165,13 @@ and redeploying, not just changing a Cloudflare dashboard setting.
 ## Verifying a deployment
 
 ```bash
-API=https://excise-revenue-recovery-api.shubhanraj2002.workers.dev
-FRONT=https://excise-revenue-recovery-portal.pages.dev
+# Primary (custom domain, single origin):
+API=https://excisebakaya.exciseup.in
+FRONT=https://excisebakaya.exciseup.in
+
+# Old URLs (kept live, not deleted — re-check these too after any deploy):
+# API=https://excise-revenue-recovery-api.shubhanraj2002.workers.dev
+# FRONT=https://excise-revenue-recovery-portal.pages.dev
 
 curl -s -o /dev/null -w "%{http_code}\n" "$API/api/auth/me"   # expect 401, no Authorization header sent
 
@@ -201,19 +219,18 @@ curl -s -o /dev/null -w "%{http_code}\n" "$API/api/admin/unlock-requests"    # e
 
 ## Known deployment constraints
 
-- **Frontend/API are cross-origin in production** (`*.pages.dev` vs `*.workers.dev`). Session
-  auth used to be two `SameSite=None; Secure` cookies, which is exactly the shape of cookie
-  Safari ITP blocks and Chrome blocks under common conditions (Incognito, a locked-down
-  profile) — this broke real logins in production (see TESTING.md's Incidents section), so auth
-  was migrated to a Bearer token instead (`api/lib/session.ts`, `frontend/lib/session.ts` — see
-  CLAUDE.md's Auth section for the full writeup). `api/middleware.ts` now sends
-  `Access-Control-Allow-Origin: *` with no credentials mode, since a Bearer token carries no
-  ambient browser credential for a wildcard origin to expose. If you later put a custom domain
-  in front of both under one zone (e.g. a Worker Route or Pages Function for
-  `example.com/api/*` — no separate server needed, just the domain + that routing), **switch
-  auth back to `HttpOnly` cookies** at that point; same-site cookies are the more secure option
-  and the only reason this app is on Bearer tokens is the two-origins constraint. Don't do
-  either migration speculatively; only if a real custom domain shows up.
+- **Custom domain is now live (`excisebakaya.exciseup.in`), but auth is still Bearer-token —
+  Rollout 1 of DOMAIN_MIGRATION.md, not yet Rollout 2.** Frontend and API were cross-origin
+  (`*.pages.dev` vs `*.workers.dev`) when the Bearer-token design was adopted (session auth used
+  to be two `SameSite=None; Secure` cookies, which is exactly the shape Safari ITP blocks and
+  Chrome blocks under common conditions — this broke real logins in production, see TESTING.md's
+  Incidents section — so auth was migrated to a Bearer token instead, `api/lib/session.ts`,
+  `frontend/lib/session.ts`, CLAUDE.md's Auth section). `api/middleware.ts` still sends
+  `Access-Control-Allow-Origin: *` with no credentials mode. Now that a true single origin exists
+  (a path-scoped Worker Route puts both apps on one hostname — see DOMAIN_MIGRATION.md), the
+  condition that was always the trigger for switching back to `HttpOnly` cookies is met; that
+  switch is planned as Rollout 2 in DOMAIN_MIGRATION.md and has **not shipped yet** — don't assume
+  cookies are in place until that doc/CLAUDE.md say so.
 - **SheetJS export can't freeze panes** on the free CDN build used in `frontend/app/layout.tsx`
   — that's a SheetJS Pro feature. Not a deployment issue, just don't expect the exported
   `.xlsx` header row to actually freeze; see `frontend/lib/export.ts`.
