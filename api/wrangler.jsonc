@@ -4,6 +4,13 @@
 	"name": "excise-revenue-recovery-api",
 	"compatibility_date": "2026-06-01",
 	"compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+	// workers_dev must stay explicit: adding `routes` below flips Wrangler's default for this
+	// key from true to false, which would silently kill the existing *.workers.dev URL —
+	// DOMAIN_MIGRATION.md's "don't delete anything" requirement.
+	"workers_dev": true,
+	"routes": [
+		{ "pattern": "excisebakaya.exciseup.in/api/*", "zone_name": "exciseup.in" }
+	],
 	"assets": {
 		"directory": ".open-next/assets",
 		"binding": "ASSETS"
