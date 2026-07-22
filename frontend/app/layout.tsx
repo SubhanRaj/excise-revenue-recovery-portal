@@ -10,9 +10,37 @@ import "./globals.css";
 // MutationObserver, so blocking in <head> before <body> exists is the correct placement,
 // not a workaround.
 
+const TITLE = "Excise Revenue Recovery Portal | आबकारी विभाग, उत्तर प्रदेश";
+const DESCRIPTION = `${SITE_TITLE_EN}. ${DATA_PERIOD_EN}.`;
+
 export const metadata: Metadata = {
-  title: "Excise Revenue Recovery Portal | आबकारी विभाग, उत्तर प्रदेश",
-  description: `${SITE_TITLE_EN}. ${DATA_PERIOD_EN}.`,
+  metadataBase: new URL("https://excisebakaya.exciseup.in"),
+  title: TITLE,
+  description: DESCRIPTION,
+  keywords: [
+    "Excise Revenue Recovery Portal",
+    "Department of Excise Uttar Pradesh",
+    "आबकारी विभाग उत्तर प्रदेश",
+    "Recovery Certificate",
+    "PAC recovery",
+    "excise arrears",
+  ],
+  // robots.txt (frontend/public/robots.txt) is the actual gate on what gets crawled at all
+  // (only /login) — this stays index/follow at the metadata level since it's shared by every
+  // route in this single-layout app, /login included.
+  openGraph: {
+    title: TITLE,
+    description: DESCRIPTION,
+    siteName: "Excise Revenue Recovery Portal",
+    url: "/login",
+    type: "website",
+    locale: "en_IN",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+  },
 };
 
 export default function RootLayout({

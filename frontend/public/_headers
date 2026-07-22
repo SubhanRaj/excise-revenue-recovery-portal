@@ -1,0 +1,6 @@
+# Cloudflare Pages custom headers (https://developers.cloudflare.com/pages/configuration/headers/).
+# next/og's static build output has no file extension (out/opengraph-image), so Pages' default
+# extension-based content-type detection would otherwise serve it as application/octet-stream —
+# link-preview scrapers (Slack, WhatsApp, Twitter/X) expect a real image content-type.
+/opengraph-image
+  Content-Type: image/png

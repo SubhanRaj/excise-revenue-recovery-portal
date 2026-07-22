@@ -1,0 +1,6 @@
+# Only /login is meant to be crawled — everything else is a session-gated app screen (client-
+# side auth check, no real content in the static HTML shell before JS runs) and isn't worth a
+# bot's time or this site's request budget.
+User-agent: *
+Allow: /login
+Disallow: /
