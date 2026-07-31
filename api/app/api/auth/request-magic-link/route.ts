@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, count, eq, gt } from "drizzle-orm";
 import { Resend } from "resend";
 import { getDb } from "@/lib/db";
 import { users, magicLinkTokens } from "@/db/schema";
@@ -7,6 +7,7 @@ import { magicLinkHtml } from "@/lib/email";
 import { withErrorHandling } from "@/lib/with-error-handling";
 
 const TOKEN_TTL_MINUTES = 15;
+const MAX_REQUESTS_PER_WINDOW = 3;
 
 export const POST = withErrorHandling("auth/request-magic-link", async (req: NextRequest) => {
   const { email } = (await req.json()) as { email?: unknown };
@@ -20,6 +21,19 @@ export const POST = withErrorHandling("auth/request-magic-link", async (req: Nex
 
   // Always return 200 regardless of match — do not leak which emails are registered.
   if (!user) {
+    return NextResponse.json({ ok: true });
+  }
+
+  // Rate limit: MAX_REQUESTS_PER_WINDOW per TOKEN_TTL_MINUTES, keyed by user — protects both
+  // against inbox-bombing a specific admin and against exhausting Resend's daily send quota
+  // (which would block every admin's real login, not just the target's). No new column needed:
+  // every token's TTL is fixed at TOKEN_TTL_MINUTES, so `expiresAt > now` for a row is exactly
+  // equivalent to "issued within the last TOKEN_TTL_MINUTES", used or not.
+  const [{ recentCount }] = await db
+    .select({ recentCount: count() })
+    .from(magicLinkTokens)
+    .where(and(eq(magicLinkTokens.userId, user.id), gt(magicLinkTokens.expiresAt, new Date().toISOString())));
+  if (recentCount >= MAX_REQUESTS_PER_WINDOW) {
     return NextResponse.json({ ok: true });
   }
 

@@ -64,12 +64,14 @@ since they need to hook into React render/event cycles rather than run as passiv
   unlock-request event: `id`, `event_type`, `actor_role`, `actor_email`, `district_name`,
   `metadata` (JSON string), `created_at`. Pruned to the last 30 days on read.
 - **`unlock_requests`** — a locked-out DEO's self-service request to be unlocked: `id`,
-  `district_id`, `reason` (plaintext), `attachment_key`/`attachment_filename` (optional PDF,
-  stored in R2 — key is server-generated, filename is display-only), `status`
+  `district_id`, `reason` (plaintext, no attachment), `status`
   (`pending`/`approved`/`denied`), `requested_at`, `resolved_at`/`resolved_by`/`admin_note`. An
   Admin resolving "approve" flips `districts.lock_status` the same way the existing manual
   Unlock button does; both approve and deny require the Admin to type their own note. See
   [CLAUDE.md](./CLAUDE.md)'s "DEO self-service unlock requests" section.
+- **`login_attempts`** — per-IP brute-force counter for `POST /api/auth/verify-cug`: `ip_hash`
+  (SHA-256 of `CF-Connecting-IP`, primary key — one row per IP, not per attempt),
+  `window_start`, `count`. See [SECURITY.md](./SECURITY.md)'s H-01.
 
 ### Migrations (`api/drizzle/`)
 
@@ -83,6 +85,10 @@ since they need to hook into React render/event cycles rather than run as passiv
 | `0005_married_landau` | `pac_data.opening_balance` / `net_recoverable` |
 | `0006_numerous_marten_broadcloak` | `pac_data.rc_details` |
 | `0007_woozy_maelstrom` | `unlock_requests` table |
+| `0008_unknown_mentor` | `users.name` / `designation` |
+| `0009_volatile_blink` | `audit_log.actor_name` / `actor_designation` |
+| `0010_mixed_ultron` | Drops `unlock_requests.attachment_key` / `attachment_filename` (PDF attachment feature removed — reason-only requests, permanently) |
+| `0011_right_thunderball` | `login_attempts` table (per-IP CUG brute-force counter, see SECURITY.md) |
 
 ### Net Recoverable (cumulative running balance)
 
@@ -139,7 +145,7 @@ A returning DEO lands in one of three states, decided by the server's current lo
 Six pages: **Dashboard** (KPI cards + charts, totals across all 5 years), **Districts**
 (sortable/searchable table, lock/unlock, exports), **district detail** (one district's full
 5-year figures), **Unlock Requests** (queue of DEO self-service unlock requests, approve/deny
-with a required note, in-browser PDF preview for attachments), **DEO Provisioning** (bulk DEO
+with a required note), **DEO Provisioning** (bulk DEO
 login upload/download, reached via the profile menu rather than the main nav), **Audit Log**
 (login/lock/unlock/unlock-request history). All six share one Dexie-backed cache with a manual
 Sync button.
@@ -154,8 +160,8 @@ there's no DEO browser involved to hash it first. The server hashes it before st
 ## System flow
 
 Auth (both routes), the DEO's five-year entry-to-lock journey, the self-service unlock-request
-loop, and the Admin surface, down to the exact API route, D1 table, and R2 bucket each step
-touches. Snapshot as of this build — regenerate by hand if the flow changes materially.
+loop, and the Admin surface, down to the exact API route and D1 table each step touches.
+Snapshot as of this build — regenerate by hand if the flow changes materially.
 
 ```mermaid
 flowchart TD
@@ -205,8 +211,6 @@ flowchart TD
         Districts --> UnlockAction["Unlock (reason required)<br/>POST /api/admin/unlock"]
         Districts --> ExportAction["Export Excel Workbook /<br/>Export SQL backup"]
         Dashboard --> UnlockQueue["/admin/unlock-requests<br/>GET /api/admin/unlock-requests"]
-        UnlockQueue --> PdfPreview["View attachment →<br/>PdfPreviewModal (native<br/>viewer iframe, blob: URL)"]
-        PdfPreview --> AttachmentApi["GET .../attachment?id=<br/>(id → attachmentKey lookup,<br/>never a raw R2 key from client)"]
         UnlockQueue --> ResolveAction["Approve / Deny<br/>(note always required)<br/>POST .../resolve"]
         Dashboard --> AuditPage["/admin/audit<br/>login / lock / unlock /<br/>unlock-request history"]
         Dashboard -. "available on every admin page header" .-> ProfileMenu["Profile menu (Admin)"]
@@ -231,8 +235,6 @@ flowchart TD
     UnlockQueue -. reads .-> UnlockReqTbl
     ResolveAction -. writes .-> UnlockReqTbl
     ResolveAction -. "approve only" .-> DistrictsTbl
-    RequestApi -. "optional PDF" .-> PdfR2[("R2: ATTACHMENTS<br/>unlock-requests/{districtId}/…")]
-    AttachmentApi -. reads .-> PdfR2
 ```
 
 ## Getting started
@@ -266,3 +268,4 @@ are in [DEPLOY.md](./DEPLOY.md).
 - [DEPLOY.md](./DEPLOY.md) — production deployment state, secrets, and redeploy commands.
 - [TESTING.md](./TESTING.md) — Playwright e2e suite (real Chrome, against live production), manual demo script, and incident notes.
 - [ROADMAP.md](./ROADMAP.md) — milestones and progress tracking.
+- [SECURITY.md](./SECURITY.md) — security audit findings, fixes applied, and open items.

@@ -148,11 +148,31 @@ preserve:
   back into `requireSession`**. The frontend still passes `?role=admin`/`?role=deo` on `GET
   /api/auth/me` and `POST /api/auth/logout` (the query param picks which role's cookie to
   check/clear; the browser attaches whichever cookies exist automatically, same-origin).
-- Real CUG numbers start with `94544`; `app/login/page.tsx` gates on this prefix before
-  hashing/sending, and the error is the same generic "Invalid user" a real auth failure shows —
-  never name the prefix rule in the message. The one demo account is matched against a
-  precomputed `DEMO_CUG_HASH` constant, not raw digits — the real demo number lives only in the
-  `DEMO_CUG` Cloudflare Worker secret; never add it to source or docs.
+- **`app/login/page.tsx` no longer does any client-side CUG pre-validation** — no prefix check,
+  no demo-account exemption, nothing. It used to gate on a `CUG_PREFIX = "94544"` constant (real
+  Excise Dept. numbers all start with this), but that constant shipped in the public static
+  bundle (`output: "export"`, fully downloadable) and shrank an attacker's search space from 10
+  billion possible 10-digit numbers down to 100,000 — see SECURITY.md's H-01. Removed entirely:
+  every 10-digit number now goes straight to `POST /api/auth/verify-cug`, which is the only real
+  gate regardless (the error is the same generic "Invalid user" either way). A former
+  `DEMO_CUG_HASH` exemption constant (a precomputed SHA-256 hash of the demo number, also
+  publicly reversible — SHA-256 of an unsalted 10-digit number is trivially crackable offline)
+  was removed alongside it, for the same reason (SECURITY.md's L-01) — there is no client-side
+  bypass for any account now, demo included; a demo/test account, if provisioned, is just a
+  normal `users` row like any DEO's. **Never reintroduce a prefix constant or any other
+  pre-validation shortcut client-side** — brute-force resistance now lives entirely server-side,
+  in `verify-cug`'s per-IP rate limiter (see below), which is the only thing that actually needs
+  to hold. The `DEMO_CUG` Cloudflare Worker secret referenced by TESTING.md's manual demo script
+  is documentation-only — no route ever reads `process.env.DEMO_CUG` — never add the raw digits
+  to source or docs regardless.
+- **`POST /api/auth/verify-cug` rate-limits by IP** (`api/lib/rate-limit.ts`'s
+  `checkIpRateLimit()`, backed by the `login_attempts` table — one row per IP hash, not per
+  attempt, so a sustained brute-force run can't grow it unbounded): a fixed 10-attempts-per-
+  5-minutes window, keyed by a SHA-256 of `CF-Connecting-IP` (never the raw address), checked
+  before the `users` table is even queried. Returns `429` once exceeded. This is the actual
+  brute-force defense (see SECURITY.md's H-01) — the frontend's matching 30-second cooldown
+  after 3 failed attempts (`app/login/page.tsx`) is a UX nicety only, not a security boundary, and
+  must never be treated as one.
 - `frontend/app/verify/page.tsx` requires an explicit button click (POST, not GET) so email
   prefetchers can't burn the magic-link token.
 - `GET /api/auth/me?role=admin|deo` is the source of truth for `{role, districtId}` on every
@@ -623,26 +643,14 @@ portal — see ROADMAP.md's Milestone 28 for the full design rationale/security 
 section documents the shipped shape.
 
 - **Schema**: `unlock_requests` (`api/db/schema.ts`) — `districtId` FK, plaintext `reason`,
-  optional `attachmentKey`/`attachmentFilename` (R2), `status` (`pending`/`approved`/`denied`),
-  `requestedAt`/`resolvedAt`/`resolvedBy`/`adminNote`. "Only one pending request per district" is
-  an application-level check-then-insert in the route (no partial unique index), not a DB
-  constraint — same posture as everything else in this schema that isn't safety-critical.
+  `status` (`pending`/`approved`/`denied`), `requestedAt`/`resolvedAt`/`resolvedBy`/`adminNote`.
+  "Only one pending request per district" is an application-level check-then-insert in the route
+  (no partial unique index), not a DB constraint — same posture as everything else in this schema
+  that isn't safety-critical. There is deliberately no PDF/file-attachment field — a locked-out
+  DEO's request is reason-only, permanently, not a placeholder for a future upload.
 - **`POST /api/deo/request-unlock` is the first multipart/`FormData` route in this codebase** —
-  every other route reads `req.json()`. Don't copy this pattern for a route with no actual file
-  upload. Magic-byte check (`%PDF-` header, not the client-reported `Content-Type`) and a 2MB
-  size cap are both re-verified server-side, zero-trust per the Validation rules section above.
-  The R2 object key is always server-generated (`unlock-requests/{districtId}/{timestamp}.pdf`)
-  — the client's original filename is stored only as a display string, never used to build the
-  key or a path.
-- **R2 bucket** `excise-revenue-recovery-attachments`, meant to bind as `ATTACHMENTS` in
-  `api/wrangler.jsonc` — private, no public access/CORS/`R2.dev` URL. The only read path is
-  `GET /api/admin/unlock-requests/attachment?id=`, which takes the request `id` (never a raw R2
-  key from the client) and looks up `attachmentKey` server-side. **That binding is currently
-  commented out in `api/wrangler.jsonc`** — `wrangler deploy` hard-fails the entire Worker
-  deploy with `[code: 10042]` if it's present while the bucket doesn't exist (R2 needs a payment
-  method enabled on the Cloudflare account, not done yet). See
-  [R2_PDF_ATTACHMENT_REPROVISIONING.md](./R2_PDF_ATTACHMENT_REPROVISIONING.md) before touching
-  this binding.
+  every other route reads `req.json()`. Kept as `FormData` even though it carries only the
+  `reason` field, not worth a refactor to JSON for this one route.
 - **`GET /api/auth/me?role=deo`** (not a separate polling endpoint) also returns
   `pendingUnlockRequest: { requestedAt, reason } | null` — this route is already the DEO page's
   single source of truth for lock state, re-fetched on every load, so the pending-request flag
@@ -653,34 +661,15 @@ section documents the shipped shape.
   still `"pending"` before writing, to avoid a double-resolve race. Approve mirrors the existing
   `POST /api/admin/unlock/route.ts` district update, batched with the `unlock_requests` row
   update and an audit-log insert.
-- **In-browser PDF preview, not a forced download — built, not currently wired up**:
-  `components/ui/PdfPreviewModal.tsx` fetches the attachment as a blob via `apiFetchBlob()` (this
-  app has no cookies — see Auth above — so a plain `<iframe src="...">` can't attach the Bearer
-  token itself) and renders it through the **browser's own native PDF viewer** via
-  `URL.createObjectURL()`. Any script embedded in the PDF runs inside that native viewer's own
-  sandbox, not as page-level JS — this is why the attachment route sets `Content-Disposition:
-  inline` (not `attachment`) plus `X-Content-Type-Options: nosniff`. Revoke the object URL on
-  modal close. First non-SweetAlert2 modal in the app — an `<iframe>` doesn't fit Swal's
-  HTML-string API, same reasoning as the DEO-side form below. **The component is untouched, but
-  `/admin/unlock-requests/page.tsx` no longer imports or renders it** — the Attachment
-  column/"View" button/`previewFor` state were removed since nothing could ever populate an
-  attachment while the DEO-side upload is disabled, and a permanently-empty column read as dead
-  UI. Re-adding both sides is covered step-by-step in
-  [R2_PDF_ATTACHMENT_REPROVISIONING.md](./R2_PDF_ATTACHMENT_REPROVISIONING.md).
 - **DEO-side UI**: a plain inline form on the existing "Data Already Locked" card
-  (`deo-data-entry/page.tsx`), not SweetAlert2 — a `<textarea>` (+ eventually `<input
-  type="file">`) doesn't fit Swal's API either. **Reason-only for now — no PDF attachment field
-  is rendered.** R2 (its storage backend) needs a payment method on file to enable, even on the
-  free tier, and D1 was ruled out as a fallback (its 2MB per-row/BLOB cap sits right at this
-  feature's size limit, and a scanned letter can realistically exceed it). The server-side
-  provision stays fully live — `POST /api/deo/request-unlock` still accepts an optional
-  `attachment` field with magic-byte/size validation, the `ATTACHMENTS` R2 binding is in
-  `api/wrangler.jsonc`, and the admin attachment route + `PdfPreviewModal.tsx` both still work —
-  so re-enabling this is a **frontend-only** change (re-add the file input; see the comment on
-  `submitUnlockRequest()`) once R2 is actually provisioned — see
-  [R2_PDF_ATTACHMENT_REPROVISIONING.md](./R2_PDF_ATTACHMENT_REPROVISIONING.md) for the exact,
-  copy-paste-ready steps and code. The "Data Already Locked" card's English/Hindi paragraphs
-  point at the **Request Unlock** button rather than telling the DEO to contact the Admin
+  (`deo-data-entry/page.tsx`), not SweetAlert2 — a `<textarea>` doesn't fit Swal's API either.
+  Reason-only by design — no PDF attachment field, no R2 bucket, no attachment-preview route.
+  This was tried and deliberately removed (see ROADMAP.md's Milestone 28 changelog): R2 needs a
+  Cloudflare payment method on file, and D1 was ruled out as a fallback (its 2MB per-row/BLOB cap
+  sits right at a scanned letter's realistic size). Don't re-add a file input or R2 binding for
+  this feature without a fresh design discussion — it isn't a "pending" gap, it's a closed one.
+  The "Data Already Locked" card's English/Hindi paragraphs point at the **Request Unlock** button
+  rather than telling the DEO to contact the Admin
   outside the app. Submitting goes through `confirmUnlockRequest()` (`lib/alerts.ts`) — a
   blocking SweetAlert2 confirm, same "irreversible-ish action" pattern as
   `confirmFinalSubmit()`/`confirmClearYear()` — before the actual `POST` fires. The Submit

@@ -116,23 +116,34 @@ export const auditLog = sqliteTable("audit_log", {
 });
 
 // DEO self-service unlock requests (ROADMAP.md Milestone 28) — a locked-out DEO submits a
-// plaintext reason (+ optional PDF letter in R2) instead of only contacting an Admin outside
-// the app; an Admin approves (unlocks the district, same as the existing manual unlock) or
-// denies. "Only one pending request per district" is enforced in application code (a
-// check-then-insert in the route), not a DB constraint — this Drizzle/SQLite version has no
-// clean partial-unique-index support, and the TOCTOU race is low-stakes (worst case: two
-// pending rows, which the admin UI just shows both of).
+// plaintext reason instead of only contacting an Admin outside the app; an Admin approves
+// (unlocks the district, same as the existing manual unlock) or denies. "Only one pending
+// request per district" is enforced in application code (a check-then-insert in the route),
+// not a DB constraint — this Drizzle/SQLite version has no clean partial-unique-index support,
+// and the TOCTOU race is low-stakes (worst case: two pending rows, which the admin UI just
+// shows both of).
 export const unlockRequests = sqliteTable("unlock_requests", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   districtId: integer("district_id").notNull().references(() => districts.id),
   reason: text("reason").notNull(), // plaintext, bilingual, no rich-text/HTML — see CLAUDE.md
-  attachmentKey: text("attachment_key"), // R2 object key, null if no PDF attached
-  attachmentFilename: text("attachment_filename"), // original filename, display only — never used to build the R2 key
   status: text("status", { enum: ["pending", "approved", "denied"] }).notNull().default("pending"),
   requestedAt: text("requested_at").notNull(), // written from JS, never a SQL default — see pac_data.locked_at above
   resolvedAt: text("resolved_at"),
   resolvedBy: text("resolved_by"), // admin's email
   adminNote: text("admin_note"), // null while pending; always set on resolve (approve or deny) — never auto-copied from `reason`
+});
+
+// Per-IP fixed-window brute-force counter for POST /api/auth/verify-cug (see SECURITY.md's
+// H-01) — one row per IP, not one row per attempt, so a sustained brute-force run can't grow
+// this table unbounded. `ipHash` is a SHA-256 of the request's CF-Connecting-IP, never the raw
+// address, consistent with this app's "hash before storing" posture elsewhere (cug_hash,
+// email_hash-equivalent patterns). Not reused for magic-link requests — those are already rate
+// limited per-user via the existing magic_link_tokens table (see request-magic-link/route.ts),
+// which needs no IP tracking since the user is already identified by that point.
+export const loginAttempts = sqliteTable("login_attempts", {
+  ipHash: text("ip_hash").primaryKey(),
+  windowStart: text("window_start").notNull(), // ISO datetime the current window began
+  count: integer("count").notNull().default(1),
 });
 
 export const FINANCIAL_YEARS = [

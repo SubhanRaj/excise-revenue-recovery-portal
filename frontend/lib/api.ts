@@ -39,16 +39,3 @@ export async function apiFetchForm<T>(path: string, body: FormData, _role: Role)
   }
   return json as T;
 }
-
-// For binary responses (the unlock-request PDF attachment) — apiFetch() above always calls
-// res.json(), which would fail on a PDF body. The HttpOnly cookie is attached automatically by
-// the browser same as any other same-origin request; callers fetch the blob and hand it to
-// URL.createObjectURL since a plain <iframe src="..."> can't set headers itself anyway.
-export async function apiFetchBlob(path: string, _role: Role): Promise<Blob> {
-  const res = await fetch(`${API_BASE_URL}${path}`);
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new ApiError(body.error ?? "Unknown error occurred.", res.status);
-  }
-  return res.blob();
-}

@@ -169,6 +169,9 @@ CLAUDE.md's Repo shape section) — not an in-place repurposing of an existing f
 - [x] Demo/test CUG moved out of source and docs entirely: raw number lives only in the
       `DEMO_CUG` Cloudflare Worker secret; frontend bypass compares against a precomputed
       hash constant instead of the raw digits
+      **— removed in Milestone 38** (see below): an unsalted SHA-256 hash of a 10-digit number
+      is trivially reversible offline, so shipping that hash in the public frontend bundle was
+      equivalent to shipping a working credential.
 - [x] Fixed disabled DEO-nav buttons showing a pointer cursor instead of not-allowed
       (Tailwind preflight `button { cursor: pointer }` conflict — see CLAUDE.md)
 - [x] Admin table: fixed the sticky header (wasn't actually sticking), added a sticky
@@ -787,36 +790,28 @@ tooling only.
 - [x] No schema/migration change — this is entirely `frontend/lib/export.ts`, reading the same
       `rc_details` JSON already synced client-side.
 
-## Milestone 28 (shipped, reason-only for now) — DEO self-service unlock requests
+## Milestone 28 (shipped, reason-only, permanently) — DEO self-service unlock requests
 
 All schema/routes/frontend below are implemented and pushed — see CLAUDE.md's "DEO self-service
 unlock requests" section for how the shipped system works.
 
-**PDF attachment upload has no DEO-facing UI right now, by decision.** R2 wasn't enabled on the
-Cloudflare account (`wrangler r2 bucket create excise-revenue-recovery-attachments` failed with
-`[code: 10042]` — Cloudflare requires a payment method on file to enable R2 at all, even for
-free-tier usage). Storing the PDFs directly as a D1 `BLOB` instead was considered and rejected:
-D1 caps any single BLOB/row at 2,000,000 bytes, right at this feature's 2MB cap, and a scanned
-letter (image-based PDF, not text) can realistically blow past that — D1 isn't a safe fit for
-this content type at this size. Decision: ship reason-only requests now (no attachment field
-anywhere in the DEO UI), keep the **entire R2-based provision live and untouched** server-side —
-the `r2_buckets` binding in `api/wrangler.jsonc` (`ATTACHMENTS`), `POST
-/api/deo/request-unlock`'s magic-byte/size-validated attachment handling, the admin attachment
-route, and `PdfPreviewModal.tsx` — so turning it back on later is a **frontend-only** change
-(re-add a `<input type="file" accept="application/pdf">` to the request form in
-`deo-data-entry/page.tsx`, see the comment on `submitUnlockRequest()` there for exactly where).
-Once the department confirms R2 is worth setting up (card on file) or an alternative PDF store
-is chosen, revisit — this note is the trigger to do so, not a permanent decision. See
-[R2_PDF_ATTACHMENT_REPROVISIONING.md](./R2_PDF_ATTACHMENT_REPROVISIONING.md) for the complete,
-copy-paste-ready checklist (exact commands + exact code to re-add) — no need to re-derive any of
-this from the codebase when the time comes.
+**PDF attachment upload was fully removed (superseded by a later decision — see Milestone 37).**
+The design below originally shipped with the entire R2-based attachment provision built and kept
+live server-side (a placeholder DEO-side file input was never wired up, pending R2 being enabled
+on the Cloudflare account). The department later confirmed no document upload is needed for this
+flow, at all — not deferred, not pending R2. Milestone 37 removed every trace: the
+`attachment_key`/`attachment_filename` columns, the `r2_buckets` binding, the admin attachment
+route, `PdfPreviewModal.tsx`, and `R2_PDF_ATTACHMENT_REPROVISIONING.md`. Unlock requests are
+reason-only, permanently — the design/security notes below are kept as historical record of why
+R2 was chosen at the time, not as a live re-enablement plan.
 
 **Problem**: today a locked-out DEO's only option is to contact an Admin outside the app (phone/
 email) and ask them to unlock the district manually via `promptUnlockReason()` on
 `/admin/districts`. This adds an in-app request/response loop: a DEO submits a plaintext reason
-(+ optional PDF letter) from the locked-out screen; an Admin sees a queue of these requests and
-approves (which unlocks the district, same as today's manual unlock) or denies (district stays
-locked, DEO sees why). Everything below is unstarted — this section exists to pick one option per
+(+ originally, optionally, a PDF letter) from the locked-out screen; an Admin sees a queue of
+these requests and approves (which unlocks the district, same as today's manual unlock) or denies
+(district stays locked, DEO sees why). Everything below is unstarted — this section exists to
+pick one option per
 open question before writing any code, not to describe what's built.
 
 ### Schema — new `unlock_requests` table
@@ -1192,6 +1187,77 @@ just extended to also require one on deny.
 - [x] CLAUDE.md's Auth section rewritten in place ("Why cookies again" replaces "Why not
       cookies", documenting both migrations and why each was correct for its own constraint);
       DEPLOY.md's secrets/known-constraints/verification sections updated to match.
+
+## Milestone 37 — SEO/OpenGraph metadata, robots.txt, R2 attachment removal (done)
+
+- [x] Added SEO/OpenGraph metadata and a generated OG image to `frontend/app/layout.tsx` for
+      link-preview cards when the portal's URL is shared.
+- [x] Added `frontend/public/robots.txt`, then fixed it to use path-specific `Disallow` rules
+      instead of a blanket one — a blanket `Disallow: /` would have also blocked the public
+      `/login` page from being indexed, not just the DEO/Admin authenticated areas.
+- [x] **Removed the PDF-attachment upload feature entirely** — the department confirmed no
+      document upload is needed for unlock requests, now or later (see Milestone 28's note).
+      Deleted, not deferred: `unlock_requests.attachment_key`/`attachment_filename` columns
+      (migration `0010_mixed_ultron`, additive-only `DROP COLUMN`s — no data loss on other
+      columns), the commented-out `r2_buckets` binding in `api/wrangler.jsonc`, the PDF
+      magic-byte/size validation in `POST /api/deo/request-unlock`, the whole `GET
+      /api/admin/unlock-requests/attachment` route, `frontend/components/ui/PdfPreviewModal.tsx`,
+      `frontend/lib/api.ts`'s now-unused `apiFetchBlob()`, and `R2_PDF_ATTACHMENT_REPROVISIONING.md`.
+      Unlock requests are reason-only, permanently — see CLAUDE.md's "DEO self-service unlock
+      requests" section, rewritten to match. `pnpm exec tsc --noEmit` clean on both apps.
+- [ ] Migration `0010_mixed_ultron` generated but **not yet applied to remote D1**
+      (`pnpm run db:migrate:remote` from `api/`) — do this before/with the next API deploy, same
+      staged-migration caution as every other schema change in this repo (see Milestone 22's
+      `rc_details` column for the precedent).
+
+## Milestone 38 — Security audit: SECURITY.md, dependency CVEs, CUG brute-force fix (done)
+
+Full audit report at [SECURITY.md](./SECURITY.md) (new file). Summary of what shipped:
+
+- [x] **Next.js `16.2.10` → `16.2.12`** (both apps) — patches 9 known CVEs including a
+      middleware/proxy bypass directly relevant to this app's cookie-auth model, plus SSRF and
+      DoS issues. Patch-only bump (same `16.2.x` line), so it doesn't touch the
+      OpenNext/`proxy.ts` compatibility constraint (see DEPLOY.md). Verified via `tsc --noEmit`,
+      `next build`, `opennextjs-cloudflare build`, and `wrangler deploy --dry-run` on both apps —
+      nothing deployed as part of this audit.
+- [x] **Security response headers added** — `frontend/public/_headers` gained `X-Frame-Options`,
+      `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, HSTS; the API's shared
+      `withErrorHandling()` wrapper now sets the equivalent on every JSON response (all 15
+      routes, one place). `Content-Security-Policy` deliberately deferred — this layout leans on
+      multiple CDN scripts (jsDelivr) and inline script/style blocks with no nonce
+      infrastructure; a draft policy is in SECURITY.md for whoever picks this up, but it needs a
+      real-browser verification pass first, not a blind ship against a live app.
+- [x] **CUG login brute-force fix (H-01 in SECURITY.md) — the headline finding.** The frontend's
+      `CUG_PREFIX = "94544"` constant shipped in the public static bundle shrank an attacker's
+      search space from 10 billion to 100,000 combinations, with zero rate limiting on
+      `verify-cug`. Fixed in two layers: (1) removed `CUG_PREFIX` entirely from
+      `app/login/page.tsx` — no client-side CUG pre-validation of any kind anymore, the server is
+      the only real gate; (2) added real per-IP rate limiting server-side — new `login_attempts`
+      table (migration `0011_right_thunderball`, one row per IP hash, not per attempt) and
+      `api/lib/rate-limit.ts`'s `checkIpRateLimit()`, a fixed 10-attempts-per-5-minutes window
+      keyed by a hash of `CF-Connecting-IP`, checked before `verify-cug` even queries `users`.
+      Also added a client-side 30-second cooldown after 3 failed attempts (UX nicety, not the
+      security boundary). **Ported the identical fix to the sibling
+      `up-excise-spatial-revenue-optimizer` project** (`packages/schema/src/auth.ts`,
+      `migrations/0006_add_login_attempts.sql`, `apps/web/src/lib/rate-limit.ts`, its
+      `verify-cug/route.ts` and `LoginForm.tsx`) — that project's CUG login had the same
+      "no rate limiting at all" gap, confirmed by reading its route directly during this audit.
+- [x] **Removed the `DEMO_CUG_HASH` exemption entirely (L-01)** — a precomputed SHA-256 hash of
+      the demo account's CUG number, shipped in the public frontend bundle. SHA-256 of an
+      unsalted 10-digit number is trivially reversible offline (well under a minute), so
+      publishing that hash was equivalent to publishing a working login credential. There is now
+      no client-side bypass for any account, demo included — CLAUDE.md's Auth section and
+      TESTING.md's manual demo script updated to match.
+- [x] **Magic-link request rate limiting (L-02)** — `POST /api/auth/request-magic-link` had no
+      throttle at all (inbox-bombing risk, and risk of exhausting Resend's daily send quota,
+      blocking every admin's real login). Fixed by porting the sibling project's own pattern:
+      count existing `magic_link_tokens` rows for that user issued within the current 15-minute
+      TTL window (no new schema — a token's fixed TTL makes `expiresAt > now` equivalent to
+      "issued recently"), reject at 3. Still returns `{ ok: true }` when rate-limited, preserving
+      the existing no-enumeration behavior.
+- [x] Remaining open items from the audit (dependency CVEs in build-time-only transitive deps,
+      CSP, `admin/truncate-demo-data` not owner-gated) are documented in SECURITY.md as accepted
+      risk or deferred with a concrete reason — not silently dropped.
 
 ## Backlog / not started
 

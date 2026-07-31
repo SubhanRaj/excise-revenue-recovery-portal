@@ -256,13 +256,6 @@ export default function EntryPage() {
     router.replace("/login");
   }
 
-  // PDF attachment upload has no UI here for now — R2 (its storage backend) needs a payment
-  // method on file to enable, even on Cloudflare's free tier, which isn't set up yet. The
-  // provision stays intact server-side (POST /api/deo/request-unlock still accepts an optional
-  // `attachment` field) — the admin Attachment column/PdfPreviewModal.tsx wiring was removed
-  // from /admin/unlock-requests since nothing can produce an attachment right now; see
-  // R2_PDF_ATTACHMENT_REPROVISIONING.md for the full re-add checklist (DEO input here, and the
-  // admin table + modal wiring) once R2 is enabled. Until then, requests are reason-only.
   async function submitUnlockRequest() {
     const reason = requestReason.trim();
     if (!reason) return notifyToast({ icon: "error", title: BLANK_FIELD_TITLE, text: BLANK_FIELD_TEXT });
@@ -443,7 +436,6 @@ export default function EntryPage() {
                     className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                   />
                 </div>
-                {/* No PDF attachment input yet — see the comment on submitUnlockRequest() above. */}
                 {requestError && <p className="text-sm font-bold text-red-600 dark:text-red-400">{requestError}</p>}
                 <div className="flex gap-2">
                   <Button variant="primary" size="sm" className="flex-1" onClick={submitUnlockRequest} disabled={requestSubmitting}>

@@ -18,7 +18,6 @@ export const GET = withErrorHandling("admin/unlock-requests", async (req: NextRe
       districtId: unlockRequests.districtId,
       districtName: districts.districtName,
       reason: unlockRequests.reason,
-      attachmentFilename: unlockRequests.attachmentFilename,
       status: unlockRequests.status,
       requestedAt: unlockRequests.requestedAt,
       resolvedAt: unlockRequests.resolvedAt,

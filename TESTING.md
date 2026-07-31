@@ -73,9 +73,10 @@ manual DB insert:
 
 1. Sign in as Admin, open the profile menu (top right) → **DEO Provisioning**, click
    **Download DEO Template**, open the `.xlsx` — column A has all 75 district names pre-filled.
-2. Fill in the demo CUG (see the `DEMO_CUG` Worker secret, not written here) in the "DEO CUG
-   Mobile" column for `Lucknow`, save, and **Upload DEO Data** the same file back. A toast
-   confirms `1 added, 0 updated`.
+2. Fill in the demo CUG (see the `DEMO_CUG` Worker secret, not written here — any 10-digit
+   number, like any real DEO's, since there is no client-side pre-validation or bypass for any
+   account; see CLAUDE.md's Auth section) in the "DEO CUG Mobile" column for `Lucknow`, save, and
+   **Upload DEO Data** the same file back. A toast confirms `1 added, 0 updated`.
 3. (Manual DB insert is still available as a fallback — same `INSERT INTO users (role,
    cug_hash, district_id) VALUES ('deo', '<sha256 of the demo CUG>', (SELECT id FROM
    districts WHERE district_name = 'Lucknow'));` as before — but the template round trip
@@ -147,8 +148,8 @@ Then:
    elsewhere, which does still confirm).
 3a. **Self-service unlock request, same locked DEO session**: click **Request Unlock** — an
     inline form opens on the card (not a SweetAlert2 popup): a reason textarea only, no file
-    input (PDF attachment upload is deliberately not shown right now — pending R2, see
-    ROADMAP.md's Milestone 28). Submitting blank — blocked with the same bilingual blank-field
+    input — requests are reason-only by design (see ROADMAP.md's Milestone 28). Submitting
+    blank — blocked with the same bilingual blank-field
     toast as any other field. Fill in a reason and click the blue **Submit Request** button — a
     bilingual SweetAlert2 confirm should appear first ("Submit unlock request?"); cancelling it
     should leave the form open and untouched, nothing sent. Confirming should show a spinning
@@ -176,11 +177,7 @@ Then:
    district's RC rows — confirm the header row's filter dropdowns (AutoFilter) let you narrow to
    one District/FY/Stayed value.
 4a. **Admin → Unlock Requests** (top nav): the pending request from step 3a should appear —
-    district, requested-at (IST), reason, and `—` in the Attachment column (no PDF was attached
-    — that field is currently unreachable from the DEO UI, see step 3a). The PDF preview path
-    (`PdfPreviewModal.tsx`, native-viewer iframe + Download button) isn't exercisable in this
-    script until the DEO-side file input is re-added — not a bug if it stays untested for now.
-    Click **Deny** on a *different* pending request (or resubmit one first) — a SweetAlert2 prompt
+    district, requested-at (IST), and reason. Click **Deny** on a *different* pending request (or resubmit one first) — a SweetAlert2 prompt
     requires a note (blank rejected); confirm it moves to "denied" status with your note shown,
     the district stays locked. Click **Approve** on the original request — same required-note
     prompt; confirm the district unlocks (check Districts page shows it unlocked) and the row's

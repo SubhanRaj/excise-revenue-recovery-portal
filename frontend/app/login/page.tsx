@@ -12,11 +12,12 @@ import { SITE_TITLE_EN, SITE_TITLE_HI, DATA_PERIOD_EN } from "@/lib/site";
 
 type Tab = "cug" | "email";
 
-// Excise Dept. CUG mobile numbers all start with this prefix. The seeded
-// demo/test account is exempted (by hash, not by number, so the raw value
-// never appears in shipped source) so it keeps working outside that range.
-const CUG_PREFIX = "94544";
-const DEMO_CUG_HASH = "ce3a598687c8d2e5aa6bedad20e059b4a78cca0adad7e563b07998d5cd226b8c";
+// Client-side cooldown after repeated failed CUG attempts — a UX nicety only, not a security
+// boundary (an attacker skips the frontend and hits the API directly). The real enforcement is
+// server-side, per-IP, in POST /api/auth/verify-cug (see SECURITY.md's H-01). This just slows
+// down a casual retry loop from this one browser tab and surfaces the server's 429 clearly.
+const COOLDOWN_AFTER_FAILURES = 3;
+const COOLDOWN_SECONDS = 30;
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,6 +27,8 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
 
   function switchTab(next: Tab) {
     setTab(next);
@@ -35,25 +38,36 @@ export default function LoginPage() {
   async function submitCug(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (cooldownUntil && Date.now() < cooldownUntil) {
+      const secondsLeft = Math.ceil((cooldownUntil - Date.now()) / 1000);
+      return setError(`Too many attempts — please wait ${secondsLeft}s before trying again.`);
+    }
     if (!/^\d{10}$/.test(mobile)) {
       return setError("Please enter a valid 10-digit mobile number.");
     }
     setBusy(true);
     try {
       const cugHash = await sha256Hex(mobile);
-      if (cugHash !== DEMO_CUG_HASH && !mobile.startsWith(CUG_PREFIX)) {
-        setBusy(false);
-        return setError("Invalid user.");
-      }
       const res = await apiFetch<{ role: "deo" | "admin"; districtId: number | null }>(
         "/api/auth/verify-cug",
         { method: "POST", body: JSON.stringify({ cugHash }) }
       );
+      setFailedAttempts(0);
       markLastRole(res.role);
       markJustAuthed();
       router.push(res.role === "admin" ? "/admin" : "/deo-data-entry");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Login failed.");
+      const nextFailures = failedAttempts + 1;
+      setFailedAttempts(nextFailures);
+      if (err instanceof ApiError && err.status === 429) {
+        setCooldownUntil(Date.now() + COOLDOWN_SECONDS * 1000);
+        setError("Too many attempts — please wait before trying again.");
+      } else if (nextFailures >= COOLDOWN_AFTER_FAILURES) {
+        setCooldownUntil(Date.now() + COOLDOWN_SECONDS * 1000);
+        setError(`Too many failed attempts — please wait ${COOLDOWN_SECONDS}s before trying again.`);
+      } else {
+        setError(err instanceof ApiError ? err.message : "Login failed.");
+      }
     } finally {
       setBusy(false);
     }
