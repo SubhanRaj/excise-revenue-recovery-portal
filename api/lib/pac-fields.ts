@@ -1,14 +1,8 @@
-// Mirrors api/db/schema.ts field-by-field. Kept duplicated on purpose — frontend and api
-// are decoupled deployments with no shared package.
-export const FINANCIAL_YEARS = [
-  "2021-22",
-  "2022-23",
-  "2023-24",
-  "2024-25",
-  "2025-26",
-] as const;
-
-export type FinancialYear = (typeof FINANCIAL_YEARS)[number];
+// Single source of truth now that the UI and API share one app — re-exported from
+// @/db/schema (the Drizzle schema file) rather than redefined, since that's where the DB's own
+// notion of a financial year already lives.
+export { FINANCIAL_YEARS, type FinancialYear } from "@/db/schema";
+import { FINANCIAL_YEARS, type FinancialYear } from "@/db/schema";
 
 export type MoneyField = "grossArrears" | "rcAmount" | "recoveredAmount" | "stayAmount";
 export type CountField = "rcCount" | "stayCount";
@@ -51,12 +45,11 @@ export function isMoneyField(field: PacField): field is MoneyField {
   return (MONEY_FIELDS as string[]).includes(field);
 }
 
-// Per-RC breakdown behind rcCount/rcAmount — mirrored byte-for-byte in api/lib/rc-details.ts
-// (see CLAUDE.md's Data model section). Independent of recoveredAmount/stayAmount/
-// openingBalance/netRecoverable: an RC is issued to inform a defaulter what they owe, for any
-// amount, regardless of what's actually recovered. `stayed` (a court staying this specific RC)
-// is a separate concept from the aggregate Stay Count/Stay Amount fields (a court staying
-// recovery of an amount) — no cross-check between the two.
+// Per-RC breakdown behind rcCount/rcAmount (see CLAUDE.md's Data model section). Independent of
+// recoveredAmount/stayAmount/openingBalance/netRecoverable: an RC is issued to inform a
+// defaulter what they owe, for any amount, regardless of what's actually recovered. `stayed`
+// (a court staying this specific RC) is a separate concept from the aggregate Stay Count/Stay
+// Amount fields (a court staying recovery of an amount) — no cross-check between the two.
 export type RcDetail = {
   rcNumber: string;
   rcAmount: number;
@@ -65,9 +58,9 @@ export type RcDetail = {
 
 export const RC_NUMBER_MAX_LENGTH = 50;
 
-// Zero-trust validator, mirrored server-side in api/lib/rc-details.ts's function of the same
-// name — used here both as YearStepForm's pre-Save&Continue check and the submit route's final
-// zero-trust check. Returns a plain English message or null if valid.
+// Zero-trust validator — used both as YearStepForm's pre-Save&Continue client-side check and
+// the submit route's final server-side check on the untrusted request body (hence the runtime
+// `typeof` guards below even though RcDetail's TS type already promises these shapes).
 export function validateRcDetails(rcCount: number, rcAmount: number, rcDetails: RcDetail[]): string | null {
   if (rcDetails.length !== rcCount) {
     return `RC Details must have exactly ${rcCount} entries (received ${rcDetails.length})`;
@@ -82,6 +75,9 @@ export function validateRcDetails(rcCount: number, rcAmount: number, rcDetails: 
     }
     if (typeof d.rcAmount !== "number" || Number.isNaN(d.rcAmount) || d.rcAmount < 0) {
       return `RC #${i + 1}: RC Amount must be a non-negative number`;
+    }
+    if (typeof d.stayed !== "boolean") {
+      return `RC #${i + 1}: stayed must be true or false`;
     }
     sum += d.rcAmount;
   }
@@ -113,12 +109,11 @@ export interface NetRecoverableEntry {
   netRecoverable: number;
 }
 
-// Cumulative running balance, mirrored server-side in api/lib/net-recoverable.ts (see CLAUDE.md's
-// Data model section) — kept duplicated on purpose, same as every other cross-app constant. For
-// the first FY, openingBalance is 0. For every later FY, openingBalance is the previous FY's
-// netRecoverable, and netRecoverable = max(0, openingBalance + grossArrears - recoveredAmount -
-// stayAmount) — uses recoveredAmount, not rcAmount, for the same reason as before: an RC being
-// issued for an amount doesn't mean that amount was actually recovered.
+// Cumulative running balance (see CLAUDE.md's Data model section). For the first FY,
+// openingBalance is 0. For every later FY, openingBalance is the previous FY's netRecoverable,
+// and netRecoverable = max(0, openingBalance + grossArrears - recoveredAmount - stayAmount) —
+// uses recoveredAmount, not rcAmount, for the same reason as before: an RC being issued for an
+// amount doesn't mean that amount was actually recovered.
 export function netRecoverableForYear(
   grossArrears: number,
   recoveredAmount: number,
@@ -132,11 +127,12 @@ export function netRecoverableForYear(
 }
 
 // Runs netRecoverableForYear() across every FY in order for one district, carrying each FY's
-// result forward as the next FY's opening balance. Only ever used for the DEO's own
-// not-yet-submitted Dexie draft (YearStepForm/MasterView) — once a district is submitted, every
-// admin-facing view reads openingBalance/netRecoverable straight off the synced pac_data row
-// instead of recomputing (server is the source of truth there). A missing FY is treated as
-// all-zero, same as every other place in this app that reads a possibly-absent pac_data row.
+// result forward as the next FY's opening balance. Client-side, only ever used for the DEO's
+// own not-yet-submitted Dexie draft (YearStepForm/MasterView) — once a district is submitted,
+// every admin-facing view reads openingBalance/netRecoverable straight off the synced pac_data
+// row instead of recomputing (server is the source of truth there). Server-side, the submit
+// route calls this same function on the just-validated request body, where every FY is always
+// present. A missing FY is treated as all-zero either way.
 export function computeNetRecoverableSeries(
   fieldsByFy: Partial<Record<FinancialYear, { grossArrears: number; recoveredAmount: number; stayAmount: number }>>
 ): Record<FinancialYear, NetRecoverableEntry> {

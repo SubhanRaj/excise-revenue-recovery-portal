@@ -31,10 +31,9 @@ export function countAmountErrors(year: DraftYear): string[] {
   return errors;
 }
 
-// Exported so deo-data-entry/page.tsx's saveAndContinue() can block on the same rule — mirrors
-// the zero-trust api/lib/rc-details.ts validator (row count + per-entry blanks + running total)
-// via the shared frontend/lib/pac-fields.ts copy, converting DraftRcDetail's raw string amounts
-// to numbers first.
+// Exported so deo-data-entry/page.tsx's saveAndContinue() can block on the same rule — calls
+// the zero-trust @/lib/pac-fields.ts validator (row count + per-entry blanks + running total),
+// converting DraftRcDetail's raw string amounts to numbers first.
 export function rcDetailsError(year: DraftYear): string | null {
   const rcCount = Number(year.rcCount) || 0;
   if (rcCount === 0) return null;

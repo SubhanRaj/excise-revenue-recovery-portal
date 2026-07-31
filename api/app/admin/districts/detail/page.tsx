@@ -27,7 +27,7 @@ function formatValue(field: (typeof PAC_FIELD_ORDER)[number], value: number) {
 type RcDetail = { rcNumber: string; rcAmount: number; stayed: boolean };
 
 // Lenient — this is a read-only admin display of a value the server already validated at
-// submit time (see api/lib/rc-details.ts), not a fresh zero-trust boundary.
+// submit time (see @/lib/pac-fields.ts), not a fresh zero-trust boundary.
 function parseRcDetails(raw: string | undefined): RcDetail[] {
   if (!raw) return [];
   try {

@@ -78,7 +78,7 @@ function istFilenameStamp(): string {
 type RcDetail = { rcNumber: string; rcAmount: number; stayed: boolean };
 
 // Lenient — this reads a value the server already validated at submit time (see
-// api/lib/rc-details.ts), not a fresh zero-trust boundary.
+// @/lib/pac-fields.ts), not a fresh zero-trust boundary.
 function parseRcDetails(raw: string | undefined): RcDetail[] {
   if (!raw) return [];
   try {
