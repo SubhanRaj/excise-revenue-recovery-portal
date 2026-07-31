@@ -51,6 +51,12 @@ const METADATA_KEY_LABELS: Record<string, string> = {
   updated: "Updated",
   errors: "Errors",
   totalRows: "Total rows",
+  newAdminEmail: "New admin email",
+  newAdminName: "New admin name",
+  targetAdminId: "Admin ID",
+  targetAdminEmail: "Admin email",
+  deletedAdminEmail: "Deleted admin email",
+  deletedAdminName: "Deleted admin name",
 };
 
 // Name/designation are captured at write time (see api/lib/audit.ts) — an admin's later name

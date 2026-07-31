@@ -506,8 +506,8 @@ separate routes, not an in-page toggle:
   time — see the Audit Log entry below), and `districts.unlocked_by`. Both fields are
   admin-only in practice — DEOs don't have them set, so their own identity display (name via
   `submitted_by_name`, "DEO {district}" everywhere else) is unchanged. Provisioning an
-  additional admin (beyond the original bootstrap account) is still a direct D1 insert
-  (`role: 'admin'`, plus `name`/`designation` if wanted) — no self-service UI yet.
+  additional admin beyond the original bootstrap account now goes through **`/admin/users`**
+  (Milestone 40) instead of a direct D1 insert — see below.
 - **DEO Provisioning is owner-only.** `OWNER_EMAIL` Worker secret + `GET /api/auth/me`'s
   `isOwner` gate which admin account can see/use `/admin/districts/provisioning` — every other
   admin (the department officials above) has the link hidden in `ProfileMenu` and gets a 403
@@ -515,6 +515,23 @@ separate routes, not an in-page toggle:
   districts with no DEO yet (`GET /api/admin/districts`'s `deoUserId`, distinct from
   `deoEmail` since a CUG-only DEO has no email) — a routine download-fill-upload can't
   accidentally overwrite an existing DEO's login.
+- **`/admin/users`** (Milestone 40) — owner-only, same `isOwner` gate/reveal pattern as
+  `/admin/districts/provisioning`: hidden from non-owner admins in `ProfileMenu`, not in the
+  flat nav, and enforced for real by every route in `api/app/api/admin/users/route.ts`
+  (`GET`/`POST`/`PATCH`/`DELETE`, all sharing one inline `getOwnerActor()` check — no shared
+  `[id]` dynamic segment exists anywhere in this API, so `PATCH`/`DELETE` take the target's `id`
+  in the JSON body, same as `POST /api/admin/unlock-requests/resolve`). Lets the owner add a new
+  admin (`name`+`email` required, `designation` optional; role hardcoded `"admin"` — no CUG,
+  since admins authenticate via magic link, not CUG) or edit/remove an existing one from a plain
+  inline add/edit form + table (no drawer/modal component — one page, one call site, not worth
+  building one). The owner's own row can have its name/designation edited here but never its
+  email, and can never be deleted — both blocked server-side (400), since `OWNER_EMAIL` is
+  compared by value against `users.email` (see `auth/me`'s `isOwner` above); silently changing
+  it would strand the owner out of every owner-only page including this one. Deleting an admin
+  also deletes their `magic_link_tokens` rows in the same `db.batch()` (they reference
+  `users.id` and would otherwise orphan). Audit events: `admin_user_created`,
+  `admin_user_updated`, `admin_user_deleted` — their metadata keys are in `/admin/audit`'s
+  `METADATA_KEY_LABELS`.
 - **`/admin/audit`** — paginated (100/page), newest-first, auto-pruned to 30 days on read. A
   "Filter by event" `<select>` and a separate sort button (`ti-sort-descending`/`ti-sort-
   ascending`) both apply only to the currently-loaded page in memory — no extra request. Uses the

@@ -1285,6 +1285,33 @@ Full audit report at [SECURITY.md](./SECURITY.md) (new file). Summary of what sh
       — now accurately describes the asymmetry (one retired by choice, one unavoidably still
       live) and why.
 
+## Milestone 40 — Admin Users management panel (`/admin/users`) (done)
+
+- [x] Provisioning an additional admin (beyond the original bootstrap account) used to be a
+      manual direct D1 insert (CLAUDE.md's old wording) — replaced with a self-service owner-only
+      page, mirroring the equivalent panel added to the sibling
+      `up-excise-spatial-revenue-optimizer` project.
+- [x] `api/app/api/admin/users/route.ts` — `GET` (list admins), `POST` (create), `PATCH`/`DELETE`
+      (edit/remove, target `id` in the JSON body — no dynamic `[id]` route segment exists
+      anywhere in this API, so this matches the existing
+      `POST /api/admin/unlock-requests/resolve` convention instead of introducing a new one).
+      All four gated by the same inline `getOwnerActor()` check used by
+      `admin/provision-deos/route.ts` (`OWNER_EMAIL` Worker secret compared against the
+      session's own `users.email`). Creating an admin needs only `name`+`email` (`designation`
+      optional) — no CUG, since admins authenticate via magic link, not the DEO's CUG flow.
+- [x] The owner's own row can't have its email changed or be deleted here (both 400s
+      server-side) — since `OWNER_EMAIL` is compared by value, silently changing it would strand
+      the owner out of every owner-only page including this one. Deleting an admin also deletes
+      their `magic_link_tokens` rows in the same `db.batch()`.
+- [x] `frontend/app/admin/users/page.tsx` — plain inline add/edit form + table (no drawer/modal
+      component, since this is the only place that needs one). Linked from `ProfileMenu`
+      alongside "DEO Provisioning", same `isOwner`-gated reveal, not in the flat nav.
+- [x] New audit events `admin_user_created`/`admin_user_updated`/`admin_user_deleted`, labeled in
+      `/admin/audit`'s `METADATA_KEY_LABELS`.
+- [x] Verified via a full `tsc --noEmit` + `opennextjs-cloudflare build` (API) and `next build`
+      (frontend) — both clean, `/api/admin/users` and `/admin/users` present in each build's
+      route list.
+
 ## Backlog / not started
 
 - [ ] **Archive previous PAC data on resubmission-after-unlock** — today, when a DEO resubmits

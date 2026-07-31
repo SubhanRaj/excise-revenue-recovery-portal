@@ -142,13 +142,14 @@ A returning DEO lands in one of three states, decided by the server's current lo
 
 ### Admin
 
-Six pages: **Dashboard** (KPI cards + charts, totals across all 5 years), **Districts**
+Seven pages: **Dashboard** (KPI cards + charts, totals across all 5 years), **Districts**
 (sortable/searchable table, lock/unlock, exports), **district detail** (one district's full
 5-year figures), **Unlock Requests** (queue of DEO self-service unlock requests, approve/deny
 with a required note), **DEO Provisioning** (bulk DEO
-login upload/download, reached via the profile menu rather than the main nav), **Audit Log**
-(login/lock/unlock/unlock-request history). All six share one Dexie-backed cache with a manual
-Sync button.
+login upload/download, reached via the profile menu rather than the main nav), **Admin Users**
+(add/edit/remove admin accounts, also profile-menu-only, owner-gated), **Audit Log**
+(login/lock/unlock/unlock-request/admin-user history). All seven share one Dexie-backed cache
+with a manual Sync button.
 
 ### Bulk DEO provisioning
 

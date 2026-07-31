@@ -104,6 +104,16 @@ export default function ProfileMenu({
               DEO Provisioning
             </Link>
           )}
+          {profile.role === "admin" && profile.isOwner && (
+            <Link
+              href="/admin/users"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-1.5 rounded-md text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+            >
+              <i className="ti ti-users-group text-base text-slate-400" />
+              Admin Users
+            </Link>
+          )}
           {profile.role === "admin" && lastSyncedAt !== undefined && (
             <div
               title="When the districts/PAC cache was last refreshed from the server"
