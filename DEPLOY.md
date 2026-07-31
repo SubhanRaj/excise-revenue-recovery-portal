@@ -1,63 +1,55 @@
 # Deploying the Excise Revenue Recovery Portal
 
-Two independent Cloudflare deployments — an API Worker (`/api`, via OpenNext) and a Pages
-static site (`/frontend`) — plus one D1 database. This doc is the source of truth for
-current production state and the exact commands to redeploy or rebuild from scratch. See
-[ROADMAP.md](./ROADMAP.md) for what's shipped (each deploy-affecting milestone is logged
-there) and [CLAUDE.md](./CLAUDE.md) for how the system itself works.
+One Cloudflare Worker (`/api`, via OpenNext — serves both the UI and `/api/*`) plus one D1
+database. This doc is the source of truth for current production state and the exact commands
+to redeploy or rebuild from scratch. See [ROADMAP.md](./ROADMAP.md) for what's shipped (each
+deploy-affecting milestone is logged there) and [CLAUDE.md](./CLAUDE.md) for how the system
+itself works.
+
+**This reflects the target state after Milestone 41's app merge and its production cutover.**
+If you're reading this while `migrate/single-worker-app` is still an unmerged branch, the
+*actual* live production state may still be the pre-Milestone-41 two-deployment setup (a
+separate Pages project + a path-scoped Worker Route) — check `wrangler pages project list` and
+the Worker's `routes` in the Cloudflare dashboard before assuming this doc matches what's
+currently serving traffic. See "Cutting over from the old two-deployment setup" below for the
+one-time manual steps that make this doc accurate.
 
 ## Current production deployment
 
 | Resource        | Value                                                                 |
 | ---------------- | ---------------------------------------------------------------------- |
 | Cloudflare account | `Subhan` (`4d93d751987b8d9ff101445570e72711`)                       |
-| Custom domain (primary) | https://excisebakaya.exciseup.in — Pages custom domain + a path-scoped Worker Route for `/api/*` (see ROADMAP.md's Milestone 35) |
-| API Worker        | `excise-revenue-recovery-api` — its `*.workers.dev` URL is **retired** (`workers_dev: false` in `api/wrangler.jsonc`, see ROADMAP.md's Milestone 39) |
-| Pages project      | `excise-revenue-recovery-portal` — https://excise-revenue-recovery-portal.pages.dev (still live, unavoidably — see below) |
-| D1 database        | `excise-revenue-recovery-db` (id `4f3e37fd-006a-4bce-b2d3-4bfb8bb16248`), region APAC |
+| Custom domain (primary) | https://excisebakaya.exciseup.in — a Worker Route matching the whole domain (`/*`), not path-scoped to `/api/*` anymore (see ROADMAP.md's Milestone 41) |
+| Worker            | `excise-revenue-recovery-api` — serves the UI and `/api/*` both. Name kept from before the merge (see CLAUDE.md's Repo shape); its `*.workers.dev` URL is **retired** (`workers_dev: false` in `api/wrangler.jsonc`, see ROADMAP.md's Milestone 39) |
+| Pages project      | **retired** (Milestone 41) — the old `/frontend` static-export app and its Pages project no longer exist; there is no `*.pages.dev` URL to worry about anymore |
+| D1 database        | `excise-revenue-recovery-db` (id `4f3e37fd-006a-4bce-b2d3-4bfb8bb16248`), region APAC — unchanged by the Milestone 41 app merge, same database, same binding |
 | Superadmin         | `shubhanraj2002@gmail.com` (role `admin`, signs in via Magic Link)   |
-
-**`*.pages.dev` stays live; `*.workers.dev` is retired — and that asymmetry is a Cloudflare
-platform constraint, not a choice.** Both were originally kept alive deliberately during
-Milestone 35's rollout (custom domain additive, not a replacement, in case anything needed
-rolling back). Once the custom domain proved stable, the grace period ended (Milestone 39):
-`workers_dev` flipped to `false`, killing the API's `*.workers.dev` URL — Cloudflare disables it
-automatically once a `routes` entry exists, same behavior the sibling
-`up-excise-spatial-revenue-optimizer` project already relies on for its own single-Worker setup.
-The Pages side has **no equivalent toggle** — `excisebakaya.exciseup.in` is a custom domain
-*attached to* the `excise-revenue-recovery-portal` Pages project, not a separate deployment, and
-Cloudflare gives every Pages project a `.pages.dev` URL with no dashboard/CLI setting to disable
-it independently (`wrangler pages project` only supports `list`/`create`/`delete` — deleting the
-project to kill the URL would also destroy the live custom domain, since it's the same project).
-Not a security exposure in practice: sessions are `HttpOnly`/host-only cookies that never attach
-to a different hostname, so `.pages.dev` only ever serves the same static, unauthenticated shell.
-`FRONTEND_URL` points at the custom domain (see Secrets below), so magic-link emails always
-resolve to `excisebakaya.exciseup.in` regardless of which URL a user is browsing from.
 
 Auth to Cloudflare: `pnpm exec wrangler whoami` (already logged in via OAuth on this machine).
 Re-auth elsewhere with `pnpm exec wrangler login`.
 
 ## CI/CD — GitHub Actions is the primary deploy path
 
-`.github/workflows/ci.yml` and `deploy.yml` typecheck/build/deploy `api/` and `frontend/`
-independently, path-filtered so a docs-only commit doesn't trigger anything. Deploys run
-automatically on push to `master` when `api/**` or `frontend/**` actually changed, and can
-always be triggered manually regardless of what changed:
+`.github/workflows/ci.yml` and `deploy.yml` each have a single job now (Milestone 41 collapsed
+the old path-filtered `api`/`frontend` split — there's only one app to typecheck/build/deploy).
+Deploys run automatically on push to `master` when `api/**` actually changed, and can always be
+triggered manually regardless:
 
 ```bash
-gh workflow run deploy.yml -f target=both     # or target=api / target=frontend
+gh workflow run deploy.yml
 gh run watch <run-id> --exit-status           # follow it live
 ```
 
-Secrets used by the workflows (`gh secret list --repo SubhanRaj/excise-revenue-recovery-portal`):
+Secrets used by the workflow (`gh secret list --repo SubhanRaj/excise-revenue-recovery-portal`):
 `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`. Manual `wrangler` commands below still work
 for local development and emergency redeploys, but treat GitHub Actions as the source of
-truth for what's actually live — see TESTING.md's Incidents section for why: this Pages
-project used to also have a **Cloudflare Git integration** silently auto-building on every
-push with a completely wrong config, racing every manual deploy. That's been disconnected;
-these two workflows are the only thing that deploys this project now. If production ever
-looks fixed after a manual `wrangler` deploy but reverts a few minutes later, suspect a
-competing deploy path before re-diagnosing the app (see TESTING.md).
+truth for what's actually live — see TESTING.md's Incidents section for why: this project used
+to also have a **Cloudflare Pages Git integration** silently auto-building on every push with a
+completely wrong config, racing every manual deploy, back when a Pages project existed at all.
+That's long gone along with the Pages project itself; this one workflow is the only thing that
+deploys this project now. If production ever looks fixed after a manual `wrangler` deploy but
+reverts a few minutes later, suspect a competing deploy path before re-diagnosing the app (see
+TESTING.md).
 
 ## One-time setup (already done — for reference / disaster recovery)
 
@@ -69,10 +61,9 @@ pnpm exec wrangler d1 create excise-revenue-recovery-db
 pnpm run db:generate           # drizzle-kit generate, only needed after schema.ts changes
 pnpm run db:migrate:remote     # applies drizzle/[0-9]*.sql to remote D1
 pnpm run db:seed:remote        # inserts 75 districts + bootstrap admin (drizzle/seed.sql)
-
-cd ../frontend
-pnpm exec wrangler pages project create excise-revenue-recovery-portal --production-branch main
 ```
+
+(There is no separate frontend setup step anymore — one app, one `wrangler.jsonc`, one deploy.)
 
 If you ever need to point the bootstrap admin at a different email, either edit
 `api/drizzle/seed.sql` before a fresh seed, or patch it live:
@@ -84,7 +75,7 @@ pnpm exec wrangler d1 execute excise-revenue-recovery-db --remote \
 
 ## Secrets
 
-Set once per Worker via `wrangler secret put <NAME>` (reads the value from stdin — pipe it,
+Set once for the Worker via `wrangler secret put <NAME>` (reads the value from stdin — pipe it,
 don't type it into a prompt that ends up in shell history):
 
 ```bash
@@ -100,7 +91,10 @@ echo "the-owners-actual-login-email@example.com" | pnpm exec wrangler secret put
   `HttpOnly`/`Secure`/`SameSite=Lax` cookie on the verify response (`__admin_session`/
   `__deo_session` — see CLAUDE.md's Auth section). Rotating it invalidates every active session.
 - `RESEND_API_KEY` — sends magic-link emails (`api/app/api/auth/request-magic-link/route.ts`).
-- `FRONTEND_URL` — the magic-link redirect target, `https://excisebakaya.exciseup.in`.
+- `FRONTEND_URL` — the magic-link redirect target, `https://excisebakaya.exciseup.in` (same
+  domain the app itself is served from, now that it's one app — this secret name predates the
+  Milestone 41 merge and was kept as-is rather than renamed, since renaming a Worker secret in
+  place is just as disruptive as adding a new one).
 - `FROM_EMAIL` — sender address for magic-link email, `noreply@mail.exciseup.in`. `mail.exciseup.in`
   is verified in Resend and this same address is reused across all UP Excise projects on the same
   Resend account (see the sibling `up-excise-spatial-revenue-optimizer` project's DEPLOY.md, which
@@ -120,12 +114,14 @@ CLAUDE.md's "Known gaps" section.
 Local dev uses `api/.dev.vars` (copy from `.dev.vars.example`) instead — never commit that
 file; it's gitignored.
 
-## Redeploying the API (after code changes)
+## Redeploying (after code changes)
 
 ```bash
 cd api
 pnpm run deploy    # = opennextjs-cloudflare build && opennextjs-cloudflare deploy
 ```
+
+One command, one deploy — there is no separate frontend redeploy step anymore.
 
 **Do not rename `api/middleware.ts` to `proxy.ts`.** Next 16 renamed the middleware
 convention to `proxy.ts` and defaults it to the Node.js runtime, but
@@ -142,108 +138,80 @@ pnpm run db:generate
 pnpm run db:migrate:remote   # and db:migrate:local for your local D1 too
 ```
 
-## Redeploying the frontend (after code changes)
-
-```bash
-cd frontend
-NEXT_PUBLIC_API_URL="" pnpm run build
-pnpm run pages:deploy   # = wrangler pages deploy out --project-name ... --branch master
-```
-
-`NEXT_PUBLIC_API_URL=""` is correct now that frontend and API share an origin
-(`excisebakaya.exciseup.in`, via a path-scoped Worker Route — see ROADMAP.md's Milestone 35):
-`apiFetch` resolves `/api/...` relative to whatever host served the page. Only local dev
-(`http://localhost:8787`, genuinely a different port) needs the fallback in
-`frontend/lib/config.ts`.
-
-A `--branch` matching the Pages project's production branch is required for a *Production*
-deployment with the stable `https://excise-revenue-recovery-portal.pages.dev` URL — anything
-else lands as a *Preview* on a random per-deploy subdomain (harmless to try, but not what
-users will see). The project was created with `--production-branch main`, but this repo's actual branch is
-`master`, and in practice `--branch master` is what reliably produces a `Production`
-deployment — confirm with
-`pnpm exec wrangler pages deployment list --project-name excise-revenue-recovery-portal` after
-any deploy rather than trusting the `--branch` value blindly. This is now a direct-upload
-project with no Git integration (see the CI/CD section above for why that matters) — all
-deploys are either the GitHub Actions workflows or a manual `wrangler`/`pnpm run` command.
-
-`NEXT_PUBLIC_API_URL` is baked in at build time (`frontend/lib/config.ts`) since this is a
-static export with no server to read env vars at request time. Changing it means rebuilding
-and redeploying, not just changing a Cloudflare dashboard setting.
-
 ## Verifying a deployment
 
 ```bash
-# Primary (custom domain, single origin):
 API=https://excisebakaya.exciseup.in
-FRONT=https://excisebakaya.exciseup.in
-
-# The API's old *.workers.dev URL is retired (Milestone 39) — expect it to 404/fail to resolve,
-# not 200, if you ever check it again.
-# The frontend's *.pages.dev URL is still live (Cloudflare platform constraint, see the
-# deployment table above) — re-check it after any frontend deploy too:
-# FRONT=https://excise-revenue-recovery-portal.pages.dev
 
 curl -s -o /dev/null -w "%{http_code}\n" "$API/api/auth/me?role=admin"   # expect 401, no cookie sent
-
-curl -s -i "$FRONT/login" | head -1                            # expect HTTP/2 200, not 503
+curl -s -i "$API/login" | head -1                                       # expect HTTP/2 200
 ```
 
-A `503` with title "Node.JS Compatibility Error" on `$FRONT` means you're looking at a
-stale/broken Pages deployment, not a real code issue — see TESTING.md's Incidents section.
-Redeploy (`pnpm run pages:deploy` in `frontend/`) and recheck before assuming it's a defect.
-
-Then in a real browser (or run `pnpm run e2e` in `frontend/` — see TESTING.md): sign in at
-`$FRONT/login` with the superadmin email, confirm the Magic Link email arrives, click
+Then in a real browser (or run `pnpm run e2e` in `api/` — see TESTING.md): sign in at
+`$API/login` with the superadmin email, confirm the Magic Link email arrives, click
 through, and confirm `/admin` loads the 75 districts.
 
-**`gh run list` showing the latest run as `success` is not enough** — `deploy.yml`'s two jobs
-are path-filtered (`api/**` / `frontend/**`), so a run that only touched one app shows the
-other job as `skipped`, and a *skipped* job on a green run can be hiding a *failed* job on an
-earlier run for that same path (see TESTING.md's 2026-07-18 incident, where the API Worker ran
-stale code in production for several commits this way). Whenever `api/` changed, check the run
-that actually touched it:
-
-```bash
-gh run list --workflow=deploy.yml --limit 5 --json databaseId,headSha,conclusion
-gh run view <databaseId> --json jobs -q '.jobs[] | {name, status, conclusion}'
-```
-
-and cross-check the Worker itself redeployed (not just that Actions reports green):
+**`gh run list` showing the latest run as `success` is confirmation enough now** — with a
+single job (Milestone 41), there's no longer a path-filtered job that can silently show
+`skipped` while hiding a stale deploy the way the old two-job `deploy.yml` could (see TESTING.md's
+2026-07-18 incident, from that era). Still worth cross-checking the Worker itself actually
+redeployed, not just that Actions reports green:
 
 ```bash
 cd api && pnpm exec wrangler deployments list   # latest "Created:" should match the push time
 ```
 
-A quick live route check (200/401 is fine, 500 is not) is worth running after any `api/**`
-deploy too — a `500` here on a route that should just be an auth check means the Worker itself
-is broken, not merely unauthenticated:
+A quick live route check (200/401 is fine, 500 is not) is worth running after any deploy too —
+a `500` here on a route that should just be an auth check means the Worker itself is broken, not
+merely unauthenticated:
 
 ```bash
 curl -s -o /dev/null -w "%{http_code}\n" "$API/api/auth/me?role=admin"       # expect 401
 curl -s -o /dev/null -w "%{http_code}\n" "$API/api/admin/unlock-requests"    # expect 401
 ```
 
+## Cutting over from the old two-deployment setup
+
+One-time, manual, done once when `migrate/single-worker-app` is merged and ready to go live —
+not part of any automated deploy, since it touches live production routing for a real
+government portal. See `plan.md`'s Section 4.G for the full rationale; summarized here as the
+actual runbook:
+
+1. Deploy the merged Worker first (`pnpm run deploy` from this branch, or merge to `master` and
+   let `deploy.yml` do it) — at this point `api/wrangler.jsonc`'s route already claims
+   `excisebakaya.exciseup.in/*`, but the still-live Pages custom domain takes priority for
+   anything Cloudflare considers a more specific/existing binding, so this is safe to do first.
+2. Verify the new Worker directly (its retired `*.workers.dev` URL won't work — use a temporary
+   preview route or `wrangler dev`/OpenNext preview locally, per DEPLOY.md's Verifying section
+   above, before touching the live domain's routing).
+3. In the Cloudflare dashboard, remove the custom-domain hostname from the
+   `excise-revenue-recovery-portal` Pages project (Pages → that project → Custom domains).
+4. Confirm the Worker's `/*` route is now the only thing serving `excisebakaya.exciseup.in` —
+   re-run the Verifying-a-deployment checks above against the real domain.
+5. Delete the `excise-revenue-recovery-portal` Pages project once satisfied (`wrangler pages
+   project delete excise-revenue-recovery-portal`) — this is what finally kills the old
+   `*.pages.dev` URL, since Cloudflare has no toggle to disable it independently of the project.
+6. **No D1 step anywhere in this list** — the database, its binding, and its data are completely
+   unaffected by this cutover; only HTTP routing changes.
+
+Rollback, if anything goes wrong after step 3: re-add the custom-domain hostname to the Pages
+project in the dashboard. No data migration or restore is needed either way, in either
+direction — this entire cutover is a routing change, not a data change.
+
 ## Known deployment constraints
 
-- **Custom domain + cookie auth are both live** (ROADMAP.md's Milestones 35 and 36). Session
-  auth is an `HttpOnly`/`Secure`/`SameSite=Lax` cookie again, not
-  a Bearer token — see CLAUDE.md's Auth section ("Why cookies again") for the full history of
-  both migrations. `api/middleware.ts` is now a no-op (no cross-origin request ever reaches
-  this Worker, so no CORS/OPTIONS handling is needed) — kept as an empty passthrough file only
-  because `api/middleware.ts` (not `proxy.ts`) is a load-bearing filename under this Next.js
-  version (see the redeploy section above). Known gap: local `next dev`/`wrangler dev` are
-  genuinely cross-origin ports, so `SameSite=Lax` cookies won't be sent between them locally —
-  see CLAUDE.md's Auth section; the e2e suite exercises the real deployed domain instead.
-- **SheetJS export can't freeze panes** on the free CDN build used in `frontend/app/layout.tsx`
-  — that's a SheetJS Pro feature. Not a deployment issue, just don't expect the exported
-  `.xlsx` header row to actually freeze; see `frontend/lib/export.ts`.
+- **Custom domain + cookie auth are both live, and the app is now a single Worker** (ROADMAP.md's
+  Milestones 35, 36, and 41). Session auth is an `HttpOnly`/`Secure`/`SameSite=Lax` cookie, not a
+  Bearer token — see CLAUDE.md's Auth section ("Why cookies again") for the full history.
+  `api/middleware.ts` is now a no-op (no cross-origin request ever reaches this Worker, so no
+  CORS/OPTIONS handling is needed) — kept as an empty passthrough file only because
+  `api/middleware.ts` (not `proxy.ts`) is a load-bearing filename under this Next.js version (see
+  the redeploy section above). The old local cross-origin dev gap (`next dev`/`wrangler dev` on
+  different ports) is gone too — one process serves everything now, in every environment.
 - D1 database region is APAC (set at creation, `wrangler d1 create` doesn't currently
   expose a region flag — Cloudflare places it near where you ran the command).
-- **A deploy that lands as `Preview` instead of `Production`** (wrong `--branch`, see the
-  redeploy section above) doesn't just miss the stable URL — it can leave multiple
-  deployments simultaneously tagged `Production` in Cloudflare's history, and different
-  edges have been observed serving different (including stale) ones inconsistently until a
-  clean redeploy settles it. Always confirm with
-  `pnpm exec wrangler pages deployment list --project-name excise-revenue-recovery-portal` and a
-  `curl -i` status-code check after deploying, not just "the command exited 0."
+- **A deploy that lands as a Cloudflare `Preview` deployment instead of `Production`** can leave
+  multiple deployments simultaneously tagged in Cloudflare's history, and different edges have
+  been observed serving different (including stale) ones inconsistently until a clean redeploy
+  settles it. Always confirm with `pnpm exec wrangler deployments list` and a `curl -i`
+  status-code check after deploying, not just "the command exited 0."

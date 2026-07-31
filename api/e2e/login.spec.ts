@@ -4,10 +4,10 @@ import path from "node:path";
 
 const API_URL = process.env.E2E_API_URL ?? "https://excisebakaya.exciseup.in";
 const SUPERADMIN_EMAIL = "shubhanraj2002@gmail.com";
-const API_DIR = path.resolve(__dirname, "../../api");
+const API_DIR = path.resolve(__dirname, "..");
 
 // Reads the most recently issued, still-unused magic-link token straight from D1 — avoids
-// needing a real inbox in CI. Read-only (SELECT), run via the api/ project's wrangler config.
+// needing a real inbox in CI. Read-only (SELECT), run via this app's own wrangler config.
 function latestUnusedToken(): string {
   const out = execFileSync(
     "pnpm",

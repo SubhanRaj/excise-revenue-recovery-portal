@@ -2,23 +2,23 @@
 
 ## End-to-end (Playwright, real Chrome)
 
-`frontend/e2e/login.spec.ts` drives the actual installed Chrome browser (not Playwright's
+`api/e2e/login.spec.ts` drives the actual installed Chrome browser (not Playwright's
 bundled Chromium) against the **live production deployment** by default — not a local dev
 server. Originally deliberate because the bug this suite existed to catch (cross-origin cookies
 between Pages and the Worker) only reproduced against the real deployed origins, not
-`localhost`; still true today for a different reason post-Milestone-36 — frontend and API are
-same-origin in production (`excisebakaya.exciseup.in`) but genuinely cross-origin ports in local
-`next dev`/`wrangler dev` (`:3000` vs `:8787`), so `SameSite=Lax` cookies won't be sent locally
-either (see CLAUDE.md's Auth section).
+`localhost`. Since Milestone 41 merged the UI and API into one app, there's no longer a
+cross-origin local-dev gap either — `next dev`/`wrangler dev`/OpenNext preview all serve
+everything from one process/port, so a local run round-trips the cookie correctly too. Kept
+defaulting to production regardless, since that's still the most representative environment.
 
 ```bash
-cd frontend
+cd api
 pnpm run e2e                    # headless, against production
 HEADED=1 pnpm run e2e           # watch it run in a real window (needs a display)
-E2E_BASE_URL=http://localhost:3000 E2E_API_URL=http://localhost:8787 pnpm run e2e   # local
+E2E_BASE_URL=http://localhost:3000 E2E_API_URL=http://localhost:3000 pnpm run e2e   # local (next dev)
 ```
 
-Config: `frontend/playwright.config.ts`. Runs headless by default because this repo is
+Config: `api/playwright.config.ts`. Runs headless by default because this repo is
 often driven from a sandboxed/non-interactive environment with no window server — set
 `HEADED=1` locally if you want to watch the browser.
 
@@ -30,7 +30,7 @@ often driven from a sandboxed/non-interactive environment with no window server 
    injects it through a JS runtime hook instead of blocking HTML parsing, so the static
    page could paint fully unstyled — the CUG field was technically present but invisible.
    Fixed by loading Tailwind's CDN script as a plain blocking `<script>` tag (see
-   `frontend/app/layout.tsx` and CLAUDE.md).
+   `api/app/layout.tsx` and CLAUDE.md).
 2. **Inline validation, no popup** — a malformed mobile number shows an inline `Banner`
    error and asserts zero `.swal2-popup` elements exist. Regression guard for the
    SweetAlert-popups-for-everything pattern that was intentionally removed (SweetAlert2 is
@@ -49,12 +49,13 @@ often driven from a sandboxed/non-interactive environment with no window server 
    followed, and the later Milestone 36 migration back to cookies once a custom domain existed
    (each change updated this test's assertion to match: cookie → `localStorage` → cookie again).
 
-### Why this needs `api/` sibling access
+### Token lookup via `wrangler d1 execute`
 
-The token-lookup helper in `login.spec.ts` shells out to `wrangler d1 execute` from
-`../api` (this repo's `api/` project, which owns the D1 binding). If you're running the
-suite from a checkout where `frontend/` and `api/` aren't siblings in the same repo, adjust
-`API_DIR` in `e2e/login.spec.ts`.
+The token-lookup helper in `login.spec.ts` shells out to `wrangler d1 execute` from this same
+app's own directory (`API_DIR` resolves to `api/`, which owns the D1 binding) — this used to
+matter more when the e2e suite lived in a separate `frontend/` app and had to reach across to
+its `api/` sibling; now that the suite lives inside `api/` itself, `API_DIR` is just its own
+directory.
 
 ### Adding new e2e coverage
 

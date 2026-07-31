@@ -6,23 +6,23 @@ all 75 districts.
 
 ## Architecture
 
-Two completely decoupled apps, deployed as separate Cloudflare resources:
+One Next.js App Router app, in `/api` (the directory name is historical — see below), built
+with [OpenNext](https://opennext.js.org/cloudflare) and deployed as a single Cloudflare Worker +
+D1. It serves both the UI pages (everything under `api/app/**` outside `app/api/`) and the
+native `app/api/**/route.ts` handlers (no Hono/Express) from one process, same-origin always
+(`excisebakaya.exciseup.in`), authenticated via an `HttpOnly` cookie (see
+[CLAUDE.md](./CLAUDE.md)'s Auth section for the setup and its history).
 
-| Directory   | What it is                                                              | Deploys to              |
-| ----------- | ------------------------------------------------------------------------ | ------------------------ |
-| `/frontend` | Next.js App Router, `output: "export"` — behaves as a static SPA        | Cloudflare Pages         |
-| `/api`      | Next.js App Router, native `app/api/**/route.ts` only (no Hono/Express) | Cloudflare Worker (via [OpenNext](https://opennext.js.org/cloudflare)) + D1 |
+This used to be two completely decoupled apps (`/frontend`, a static-export Pages SPA, and
+`/api`, a separate Worker) with no shared package and hand-mirrored duplicate constants between
+them, merged into one app in Milestone 41 once a shared custom domain removed the reason for the
+split — see ROADMAP.md's Milestone 41. The `/api` directory name was kept as-is (it's just the
+Worker's name at this point) rather than renamed as part of that merge.
 
-They talk over plain `fetch`, same-origin in production (`excisebakaya.exciseup.in`, a Pages
-custom domain plus a path-scoped Worker Route for `/api/*`), authenticated via an `HttpOnly`
-cookie (see [CLAUDE.md](./CLAUDE.md)'s Auth section for the setup and its history). There is no
-shared package — types that overlap (financial years, PAC field order) are intentionally
-duplicated in each app.
-
-Client-side libraries (SweetAlert2, SheetJS, Tabler Icons, Google Fonts, Tailwind CSS v4,
-Chart.js) load from the jsDelivr CDN in `frontend/app/layout.tsx` rather than being bundled —
-see that file. SweetAlert2/SheetJS/Chart.js are still listed as npm `devDependencies` purely
-for their TypeScript types (`frontend/lib/globals.d.ts`'s `window.Swal`/`XLSX`/`Chart`), not
+Client-side libraries (SweetAlert2, ExcelJS, Tabler Icons, Google Fonts, Tailwind CSS v4,
+Chart.js) load from the jsDelivr CDN in `api/app/layout.tsx` rather than being bundled —
+see that file. SweetAlert2/ExcelJS/Chart.js are still listed as npm `devDependencies` purely
+for their TypeScript types (`api/lib/globals.d.ts`'s `window.Swal`/`ExcelJS`/`Chart`), not
 because they're actually bundled. Cleave.js and TanStack Table are real npm dependencies,
 since they need to hook into React render/event cycles rather than run as passive globals.
 
@@ -50,7 +50,7 @@ since they need to hook into React render/event cycles rather than run as passiv
 
   Plus `rc_details` — a JSON-stringified array of `{ rcNumber, rcAmount, stayed }`, the per-RC
   breakdown behind `rcCount`/`rcAmount` above (row count must equal `rcCount`, entries must sum
-  to `rcAmount` — see `api/lib/rc-details.ts`'s `validateRcDetails()`). Independent of
+  to `rcAmount` — see `api/lib/pac-fields.ts`'s `validateRcDetails()`). Independent of
   `recoveredAmount`/`stayAmount`/the computed columns below — an RC informs a defaulter what
   they owe, for any amount, regardless of what's actually recovered; `stayed` (a court staying
   this specific RC) is a different concept from the aggregate Stay Count/Stay Amount fields (a
@@ -97,8 +97,8 @@ next FY's `opening_balance`. For FY 2021-22, `opening_balance = 0` and `net_reco
 max(0, grossArrears - recoveredAmount - stayAmount)`. For every later FY, `opening_balance` =
 the previous FY's `net_recoverable`, and `net_recoverable = max(0, opening_balance +
 grossArrears - recoveredAmount - stayAmount)`. Both values are computed server-side at submit
-time (`api/lib/net-recoverable.ts`'s `computeNetRecoverableSeries()`, mirrored in
-`frontend/lib/pac-fields.ts`) and persisted — never recomputed from raw fields on read, except
+time (`api/lib/pac-fields.ts`'s `computeNetRecoverableSeries()`, the same function the UI calls
+for a DEO's live draft) and persisted — never recomputed from raw fields on read, except
 for a DEO's own not-yet-submitted draft.
 
 ## App flow
@@ -114,14 +114,15 @@ for a DEO's own not-yet-submitted draft.
 - Both are 7-day JWTs, set on the verify response as `HttpOnly; Secure; SameSite=Lax` cookies —
   the browser attaches them automatically on every subsequent same-origin request, no
   `Authorization` header needed. This app briefly ran a Bearer-token-in-localStorage design
-  instead (Milestone 21) back when frontend and API were cross-origin (different public-suffix
-  domains) in production, since a `SameSite=None` cookie there is a third-party cookie that
-  Safari ITP blocks outright and that Chrome blocks too under common conditions — that broke
-  real logins in production. Once a custom domain (`excisebakaya.exciseup.in`) made both apps a
-  true single origin, the design reverted to `HttpOnly` cookies — the more secure option (immune
-  to XSS token theft, unlike `localStorage`) — since the cross-origin constraint that justified
-  Bearer tokens no longer applies. See [CLAUDE.md](./CLAUDE.md)'s Auth section ("Why cookies
-  again") for the full history of both migrations.
+  instead (Milestone 21) back when the frontend and API were separate, cross-origin deployments
+  (different public-suffix domains) in production, since a `SameSite=None` cookie there is a
+  third-party cookie that Safari ITP blocks outright and that Chrome blocks too under common
+  conditions — that broke real logins in production. A custom domain
+  (`excisebakaya.exciseup.in`, Milestone 35) made both a true single origin and the design
+  reverted to `HttpOnly` cookies (Milestone 36) — the more secure option (immune to XSS token
+  theft, unlike `localStorage`). Milestone 41 then merged the two apps into one entirely, so
+  same-origin is now structural rather than a routing arrangement. See
+  [CLAUDE.md](./CLAUDE.md)'s Auth section ("Why cookies again") for the full history.
 
 ### DEO data entry
 
@@ -241,28 +242,26 @@ flowchart TD
 ## Getting started
 
 ```bash
-# Frontend
-cd frontend
-pnpm install
-pnpm run dev          # http://localhost:3000
-
-# API
 cd api
 pnpm install
-cp .dev.vars.example .dev.vars   # fill in JWT_SECRET, RESEND_API_KEY, FRONTEND_URL
+cp .dev.vars.example .dev.vars   # fill in JWT_SECRET, RESEND_API_KEY, FRONTEND_URL, FROM_EMAIL
 pnpm run db:generate               # regenerate drizzle/*.sql after schema.ts changes
 pnpm run db:migrate:local          # apply migrations to the local D1 (miniflare) instance
 pnpm run db:seed:local             # seed the 75 UP districts + bootstrap admin
-pnpm run dev                       # http://localhost:8787 (default Next dev port; adjust as needed)
+pnpm run dev                       # http://localhost:3000 — UI and /api/* both served here
 ```
+
+For a closer-to-production check (real Worker runtime, D1 binding, asset serving) instead of
+plain `next dev`: `pnpm run preview` (builds via OpenNext, then runs a local `wrangler`
+preview on `http://localhost:8787`).
 
 ## Deploying
 
-Live at `https://excisebakaya.exciseup.in` (custom domain, both apps). The API's old
-`*.workers.dev` URL is retired; the frontend's `*.pages.dev` URL stays live as an unavoidable
-Cloudflare Pages platform constraint (see DEPLOY.md). Full deploy/redeploy commands,
-required secrets, and the OpenNext/Next-16-middleware gotcha that blocks a naive deploy
-are in [DEPLOY.md](./DEPLOY.md).
+Live at `https://excisebakaya.exciseup.in` (custom domain) as a single Cloudflare Worker + D1 —
+there is no separate Pages project anymore (retired in Milestone 41; the old frontend's
+`*.pages.dev` URL and the API's old `*.workers.dev` URL are both gone). Full deploy/redeploy
+commands, required secrets, and the OpenNext/Next-16-middleware gotcha that blocks a naive
+deploy are in [DEPLOY.md](./DEPLOY.md).
 
 ## Documentation
 
