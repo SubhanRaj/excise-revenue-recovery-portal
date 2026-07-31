@@ -10,6 +10,7 @@ import AppHeader, { type NavLink } from "@/components/ui/AppHeader";
 import Banner from "@/components/ui/Banner";
 import Button from "@/components/ui/Button";
 import HelpPanel from "@/components/ui/HelpPanel";
+import AdminUserDrawer from "@/components/ui/AdminUserDrawer";
 
 const NAV_LINKS: NavLink[] = [
   { label: "Dashboard", href: "/admin" },
@@ -28,7 +29,6 @@ type AdminRow = {
 };
 
 type FormState = { name: string; email: string; designation: string };
-const EMPTY_FORM: FormState = { name: "", email: "", designation: "" };
 
 // Same "blocking confirm before an irreversible/session-ending action" pattern as
 // confirmClearYear()/confirmUnlockRequest() in alerts.ts — not added there since this is the
@@ -52,9 +52,9 @@ export default function AdminUsersPage() {
   const [rows, setRows] = useState<AdminRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [formOpen, setFormOpen] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editingRow, setEditingRow] = useState<AdminRow | null>(null);
+  const [drawerError, setDrawerError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Hiding this page from a non-owner admin is UX only — the API routes' own OWNER_EMAIL check
@@ -81,32 +81,32 @@ export default function AdminUsersPage() {
   }, [ready, profile?.isOwner]);
 
   function startCreate() {
-    setEditingId(null);
-    setForm(EMPTY_FORM);
-    setFormOpen(true);
+    setEditingRow(null);
+    setDrawerError(null);
+    setDrawerOpen(true);
   }
 
   function startEdit(row: AdminRow) {
-    setEditingId(row.id);
-    setForm({ name: row.name ?? "", email: row.email, designation: row.designation ?? "" });
-    setFormOpen(true);
+    setEditingRow(row);
+    setDrawerError(null);
+    setDrawerOpen(true);
   }
 
-  async function saveForm(e: React.FormEvent) {
-    e.preventDefault();
+  async function saveDrawer(form: FormState) {
+    setDrawerError(null);
     setSaving(true);
     try {
-      if (editingId === null) {
+      if (editingRow === null) {
         await apiFetch("/api/admin/users", { method: "POST", body: JSON.stringify(form) }, "admin");
         notifyToast({ icon: "success", title: "Admin added" });
       } else {
-        await apiFetch("/api/admin/users", { method: "PATCH", body: JSON.stringify({ id: editingId, ...form }) }, "admin");
+        await apiFetch("/api/admin/users", { method: "PATCH", body: JSON.stringify({ id: editingRow.id, ...form }) }, "admin");
         notifyToast({ icon: "success", title: "Admin updated" });
       }
-      setFormOpen(false);
+      setDrawerOpen(false);
       await load();
     } catch (err) {
-      notifyToast({ icon: "error", title: "Save failed", text: err instanceof ApiError ? err.message : "Please try again." });
+      setDrawerError(err instanceof ApiError ? err.message : "Please try again.");
     } finally {
       setSaving(false);
     }
@@ -166,55 +166,14 @@ export default function AdminUsersPage() {
           </Button>
         </div>
 
-        {formOpen && (
-          <form
-            onSubmit={saveForm}
-            className="mb-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
-          >
-            <h2 className="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">
-              {editingId === null ? "Add Admin" : "Edit Admin"}
-            </h2>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Full Name</label>
-                <input
-                  required
-                  value={form.name}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Email</label>
-                <input
-                  required
-                  type="email"
-                  disabled={editingId !== null && rows.find((r) => r.id === editingId)?.isOwner}
-                  value={form.email}
-                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  style={editingId !== null && rows.find((r) => r.id === editingId)?.isOwner ? { cursor: "not-allowed" } : undefined}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Designation (optional)</label>
-                <input
-                  value={form.designation}
-                  onChange={(e) => setForm((f) => ({ ...f, designation: e.target.value }))}
-                  placeholder="e.g. Excise Commissioner"
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                />
-              </div>
-            </div>
-            <div className="mt-3 flex gap-2">
-              <Button type="submit" size="sm" disabled={saving}>
-                {saving ? "Saving..." : "Save"}
-              </Button>
-              <Button type="button" variant="secondary" size="sm" onClick={() => setFormOpen(false)}>
-                Cancel
-              </Button>
-            </div>
-          </form>
+        {drawerOpen && (
+          <AdminUserDrawer
+            user={editingRow}
+            saving={saving}
+            error={drawerError}
+            onClose={() => setDrawerOpen(false)}
+            onSave={saveDrawer}
+          />
         )}
 
         <div className="min-h-[400px] max-h-[70vh] overflow-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
