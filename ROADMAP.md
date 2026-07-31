@@ -27,7 +27,7 @@ which districts had actually reported.
 | O-1 | **Universal coverage** | All 75 districts submit complete, locked 5-year PAC/RC data. |
 | O-2 | **Financial accuracy** | Six figures per district-year (Gross Arrears, RC count/amount, Recovered Amount, Stay count/amount), each independently validated — no field silently defaults to zero. |
 | O-3 | **Auditability** | Every submission is locked and attributed to a named DEO; every unlock requires a stated reason and is logged. HQ can always answer "who submitted this, when, and who touched it since." |
-| O-4 | **Zero infrastructure cost** | Runs entirely on Cloudflare's free tier (Pages + Workers + D1) — no server provisioning, no paid plan, for a portal used by ~90 people (75 DEOs + a handful of admins). |
+| O-4 | **Zero infrastructure cost** | Runs entirely on Cloudflare's free tier (Workers + D1 — no separate Pages project since Milestone 41) — no server provisioning, no paid plan, for a portal used by ~90 people (75 DEOs + a handful of admins). |
 | O-5 | **Field-safe data entry** | A DEO's in-progress entry survives connectivity loss, accidental refresh, or tab closure — nothing is sent to the server (and nothing can be lost) until the DEO explicitly reviews and locks. |
 | O-6 | **HQ-usable output** | An Admin can view, filter, and export (Excel or SQL) the full dataset without needing database access. |
 
