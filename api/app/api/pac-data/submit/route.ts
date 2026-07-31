@@ -4,8 +4,7 @@ import { getDb } from "@/lib/db";
 import { pacData, districts, users, FINANCIAL_YEARS, type FinancialYear } from "@/db/schema";
 import { requireSession } from "@/lib/auth-guard";
 import { auditLogInsert } from "@/lib/audit";
-import { computeNetRecoverableSeries } from "@/lib/net-recoverable";
-import { validateRcDetails, type RcDetail } from "@/lib/rc-details";
+import { computeNetRecoverableSeries, validateRcDetails, type RcDetail } from "@/lib/pac-fields";
 import { withErrorHandling } from "@/lib/with-error-handling";
 
 type YearRow = {
@@ -54,7 +53,7 @@ function validateRow(row: YearRow): string | null {
   }
 
   // Per-RC breakdown: row count must match rcCount, and every entry's own amount must sum to
-  // the aggregate rcAmount above — see api/lib/rc-details.ts. Independent of
+  // the aggregate rcAmount above — see @/lib/pac-fields's validateRcDetails(). Independent of
   // recoveredAmount/stayAmount/openingBalance/netRecoverable by design (see CLAUDE.md).
   if (!Array.isArray(row.rcDetails)) {
     return `rcDetails for ${row.financialYear} must be an array`;

@@ -44,7 +44,7 @@ export const pacData = sqliteTable("pac_data", {
   financialYear: text("financial_year").notNull(), // "2021-22" .. "2025-26"
 
   // Numbered 2-5, not 1-4: Opening Balance (openingBalance below) is "1." since it leads every
-  // per-FY view, so these six DEO-entered fields shift down one to match frontend/lib/pac-fields.ts.
+  // per-FY view, so these six DEO-entered fields shift down one to match @/lib/pac-fields.ts.
   // 2. सकल बकाया धनराशि (मूल धन + ब्याज) — Gross Arrears (Principal + Interest)
   grossArrears: real("gross_arrears").notNull(),
   // 3. (i) जारी आर.सी. (R.C.) की संख्या — No. of RCs Issued
@@ -52,7 +52,7 @@ export const pacData = sqliteTable("pac_data", {
   // 3. (ii) आर.सी. में निहित धनराशि
   rcAmount: real("rc_amount").notNull(),
   // Per-RC breakdown behind rcCount/rcAmount above — JSON-stringified RcDetail[] (see
-  // api/lib/rc-details.ts). One entry per RC: rcNumber, this RC's own amount, and whether a
+  // @/lib/pac-fields.ts). One entry per RC: rcNumber, this RC's own amount, and whether a
   // court has stayed this specific RC (independent of stayCount/stayAmount below — see
   // CLAUDE.md's Data model section). Stored as a JSON string in one column (not a child table)
   // per the department's ask; the array's own rcAmount values must sum to rcAmount above,
@@ -70,7 +70,7 @@ export const pacData = sqliteTable("pac_data", {
 
   // Cumulative running balance, not one of the DEO-entered six fields above — computed
   // server-side by POST /api/pac-data/submit (never trusted from the client) via
-  // api/lib/net-recoverable.ts's computeNetRecoverableSeries(), which walks FINANCIAL_YEARS in
+  // @/lib/pac-fields.ts's computeNetRecoverableSeries(), which walks FINANCIAL_YEARS in
   // order once per submit. openingBalance is the *previous* FY's netRecoverable (0 for the first
   // FY, 2021-22); netRecoverable = max(0, openingBalance + grossArrears - recoveredAmount -
   // stayAmount). See CLAUDE.md's Data model section for the full reasoning — this used to be

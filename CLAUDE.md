@@ -1,9 +1,8 @@
 # CLAUDE.md — Excise Revenue Recovery Portal
 
-Instructions for AI agents working in this repo. Each subdirectory has its own `CLAUDE.md`
-(`@AGENTS.md`) with a Next.js-version warning — read those too. See
-[ROADMAP.md](./ROADMAP.md) for what's shipped and what's left; this file documents how the
-shipped system works, not its build history.
+Instructions for AI agents working in this repo. `api/CLAUDE.md` (`@AGENTS.md`) has a
+Next.js-version warning — read that too. See [ROADMAP.md](./ROADMAP.md) for what's shipped and
+what's left; this file documents how the shipped system works, not its build history.
 
 ## What this is
 
@@ -13,23 +12,38 @@ district is final: once a DEO locks, it cannot be re-edited without an Admin unl
 
 ## Repo shape
 
-`/frontend` and `/api` are two independent Next.js apps — separate `package.json`,
-`node_modules`, deployments. No shared package. Constants present in both (financial years,
-PAC field order/labels) are duplicated by design: `frontend/lib/pac-fields.ts` mirrors
-`api/db/schema.ts`. When you change field names, units, or validation rules, change both and
-keep them in sync by hand.
+**One Next.js app, in `api/`** (the directory name is historical — kept as-is rather than
+renamed, since it's just a Worker/deployment name at this point, not a description of scope —
+see Milestone 41 in ROADMAP.md), built with `@opennextjs/cloudflare` and deployed as a single
+Cloudflare Worker that serves both the UI pages (`api/app/**`, everything outside `app/api/`)
+and the `/api/*` route handlers, backed by one D1 binding. This used to be two independent
+Next.js apps (`/frontend`, a static-export Pages SPA, and `/api`, a separate Worker) with no
+shared package and hand-mirrored duplicate constants between them — collapsed into one app in
+Milestone 41 once a shared custom domain removed the reason for the split (see "Why cookies
+again" below and ROADMAP.md's Milestone 41 for the full history). There is now exactly one copy
+of every cross-cutting constant/validator (`api/lib/pac-fields.ts` — financial years, PAC field
+order/labels, `computeNetRecoverableSeries()`, `validateRcDetails()` — imported by both UI
+components and API route handlers); don't reintroduce a second copy anywhere.
 
-**Package manager is pnpm, not npm** (`pnpm-lock.yaml` in each app, no `package-lock.json`) —
-matches every sibling project in this workspace. `pnpm install`/`pnpm run <script>`/`pnpm exec
-<bin>`, and CI (`ci.yml`/`deploy.yml`) uses `pnpm/action-setup@v4` + `pnpm install
---frozen-lockfile`. Each app's `pnpm-workspace.yaml` sets `allowBuilds` for the native
-postinstall scripts pnpm blocks by default (`esbuild`, `sharp`, `unrs-resolver`, `workerd` —
-all needed by `wrangler`/`opennextjs-cloudflare`/Next itself); if `pnpm install` ever reports
+Two files that collided by name when the apps merged were renamed to stay unambiguous:
+`lib/client-db.ts` (was frontend's Dexie wrapper, `lib/db.ts`) and `lib/client-session.ts` (was
+frontend's `getLastRole()`/`markJustAuthed()` helpers, `lib/session.ts`) — both distinct from
+this app's own server-side `lib/db.ts` (D1/Drizzle `getDb()`) and `lib/session.ts` (JWT
+sign/verify), which keep their original names and meaning.
+
+**Package manager is pnpm, not npm** (`pnpm-lock.yaml`, no `package-lock.json`) — matches every
+sibling project in this workspace. `pnpm install`/`pnpm run <script>`/`pnpm exec <bin>`, and
+CI (`ci.yml`/`deploy.yml`) uses `pnpm/action-setup@v4` + `pnpm install --frozen-lockfile`.
+`pnpm-workspace.yaml` sets `allowBuilds` for the native postinstall scripts pnpm blocks by
+default (`esbuild`, `sharp`, `unrs-resolver`, `workerd` — all needed by
+`wrangler`/`opennextjs-cloudflare`/Next itself); if `pnpm install` ever reports
 `ERR_PNPM_IGNORED_BUILDS` again after adding a new dependency, add its name to that file's
 list rather than running `pnpm approve-builds` interactively (that doesn't persist for CI).
 
-The two apps talk only over cross-origin HTTP; session auth is a Bearer token, not a cookie —
-see Auth below for why.
+UI and `/api/*` are always same-origin now, in every environment (not just production) — there
+is no separate deployment to point at, so `lib/config.ts`'s `API_BASE_URL` is always `""`.
+Session auth is an `HttpOnly` cookie — see Auth below for why (and for why it was briefly a
+Bearer token in between).
 
 ## Data model
 
@@ -41,9 +55,10 @@ reference. Rules an agent must preserve when touching `pac_data` or its computed
   submit for the same district would otherwise collide with the `(district_id, financial_year)`
   unique index.
 - `opening_balance`/`net_recoverable` are computed and written server-side only
-  (`api/lib/net-recoverable.ts`'s `computeNetRecoverableSeries()`, mirrored byte-for-byte in
-  `frontend/lib/pac-fields.ts`) — never trust these from the client payload. The formula uses
-  `recoveredAmount`, never `rcAmount` (an issued RC amount is not a recovered amount).
+  (`lib/pac-fields.ts`'s `computeNetRecoverableSeries()` — the submit route calls this same
+  function the UI uses for the DEO's live draft) — never trust these from the client payload.
+  The formula uses `recoveredAmount`, never `rcAmount` (an issued RC amount is not a recovered
+  amount).
 - Every view of a district's per-FY PAC figures must show both `opening_balance` and
   `net_recoverable` alongside them (`YearStepForm.tsx`, `MasterView.tsx`, the admin district
   detail table, the admin districts table, the Excel export) — add both when adding a new such
@@ -55,11 +70,12 @@ reference. Rules an agent must preserve when touching `pac_data` or its computed
   Amount totals stay legitimately summed across all 5 years (fresh per-year figures).
 - Always write `locked_at`/`created_at` timestamps as `new Date().toISOString()` from JS, never
   a SQL `CURRENT_TIMESTAMP` default (SQLite stores that without a timezone marker). `formatIST()`
-  (`frontend/lib/format.ts`) is the only place that converts to IST for display; storage stays
+  (`lib/format.ts`) is the only place that converts to IST for display; storage stays
   UTC always.
 - `pac_data.rc_details` is a JSON-stringified `RcDetail[]` (per-RC number/amount/stayed
   breakdown behind the aggregate `rcCount`/`rcAmount` fields), validated by
-  `api/lib/rc-details.ts`'s `validateRcDetails()` (mirrored in `frontend/lib/pac-fields.ts`) —
+  `lib/pac-fields.ts`'s `validateRcDetails()` (one copy, called from both the submit route and
+  `YearStepForm.tsx`) —
   row count must equal `rcCount`, and every entry's `rcAmount` must sum to the aggregate
   `rcAmount`. It does **not** feed into `recoveredAmount`/`stayAmount`/`openingBalance`/
   `netRecoverable` — an RC's own detail is independent of what's actually recovered (see
@@ -87,14 +103,14 @@ reference. Rules an agent must preserve when touching `pac_data` or its computed
    which only exists once every row has passed `validateRow()`), placed before the `db.batch()`.
 5. **A non-zero `rcAmount`/`stayAmount` requires a non-zero `rcCount`/`stayCount`** — an RC
    issued or a stay order granted for money implies at least one RC/order exists; a DEO can't
-   enter an amount against a count of 0. Enforced in `api/lib/net-recoverable.ts`'s sibling
-   `validateRow()` (`api/app/api/pac-data/submit/route.ts`) and mirrored client-side as an
+   enter an amount against a count of 0. Enforced in `validateRow()`
+   (`api/app/api/pac-data/submit/route.ts`) and mirrored client-side as an
    inline, bold, bilingual, blur-triggered field error under the count field
    (`YearStepForm.tsx`'s `countAmountErrors()`, also blocking `saveAndContinue()` in
    `deo-data-entry/page.tsx` for the case a DEO never blurs the offending field).
 6. **The per-RC breakdown's own amounts must sum to the aggregate RC Amount field, and its row
-   count must equal RC Count.** Enforced in `api/lib/rc-details.ts`'s `validateRcDetails()`
-   (mirrored in `frontend/lib/pac-fields.ts`), called from the submit route's `validateRow()`
+   count must equal RC Count.** Enforced in `lib/pac-fields.ts`'s `validateRcDetails()` (one
+   copy), called from the submit route's `validateRow()`
    and from `YearStepForm.tsx`'s `rcDetailsError()` (blocks `saveAndContinue()`, shows a
    bilingual toast, same pattern as rule 4 above). Each entry's `rcNumber` is subject to the
    Anti-Blank Rule too (non-blank, ≤ 50 chars) — see the Data model section above for the column
@@ -127,7 +143,7 @@ exceptions; when adding a new route, wrap it from the start rather than adding t
   rules for where that's required. `withErrorHandling` is about the *response shape* on failure,
   not about making writes atomic; use both together where a route does a multi-step write.
 
-## Auth (`api/lib/session.ts`, `api/lib/auth-guard.ts`, `api/middleware.ts`, `frontend/lib/session.ts`)
+## Auth (`api/lib/session.ts`, `api/lib/auth-guard.ts`, `api/middleware.ts`, `lib/client-session.ts`)
 
 See [README.md](./README.md)'s App flow → Auth for the CUG/magic-link flow overview. Session
 auth is an **`HttpOnly`/`Secure`/`SameSite=Lax` cookie, not a Bearer token** — this is the
@@ -173,11 +189,11 @@ preserve:
   brute-force defense (see SECURITY.md's H-01) — the frontend's matching 30-second cooldown
   after 3 failed attempts (`app/login/page.tsx`) is a UX nicety only, not a security boundary, and
   must never be treated as one.
-- `frontend/app/verify/page.tsx` requires an explicit button click (POST, not GET) so email
+- `app/verify/page.tsx` requires an explicit button click (POST, not GET) so email
   prefetchers can't burn the magic-link token.
 - `GET /api/auth/me?role=admin|deo` is the source of truth for `{role, districtId}` on every
   gated page load — call it directly, never gate a page on the `excise-portal:last-role` hint in
-  `frontend/lib/session.ts` (`getLastRole()`/`markLastRole()`/`clearLastRole()` — that hint is
+  `lib/client-session.ts` (`getLastRole()`/`markLastRole()`/`clearLastRole()` — that hint is
   shared across the whole browser and only exists for `/`'s first-paint redirect guess; it goes
   stale the instant the other role logs in on any tab, and it isn't the credential — the cookie
   is, and frontend JS can't read it by design). A 401 here means "not logged in as this role,"
@@ -200,12 +216,10 @@ preserve:
   is needed. Kept as an empty passthrough file, not deleted, only because `api/middleware.ts`
   (not `proxy.ts`) is a load-bearing filename under this Next.js version (see DEPLOY.md's
   redeploy section).
-- **Known local-dev gap**: `next dev` (`:3000`) and `wrangler dev` (`:8787`) are genuinely
-  cross-origin ports. `SameSite=Lax` cookies aren't sent on the `fetch()` calls between them
-  (`Lax` only covers top-level navigations cross-site), so a manual local login will appear to
-  succeed and then 401 on the next `/api/auth/me` call. Not solved (a local single-origin dev
-  proxy is more setup than warranted) — the e2e suite exercises the real deployed domain instead
-  (`playwright.config.ts`'s default `baseURL`), unaffected by this gap.
+- **The old cross-origin local-dev gap is gone** (Milestone 41) — `next dev`/`wrangler
+  dev`/OpenNext preview all serve the UI and `/api/*` from the same process/port now, so a local
+  login round-trips the cookie correctly. `playwright.config.ts` still defaults `baseURL` to the
+  real production domain (override with `E2E_BASE_URL` to point at a local preview instead).
 
 ### Why cookies again
 
@@ -238,12 +252,17 @@ Milestone 21 had explicitly accepted as a concession, not a preference. This is 
 back happened now and not speculatively — the exact condition CLAUDE.md had flagged ("if this
 app ever gets a custom domain, switch back to cookies") was met.
 
-If a future infra change ever reintroduces a genuine cross-origin split between frontend and
-API (e.g. reverting the custom domain, or serving one of the two apps from a different zone),
-re-read this whole section before touching auth — that's exactly the condition that made
-Milestone 21's Bearer-token detour necessary the first time.
+If a future infra change ever reintroduces a genuine cross-origin split (e.g. reverting the
+custom domain, or splitting the UI and `/api/*` back into separate deployments), re-read this
+whole section before touching auth — that's exactly the condition that made Milestone 21's
+Bearer-token detour necessary the first time.
 
-## Portal identity strings (`frontend/lib/site.ts`)
+**Milestone 41** went a step further than Rollout 2: rather than two deployments kept
+same-origin via routing (a Pages project + a path-scoped Worker Route), the UI and `/api/*` are
+now literally the same app/Worker, so there is no routing configuration left that could
+accidentally drift the two apart — same-origin is now structural, not just configured.
+
+## Portal identity strings (`lib/site.ts`)
 
 `SITE_TITLE_EN`/`SITE_TITLE_HI` and `DATA_PERIOD_EN`/`DATA_PERIOD_HI` live in one file so the tab
 meta description, login page, and DEO title bar can't drift out of sync. The Excel export's
@@ -256,7 +275,7 @@ ever shifts, update these strings by hand.
 term) — this portal is UP state excise revenue, a different tax entirely. Use आबकारी in any new
 Hindi copy referring to this revenue/department.
 
-## Frontend offline flow (`frontend/lib/db.ts`, Dexie)
+## Frontend offline flow (`lib/client-db.ts`, Dexie)
 
 See [README.md](./README.md)'s App flow → DEO data entry for the three-state overview. Rules an
 agent must preserve:
@@ -289,7 +308,7 @@ An Admin unlock (`districts.lock_status` → 0) only lets the DEO edit again —
 `pac_data`, since an unlock is usually meant to correct existing figures, not restart from zero.
 
 **The DEO's name is collected at lock time, not as a form field.** `MasterView.tsx` has no name
-input — clicking "Submit & Lock" runs a two-step SweetAlert2 flow (`frontend/lib/alerts.ts`):
+input — clicking "Submit & Lock" runs a two-step SweetAlert2 flow (`lib/alerts.ts`):
 
 1. `confirmFinalSubmit()` — yes/no: verify the data, locking is irreversible without Admin help.
 2. `promptDeoNameAndLock()` (only if step 1 confirmed) — a text input with a liability
@@ -311,9 +330,9 @@ financial year appears: DEO nav pills, `YearStepForm` headings, Admin selectors/
 ## Visual language
 
 - **Brand color is `blue-*` (Tailwind default), never `indigo-*`**, across every component
-  including the magic-link email's inline hex colors. `frontend/e2e/login.spec.ts` asserts
+  including the magic-link email's inline hex colors. `e2e/login.spec.ts` asserts
   `text-blue-700` on the active login tab as a regression guard.
-- **Dark mode** (`frontend/lib/theme.ts`, `ThemeToggle.tsx`): persisted in `localStorage`
+- **Dark mode** (`lib/theme.ts`, `ThemeToggle.tsx`): persisted in `localStorage`
   (`excise-portal:theme`), defaults to OS `prefers-color-scheme`. `app/layout.tsx`'s blocking
   inline `<script>` sets the `.dark` class on `<html>` before first paint. The `<style
   type="text/tailwindcss">` block that declares `@custom-variant dark
@@ -324,7 +343,7 @@ financial year appears: DEO nav pills, `YearStepForm` headings, Admin selectors/
   just inherit whatever the blocking script resolved). Use the existing `dark:bg-slate-900` /
   `dark:text-slate-100` / `dark:border-slate-800` pattern for new components. `<head>` also
   declares `<meta name="color-scheme" content="light dark" />`.
-- **`frontend/app/globals.css` is a plain external stylesheet, not wrapped in a Tailwind
+- **`app/globals.css` is a plain external stylesheet, not wrapped in a Tailwind
   `@layer`.** CSS Cascade Layers make any unlayered rule in this file outrank every
   `@layer`-wrapped Tailwind utility for the same property, regardless of specificity. Never add a
   bare `color`, `padding`, or other styling rule for `body`/`button`/`input`/`select` here — it
@@ -360,10 +379,10 @@ financial year appears: DEO nav pills, `YearStepForm` headings, Admin selectors/
   `promptUnlockReason()`) and for toasts via `notifyToast()` (`showCloseButton: true`, responsive
   width). Don't call `window.Swal.fire({ toast: true, ... })` directly — always go through
   `notifyToast()`.
-- **"Welcome" toast fires once per sign-in**: `frontend/lib/session.ts`'s
+- **"Welcome" toast fires once per sign-in**: `lib/client-session.ts`'s
   `markJustAuthed()`/`consumeJustAuthed()` gate it via `sessionStorage`. Any new post-auth
   redirect destination must call `markJustAuthed()` before redirecting, or the toast won't show.
-- **Help button** (`frontend/components/ui/HelpPanel.tsx`): `position: fixed`, `bottom-6
+- **Help button** (`components/ui/HelpPanel.tsx`): `position: fixed`, `bottom-6
   right-6`, one instance per gated page (not per sub-view). Opens upward-left on click only,
   sized against actual available space before paint. The balloon's `×` closes it for that
   session; "Don't show this again" persists a per-`pageKey` `localStorage` flag that only clears
@@ -408,9 +427,9 @@ financial year appears: DEO nav pills, `YearStepForm` headings, Admin selectors/
   page's toolbar row in the skeleton too (a same-sized pulse block per real control), not just
   the big content block below it.
 - **Tailwind loads via CDN script** (`@tailwindcss/browser@4`), not a build step — it must stay a
-  plain blocking `<script src=...>` tag in `frontend/app/layout.tsx`, not `next/script` (whose
+  plain blocking `<script src=...>` tag in `app/layout.tsx`, not `next/script` (whose
   `beforeInteractive` strategy injects via a JS hook rather than blocking HTML parsing, letting
-  the static export paint unstyled first).
+  the page paint unstyled first).
 - Money inputs use Cleave.js with `numeralThousandsGroupStyle: "lakh"` and a `₹` prefix — use
   this, don't hand-roll Indian-numeral formatting.
 - `YearStepForm.tsx`'s field grid hardcodes the six PAC fields into four rows (gross arrears
@@ -429,9 +448,11 @@ financial year appears: DEO nav pills, `YearStepForm` headings, Admin selectors/
 ## CI/CD
 
 `.github/workflows/ci.yml` and `deploy.yml` are the only things that deploy this project (see
-DEPLOY.md). **Never connect a Cloudflare Pages Git integration for this repo** — Cloudflare's own
-auto-build uses the wrong adapter for this app's static-export setup and will race manual/Action
-deploys. If the Cloudflare dashboard nudges you to "connect to Git," decline.
+DEPLOY.md) — one job each, since Milestone 41 collapsed this to a single app/Worker (there is no
+longer a separate Cloudflare Pages project at all). **Never connect a Cloudflare Pages Git
+integration for this repo** — this app deploys as a Worker via `wrangler`/`opennextjs-cloudflare`
+only; a Pages Git integration would be pointed at nothing this repo produces. If the Cloudflare
+dashboard nudges you to "connect to Git," decline.
 
 ## Admin pages: Dashboard / Districts / district detail / DEO Provisioning / Audit Log
 
@@ -538,14 +559,16 @@ separate routes, not an in-page toggle:
   same `useAdminData()` hook as the other admin pages (Sync, district search, "Synced:"
   timestamp), even though it has no districts/pacData of its own to render.
 
-**Which district/status to show travels via `sessionStorage`** (`frontend/lib/adminNav.ts`),
-never a `?id=`/`?status=` URL query string — this app is a static export
-(`next.config.ts`: `output: "export"`) with no server to resolve dynamic paths at request time.
-`setNavDistrictId()`/`getNavDistrictId()` are not consume-on-read (a detail-page reload should
-keep showing the same district). `setNavStatusFilter()`/`consumeNavStatusFilter()` are
-consume-on-read — landing on `/admin/districts` via the regular nav link should default to "all".
+**Which district/status to show travels via `sessionStorage`** (`lib/adminNav.ts`),
+never a `?id=`/`?status=` URL query string — originally forced by the frontend's static export
+(no server to resolve a dynamic path at request time); the app is no longer statically exported
+(Milestone 41), but this is kept as-is rather than reworked into query params now that it works
+and nothing requires the change. `setNavDistrictId()`/`getNavDistrictId()` are not
+consume-on-read (a detail-page reload should keep showing the same district).
+`setNavStatusFilter()`/`consumeNavStatusFilter()` are consume-on-read — landing on
+`/admin/districts` via the regular nav link should default to "all".
 
-All admin pages share `frontend/lib/useAdminData.ts` (session guard, Dexie cache, `sync()`,
+All admin pages share `lib/useAdminData.ts` (session guard, Dexie cache, `sync()`,
 `unlock()`). `AppHeader` takes `navLinks`, `onSync`/`syncing`, `lastSyncedAt` (persisted to
 `localStorage` as `excise-portal:admin-last-sync`), and an optional `districts` prop that renders
 a global "jump to a district" search. `AppHeader.navLinks` is still just Dashboard/Districts/
@@ -580,7 +603,7 @@ deliberately different from the DEO side, which stays verbose/hand-holding on pu
 
 ### Excel export
 
-`exportDistrictsToXlsx()` (`frontend/lib/export.ts`, ExcelJS) is one workbook, **ten** sheets: a
+`exportDistrictsToXlsx()` (`lib/export.ts`, ExcelJS) is one workbook, **ten** sheets: a
 **Summary** cover sheet, a **Master** sheet, a **Lock Status** sheet, one sheet per financial year
 (districts × the 6 PAC fields plus Opening Balance/Net Recoverable, read straight off the synced
 `pac_data` row), and a trailing **RC Details** sheet. FY sheets are named `FY 2021-22`, etc. Each FY sheet carries two
@@ -723,11 +746,12 @@ rules:
 - The seeded demo DEO account is a manual `wrangler d1 execute --remote` insert; it does not
   exist in remote D1 just because it's documented. If demo login fails with "Invalid user," check
   the `users` table remotely before assuming a regression.
-- No real domain/DNS yet; collapsing `/frontend` + `/api` onto one zone (which would let auth
-  switch back from a Bearer token to more-secure `HttpOnly` cookies — see CLAUDE.md's Auth
-  section) is deferred until one exists.
-- ~~`mail.upexciseonline.co` (or the chosen domain) is not yet verified in Resend~~ — resolved:
-  `mail.exciseup.in` is verified, `FROM_EMAIL` is `noreply@mail.exciseup.in` (same domain/address
-  shared with the sibling `up-excise-spatial-revenue-optimizer` project — see DEPLOY.md). This is
-  only the email-sending domain — the "no real domain/DNS yet" gap above, about this project's own
-  frontend/api hosting and the Bearer-token-vs-cookie tradeoff, is unrelated and still open.
+- ~~No real domain/DNS yet; collapsing `/frontend` + `/api` onto one zone (which would let auth
+  switch back from a Bearer token to more-secure `HttpOnly` cookies) is deferred until one
+  exists.~~ — resolved in two steps: the custom domain landed in Milestone 35 (auth switched
+  back to cookies in Rollout 2/Milestone 36), then Milestone 41 went further and merged
+  `/frontend` + `/api` into one app entirely, not just one routed domain. See the Auth section
+  above and ROADMAP.md's Milestone 41.
+- `mail.exciseup.in` is verified in Resend, `FROM_EMAIL` is `noreply@mail.exciseup.in` (same
+  domain/address shared with the sibling `up-excise-spatial-revenue-optimizer` project — see
+  DEPLOY.md).

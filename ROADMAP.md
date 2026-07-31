@@ -1312,6 +1312,72 @@ Full audit report at [SECURITY.md](./SECURITY.md) (new file). Summary of what sh
       (frontend) — both clean, `/api/admin/users` and `/admin/users` present in each build's
       route list.
 
+## Milestone 41 — Collapse `frontend` + `api` into one Next.js/OpenNext Worker (`migrate/single-worker-app`)
+
+- [x] Merged the two independent Next.js apps (`/frontend`, a static-export Pages SPA; `/api`, a
+      separate OpenNext Worker) into one app, served by one Worker, mirroring the sibling
+      `up-excise-spatial-revenue-optimizer` project's shape. The original reason for the split —
+      no shared domain, forcing a Bearer-token workaround around third-party-cookie blocking
+      (Milestone 21) — was already resolved by the custom domain (Milestone 35) and the cookie
+      revert (Milestone 36); this milestone removes the *routing* split entirely, not just the
+      cookie problem it used to cause. See `plan.md` for the full evaluation/plan this was built
+      from.
+- [x] Moved `frontend/app/**` (non-`/api` routes), `components/**`, `lib/*.ts`, `public/**`, and
+      the `e2e/`/`playwright.config.ts` suite into `api/`. Two genuine name collisions renamed to
+      stay unambiguous: `lib/db.ts` (frontend's Dexie wrapper) → `lib/client-db.ts`;
+      `lib/session.ts` (frontend's `getLastRole()`/`markJustAuthed()` helpers) →
+      `lib/client-session.ts`. Both distinct from `api`'s own server-side `lib/db.ts`
+      (D1/Drizzle `getDb()`) and `lib/session.ts` (JWT sign/verify), which kept their names.
+- [x] Dropped `api/app`'s unused create-next-app boilerplate (`page.tsx`, default layout,
+      `globals.css`, placeholder SVGs) in favor of the real app moved in from `frontend`.
+- [x] `next.config.ts`: no `output: "export"` to remove (the base app was never a static
+      export) — ported `frontend/public/_headers`' security headers (a Cloudflare
+      Pages-only mechanism a Worker doesn't read) into `next.config.ts`'s `headers()` instead.
+      Confirmed via `next build`'s route list that every UI route still prerenders `○ Static`
+      (same SPA-like "loads fast, then hydrates" behavior as before) while every `/api/*` route
+      stays `ƒ Dynamic` — removing static export changed nothing observable about how the UI
+      pages actually render.
+- [x] `wrangler.jsonc`: route widened from `excisebakaya.exciseup.in/api/*` to
+      `excisebakaya.exciseup.in/*` (this Worker now serves the whole app). D1
+      `binding`/`database_name`/`database_id` are byte-for-byte unchanged — no new database, no
+      migration, no data touched by this milestone at all.
+- [x] `package.json`: merged `frontend`'s runtime deps (`dexie`, `cleave.js`,
+      `@tanstack/react-table`) and CDN-loaded-library type packages (`chart.js`, `exceljs`,
+      `sweetalert2`) into `api`'s; one `pnpm-lock.yaml` now. CDN script tags themselves
+      (Tailwind Play CDN, SweetAlert2, ExcelJS, Chart.js, Tabler Icons, Google Fonts) moved with
+      `layout.tsx` unchanged — still CDN-loaded, per explicit instruction, not bundled.
+- [x] `lib/config.ts`'s `API_BASE_URL` is now always `""` (same-origin in every environment,
+      not just production) — no more separate deployment for it to conditionally point at, and
+      the old cross-origin local-dev gap (`next dev` vs `wrangler dev` on different ports) is
+      gone with it.
+- [x] Folded the `lib/pac-fields.ts` (frontend) / `lib/net-recoverable.ts` +
+      `lib/rc-details.ts` (api) hand-mirrored duplication into one copy: `lib/pac-fields.ts` now
+      re-exports `FINANCIAL_YEARS`/`FinancialYear` from `@/db/schema` instead of redefining them,
+      and is the single definition of `computeNetRecoverableSeries()`/`validateRcDetails()`/
+      `RcDetail` (kept the stricter server-side `validateRcDetails()`, which also runtime-checks
+      `stayed` is a boolean, against the untrusted submit-route payload). Deleted
+      `lib/net-recoverable.ts`/`lib/rc-details.ts`; the submit route now imports both functions
+      from `@/lib/pac-fields`. Done as a separate commit after the plain file-move was verified
+      working, deliberately not bundled into the same diff as the move itself.
+- [x] `ci.yml`/`deploy.yml` collapsed from the path-filtered two-job setup (`api`/`frontend`,
+      `dorny/paths-filter@v3`) to a single job each — one app to typecheck/build/deploy.
+- [x] Updated CLAUDE.md/README.md/DEPLOY.md throughout to describe the one-app shape (also
+      caught and fixed a few docs that had already gone stale before this milestone — e.g.
+      README.md still described the Excel export library as SheetJS/`window.XLSX`, when the
+      actual code has used ExcelJS/`window.ExcelJS` for a while; a "no real domain/DNS yet" Known
+      Gaps bullet that Milestones 35/36 had already resolved without ever being removed).
+- [x] Verified at each stage: `tsc --noEmit` clean, `next build` clean (route list reviewed —
+      static vs dynamic split as described above), `opennextjs-cloudflare build` succeeds, and a
+      local OpenNext/`wrangler` preview serves `/login`/`/admin`/`/opengraph-image` (correct
+      `image/png` content-type), returns `401` from `/api/auth/me` with no cookie, and carries
+      the ported security headers — all against the local D1 binding only (`Mode: local` in
+      `wrangler`'s own binding table), no remote database touched at any point.
+- [ ] **Production cutover not yet done** — this milestone builds and verifies the merged app on
+      the `migrate/single-worker-app` branch; actually pointing `excisebakaya.exciseup.in` at it
+      and retiring the `excise-revenue-recovery-portal` Pages project is a deliberate, manual,
+      later step (see DEPLOY.md's "Cutting over from the old two-deployment setup"), done only
+      after this branch is reviewed and merged.
+
 ## Backlog / not started
 
 - [ ] **Archive previous PAC data on resubmission-after-unlock** — today, when a DEO resubmits
