@@ -257,8 +257,9 @@ pnpm run dev                       # http://localhost:8787 (default Next dev por
 
 ## Deploying
 
-Live at: API `https://excise-revenue-recovery-api.shubhanraj2002.workers.dev`, frontend
-`https://excise-revenue-recovery-portal.pages.dev`. Full deploy/redeploy commands,
+Live at `https://excisebakaya.exciseup.in` (custom domain, both apps). The API's old
+`*.workers.dev` URL is retired; the frontend's `*.pages.dev` URL stays live as an unavoidable
+Cloudflare Pages platform constraint (see DEPLOY.md). Full deploy/redeploy commands,
 required secrets, and the OpenNext/Next-16-middleware gotcha that blocks a naive deploy
 are in [DEPLOY.md](./DEPLOY.md).
 

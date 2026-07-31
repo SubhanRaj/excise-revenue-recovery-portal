@@ -4,10 +4,13 @@
 	"name": "excise-revenue-recovery-api",
 	"compatibility_date": "2026-06-01",
 	"compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
-	// workers_dev must stay explicit: adding `routes` below flips Wrangler's default for this
-	// key from true to false, which would silently kill the existing *.workers.dev URL —
-	// DOMAIN_MIGRATION.md's "don't delete anything" requirement.
-	"workers_dev": true,
+	// workers_dev deliberately false (matches what Wrangler would default to anyway once
+	// `routes` is set) — the *.workers.dev URL is retired now that the custom domain
+	// (excisebakaya.exciseup.in) is the only production entry point. See CLAUDE.md's Auth
+	// section / DEPLOY.md's Known Deployment Constraints for the history: this was kept
+	// explicitly `true` during Milestone 35's rollout so the old URL didn't disappear before
+	// the custom domain was confirmed stable — that grace period is over.
+	"workers_dev": false,
 	"routes": [
 		{ "pattern": "excisebakaya.exciseup.in/api/*", "zone_name": "exciseup.in" }
 	],

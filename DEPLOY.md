@@ -12,15 +12,27 @@ there) and [CLAUDE.md](./CLAUDE.md) for how the system itself works.
 | ---------------- | ---------------------------------------------------------------------- |
 | Cloudflare account | `Subhan` (`4d93d751987b8d9ff101445570e72711`)                       |
 | Custom domain (primary) | https://excisebakaya.exciseup.in — Pages custom domain + a path-scoped Worker Route for `/api/*` (see ROADMAP.md's Milestone 35) |
-| API Worker        | `excise-revenue-recovery-api` — https://excise-revenue-recovery-api.shubhanraj2002.workers.dev (still live, kept via `workers_dev: true` in `api/wrangler.jsonc`) |
-| Pages project      | `excise-revenue-recovery-portal` — https://excise-revenue-recovery-portal.pages.dev (still live) |
+| API Worker        | `excise-revenue-recovery-api` — its `*.workers.dev` URL is **retired** (`workers_dev: false` in `api/wrangler.jsonc`, see ROADMAP.md's Milestone 39) |
+| Pages project      | `excise-revenue-recovery-portal` — https://excise-revenue-recovery-portal.pages.dev (still live, unavoidably — see below) |
 | D1 database        | `excise-revenue-recovery-db` (id `4f3e37fd-006a-4bce-b2d3-4bfb8bb16248`), region APAC |
 | Superadmin         | `shubhanraj2002@gmail.com` (role `admin`, signs in via Magic Link)   |
 
-The `*.pages.dev`/`*.workers.dev` URLs are kept live deliberately (not deleted) — the custom
-domain is additive, not a replacement. `FRONTEND_URL` now points at the custom domain (see
-Secrets below), so magic-link emails always resolve to `excisebakaya.exciseup.in` regardless of
-which URL a user is browsing from.
+**`*.pages.dev` stays live; `*.workers.dev` is retired — and that asymmetry is a Cloudflare
+platform constraint, not a choice.** Both were originally kept alive deliberately during
+Milestone 35's rollout (custom domain additive, not a replacement, in case anything needed
+rolling back). Once the custom domain proved stable, the grace period ended (Milestone 39):
+`workers_dev` flipped to `false`, killing the API's `*.workers.dev` URL — Cloudflare disables it
+automatically once a `routes` entry exists, same behavior the sibling
+`up-excise-spatial-revenue-optimizer` project already relies on for its own single-Worker setup.
+The Pages side has **no equivalent toggle** — `excisebakaya.exciseup.in` is a custom domain
+*attached to* the `excise-revenue-recovery-portal` Pages project, not a separate deployment, and
+Cloudflare gives every Pages project a `.pages.dev` URL with no dashboard/CLI setting to disable
+it independently (`wrangler pages project` only supports `list`/`create`/`delete` — deleting the
+project to kill the URL would also destroy the live custom domain, since it's the same project).
+Not a security exposure in practice: sessions are `HttpOnly`/host-only cookies that never attach
+to a different hostname, so `.pages.dev` only ever serves the same static, unauthenticated shell.
+`FRONTEND_URL` points at the custom domain (see Secrets below), so magic-link emails always
+resolve to `excisebakaya.exciseup.in` regardless of which URL a user is browsing from.
 
 Auth to Cloudflare: `pnpm exec wrangler whoami` (already logged in via OAuth on this machine).
 Re-auth elsewhere with `pnpm exec wrangler login`.
@@ -166,8 +178,10 @@ and redeploying, not just changing a Cloudflare dashboard setting.
 API=https://excisebakaya.exciseup.in
 FRONT=https://excisebakaya.exciseup.in
 
-# Old URLs (kept live, not deleted — re-check these too after any deploy):
-# API=https://excise-revenue-recovery-api.shubhanraj2002.workers.dev
+# The API's old *.workers.dev URL is retired (Milestone 39) — expect it to 404/fail to resolve,
+# not 200, if you ever check it again.
+# The frontend's *.pages.dev URL is still live (Cloudflare platform constraint, see the
+# deployment table above) — re-check it after any frontend deploy too:
 # FRONT=https://excise-revenue-recovery-portal.pages.dev
 
 curl -s -o /dev/null -w "%{http_code}\n" "$API/api/auth/me?role=admin"   # expect 401, no cookie sent

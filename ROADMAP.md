@@ -1259,6 +1259,32 @@ Full audit report at [SECURITY.md](./SECURITY.md) (new file). Summary of what sh
       CSP, `admin/truncate-demo-data` not owner-gated) are documented in SECURITY.md as accepted
       risk or deferred with a concrete reason — not silently dropped.
 
+## Milestone 39 — Retire the API's `*.workers.dev` URL (done)
+
+- [x] The custom domain (`excisebakaya.exciseup.in`, Milestone 35) originally kept both old URLs
+      alive deliberately alongside it — additive, not a replacement, in case anything needed
+      rolling back. With the custom domain now proven stable, that grace period ended:
+      `api/wrangler.jsonc`'s `workers_dev` flipped from `true` to `false`. Cloudflare disables the
+      `*.workers.dev` URL automatically once a `routes` entry exists — this just lets that default
+      take effect instead of overriding it, same mechanism the sibling
+      `up-excise-spatial-revenue-optimizer` project already relies on for its own (single-Worker)
+      deployment.
+- [x] The frontend's `*.pages.dev` URL (`excise-revenue-recovery-portal.pages.dev`) has **no
+      equivalent toggle** and stays live — a Cloudflare Pages platform constraint, not a choice.
+      `excisebakaya.exciseup.in` is a custom domain attached to that same Pages project, not a
+      separate deployment; `wrangler pages project` only supports `list`/`create`/`delete`, and
+      deleting the project to kill the `.pages.dev` URL would also destroy the live custom-domain
+      frontend since they're the same project. Not treated as a security gap: sessions are
+      `HttpOnly`/host-only cookies that never attach to a different hostname, so `.pages.dev` can
+      only ever serve the same static, unauthenticated shell — no session/data exposure there.
+- [x] Verified via `wrangler deploy --dry-run` before deploying: the custom domain's
+      `excisebakaya.exciseup.in/api/*` route is unaffected by the `workers_dev` change (two
+      independent config keys). Confirmed live after deploy: the old `*.workers.dev` URL no
+      longer resolves; `excisebakaya.exciseup.in` continues serving both apps normally.
+- [x] DEPLOY.md/README.md updated to drop the old "kept live deliberately" framing for both URLs
+      — now accurately describes the asymmetry (one retired by choice, one unavoidably still
+      live) and why.
+
 ## Backlog / not started
 
 - [ ] **Archive previous PAC data on resubmission-after-unlock** — today, when a DEO resubmits
