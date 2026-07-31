@@ -11,8 +11,12 @@
 	// explicitly `true` during Milestone 35's rollout so the old URL didn't disappear before
 	// the custom domain was confirmed stable — that grace period is over.
 	"workers_dev": false,
+	// Widened from /api/* to /* now that this Worker serves the whole app (UI pages + API
+	// routes), not just the API — see plan.md. Cutting the real Cloudflare Pages custom domain
+	// over to this route is a separate, manual production step (plan.md Section 4.G), done only
+	// after this branch is fully verified.
 	"routes": [
-		{ "pattern": "excisebakaya.exciseup.in/api/*", "zone_name": "exciseup.in" }
+		{ "pattern": "excisebakaya.exciseup.in/*", "zone_name": "exciseup.in" }
 	],
 	"assets": {
 		"directory": ".open-next/assets",
