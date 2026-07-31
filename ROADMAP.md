@@ -1372,11 +1372,19 @@ Full audit report at [SECURITY.md](./SECURITY.md) (new file). Summary of what sh
       `image/png` content-type), returns `401` from `/api/auth/me` with no cookie, and carries
       the ported security headers — all against the local D1 binding only (`Mode: local` in
       `wrangler`'s own binding table), no remote database touched at any point.
-- [ ] **Production cutover not yet done** — this milestone builds and verifies the merged app on
-      the `migrate/single-worker-app` branch; actually pointing `excisebakaya.exciseup.in` at it
-      and retiring the `excise-revenue-recovery-portal` Pages project is a deliberate, manual,
-      later step (see DEPLOY.md's "Cutting over from the old two-deployment setup"), done only
-      after this branch is reviewed and merged.
+- [x] **Production cutover done.** `migrate/single-worker-app` merged to `master` (PR #1),
+      `deploy.yml` deployed the merged Worker — its already-widened `/*` route took over
+      serving `excisebakaya.exciseup.in` immediately (Cloudflare Worker Routes outrank a Pages
+      custom domain for the same hostname), confirmed via `x-opennext`/`x-nextjs-prerender`/
+      `x-powered-by: Next.js` response headers on the live domain (headers only the Worker
+      adds, never Pages' static-asset path) rather than status codes alone. Cleanup done after:
+      detached the custom domain from the `excise-revenue-recovery-portal` Pages project via the
+      Cloudflare API (`DELETE .../pages/projects/.../domains/...` — `wrangler` has no CLI
+      subcommand for this), deleted all 25 of that project's deployments (`wrangler pages
+      deployment delete`, one at a time — bulk-deleting the project directly fails with "too
+      many deployments"), then deleted the Pages project itself. Re-verified the live domain
+      after each destructive step; no interruption at any point. No D1/database action anywhere
+      in this cutover — same database, same binding, throughout.
 
 ## Backlog / not started
 

@@ -6,13 +6,11 @@ to redeploy or rebuild from scratch. See [ROADMAP.md](./ROADMAP.md) for what's s
 deploy-affecting milestone is logged there) and [CLAUDE.md](./CLAUDE.md) for how the system
 itself works.
 
-**This reflects the target state after Milestone 41's app merge and its production cutover.**
-If you're reading this while `migrate/single-worker-app` is still an unmerged branch, the
-*actual* live production state may still be the pre-Milestone-41 two-deployment setup (a
-separate Pages project + a path-scoped Worker Route) — check `wrangler pages project list` and
-the Worker's `routes` in the Cloudflare dashboard before assuming this doc matches what's
-currently serving traffic. See "Cutting over from the old two-deployment setup" below for the
-one-time manual steps that make this doc accurate.
+**This reflects the current live state — Milestone 41's app merge and production cutover are
+both done.** `excisebakaya.exciseup.in` is served entirely by the single merged Worker; the old
+`excise-revenue-recovery-portal` Pages project (and its `*.pages.dev` URL) no longer exist. See
+"How the cutover happened" below for how this went, kept for reference in case a future
+migration needs a similar runbook.
 
 ## Current production deployment
 
@@ -170,33 +168,45 @@ curl -s -o /dev/null -w "%{http_code}\n" "$API/api/auth/me?role=admin"       # e
 curl -s -o /dev/null -w "%{http_code}\n" "$API/api/admin/unlock-requests"    # expect 401
 ```
 
-## Cutting over from the old two-deployment setup
+## How the cutover happened
 
-One-time, manual, done once when `migrate/single-worker-app` is merged and ready to go live —
-not part of any automated deploy, since it touches live production routing for a real
-government portal. See `plan.md`'s Section 4.G for the full rationale; summarized here as the
-actual runbook:
+Kept for reference — a similar runbook may be useful for a future Cloudflare routing change.
+`plan.md`'s Section 4.G laid out the planned steps; here's what actually happened when
+`migrate/single-worker-app` merged (PR #1) and `deploy.yml` deployed it:
 
-1. Deploy the merged Worker first (`pnpm run deploy` from this branch, or merge to `master` and
-   let `deploy.yml` do it) — at this point `api/wrangler.jsonc`'s route already claims
-   `excisebakaya.exciseup.in/*`, but the still-live Pages custom domain takes priority for
-   anything Cloudflare considers a more specific/existing binding, so this is safe to do first.
-2. Verify the new Worker directly (its retired `*.workers.dev` URL won't work — use a temporary
-   preview route or `wrangler dev`/OpenNext preview locally, per DEPLOY.md's Verifying section
-   above, before touching the live domain's routing).
-3. In the Cloudflare dashboard, remove the custom-domain hostname from the
-   `excise-revenue-recovery-portal` Pages project (Pages → that project → Custom domains).
-4. Confirm the Worker's `/*` route is now the only thing serving `excisebakaya.exciseup.in` —
-   re-run the Verifying-a-deployment checks above against the real domain.
-5. Delete the `excise-revenue-recovery-portal` Pages project once satisfied (`wrangler pages
-   project delete excise-revenue-recovery-portal`) — this is what finally kills the old
-   `*.pages.dev` URL, since Cloudflare has no toggle to disable it independently of the project.
-6. **No D1 step anywhere in this list** — the database, its binding, and its data are completely
-   unaffected by this cutover; only HTTP routing changes.
+1. **Merging to `master` and deploying was the cutover itself, not a step before it.** The
+   plan's assumption — that the still-live Pages custom domain would keep serving traffic until
+   manually removed — was wrong. `api/wrangler.jsonc`'s route had already been widened from
+   `/api/*` to `/*` in the merged branch, and **a Cloudflare Worker Route takes priority over a
+   Pages custom domain for the same hostname the instant it's deployed** — there's no grace
+   period or manual switch-over needed. This was confirmed, not assumed: right after the
+   deploy, `curl -sI` against `excisebakaya.exciseup.in/login` showed `x-opennext: 1`,
+   `x-nextjs-prerender: 1`, and `x-powered-by: Next.js` — headers only the OpenNext Worker adds,
+   never Pages' static-asset serving path — which is a more reliable signal than a `200` status
+   code, since both the old and new setups would return `200` for the same paths.
+2. Cleanup, done after confirming the Worker was correctly serving everything: detached
+   `excisebakaya.exciseup.in` from the `excise-revenue-recovery-portal` Pages project via the
+   Cloudflare API directly (`DELETE .../pages/projects/<project>/domains/<domain>` — `wrangler`
+   has no CLI subcommand for removing a Pages custom domain, only for creating a project).
+3. Deleting the Pages project outright (`wrangler pages project delete`) failed twice in a row
+   with more specific errors each time: first "too many deployments to be deleted" (the project
+   had 25), then — once all but the currently-marked-"active" one were deleted individually via
+   `wrangler pages deployment delete <id>` — "you cannot delete the active production
+   deployment" for that last one. Neither blocked the actual project delete once the custom
+   domain was detached first; the project delete succeeded immediately after that, with the one
+   remaining "active" deployment going with it.
+4. Re-verified the live domain after every destructive step (domain detach, each deployment
+   delete, and the final project delete) — no interruption at any point.
+5. **No D1 step anywhere in this cutover** — the database, its binding, and its data were
+   completely unaffected throughout; only HTTP routing and the now-defunct Pages project
+   changed.
 
-Rollback, if anything goes wrong after step 3: re-add the custom-domain hostname to the Pages
-project in the dashboard. No data migration or restore is needed either way, in either
-direction — this entire cutover is a routing change, not a data change.
+If a future infra change needs to roll back to a two-deployment setup for some reason, there is
+no Pages project left to reattach a domain to — it would need to be recreated from scratch
+(`wrangler pages project create`), which is a bigger step than the simple "re-add the domain"
+rollback this plan originally anticipated. In practice this is unlikely to matter: the whole
+point of Milestone 41 was that the two-deployment setup no longer serves any purpose now that
+both apps are one.
 
 ## Known deployment constraints
 
