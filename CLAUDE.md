@@ -755,3 +755,10 @@ rules:
 - `mail.exciseup.in` is verified in Resend, `FROM_EMAIL` is `noreply@mail.exciseup.in` (same
   domain/address shared with the sibling `up-excise-spatial-revenue-optimizer` project — see
   DEPLOY.md).
+
+## Writing docs/commits/comments
+
+Use the `dev-docs-human` skill (`~/.claude/skills/dev-docs-human`) for README/architecture-doc/
+code-comment/PR-description writing — invoke with `/dev-docs-human`, or it triggers automatically
+on dev-facing doc work. Cuts AI narrative tells: before/after story framing, "X, not Y" contrast
+used to explain a design choice, inflated vocabulary, emoji-heading README theater.
