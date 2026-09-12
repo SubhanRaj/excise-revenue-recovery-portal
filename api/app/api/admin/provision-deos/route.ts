@@ -108,14 +108,18 @@ export const POST = withErrorHandling("admin/provision-deos", async (req: NextRe
   const inserted = results.filter((r) => r.status === "inserted").length;
   const updated = results.filter((r) => r.status === "updated").length;
   const errors = results.filter((r) => r.status === "error").length;
-  await auditLogInsert(db, {
-    eventType: "deo_provisioned",
-    actorRole: "admin",
-    actorEmail: admin?.email,
-    actorName: admin?.name,
-    actorDesignation: admin?.designation,
-    metadata: { inserted, updated, errors, totalRows: rows.length },
-  });
+  try {
+    await auditLogInsert(db, {
+      eventType: "deo_provisioned",
+      actorRole: "admin",
+      actorEmail: admin?.email,
+      actorName: admin?.name,
+      actorDesignation: admin?.designation,
+      metadata: { inserted, updated, errors, totalRows: rows.length },
+    });
+  } catch (err) {
+    console.error("admin/provision-deos: audit-log insert failed, per-row results were still committed", err);
+  }
 
   return NextResponse.json({ results });
 });

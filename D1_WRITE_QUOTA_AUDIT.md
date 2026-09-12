@@ -1,5 +1,10 @@
 # D1 Write-Quota Audit — Cross-Project Incident Check (2026-09-12)
 
+**Status: fixed.** All six open findings (Q-01 through Q-06) below now wrap their non-essential
+audit-log insert (or, for Q-01, the retention purge) in `try/catch` so a D1 write-quota failure
+there can't turn an already-successful essential write into a visible 500. No schema or data
+change — code only.
+
 **Trigger:** the sibling project `up-excise-spatial-revenue-optimizer` (same developer, same
 Next.js + Cloudflare Workers + D1 + Drizzle stack) hit Cloudflare D1's account-wide daily
 write-row quota (100,000 rows/day, shared across every D1 database on the account) today,
@@ -29,12 +34,12 @@ as the sibling project.
 
 | ID | Finding | Pattern | Status |
 |----|---------|---------|--------|
-| Q-01 | `GET /api/admin/audit-log` runs an unconditional purge `DELETE` before every read, no try/catch | #3 (write-before-read, no fallback) | **OPEN** |
-| Q-02 | `POST /api/auth/verify-magic-link` marks the token used, then a separate unguarded audit-log insert can fail and burn the one-time token with no session granted | #2 (essential write, then unguarded non-essential write) | **OPEN** |
-| Q-03 | `POST /api/auth/verify-cug` grants a session only after an unguarded audit-log insert; a failure there turns a valid login into a 500 | #2 | **OPEN** |
-| Q-04 | `POST/PATCH /api/admin/users` (create, update) each do the essential write, then a separate unguarded audit-log insert | #2 | **OPEN** |
-| Q-05 | `DELETE /api/admin/users` batches the essential deletes atomically, but the following audit-log insert is a separate unguarded call | #2 | **OPEN** |
-| Q-06 | `POST /api/admin/provision-deos` commits every row's insert/update individually inside the loop, then a single unguarded audit-log insert at the end | #2 (bulk variant) | **OPEN** |
+| Q-01 | `GET /api/admin/audit-log` runs an unconditional purge `DELETE` before every read, no try/catch | #3 (write-before-read, no fallback) | **FIXED** |
+| Q-02 | `POST /api/auth/verify-magic-link` marks the token used, then a separate unguarded audit-log insert can fail and burn the one-time token with no session granted | #2 (essential write, then unguarded non-essential write) | **FIXED** |
+| Q-03 | `POST /api/auth/verify-cug` grants a session only after an unguarded audit-log insert; a failure there turns a valid login into a 500 | #2 | **FIXED** |
+| Q-04 | `POST/PATCH /api/admin/users` (create, update) each do the essential write, then a separate unguarded audit-log insert | #2 | **FIXED** |
+| Q-05 | `DELETE /api/admin/users` batches the essential deletes atomically, but the following audit-log insert is a separate unguarded call | #2 | **FIXED** |
+| Q-06 | `POST /api/admin/provision-deos` commits every row's insert/update individually inside the loop, then a single unguarded audit-log insert at the end | #2 (bulk variant) | **FIXED** |
 | — | Reminder/dismiss-modal-writes-per-page-load (pattern #1) | #1 | **NOT FOUND** — no reminder-modal-on-page-load write pattern exists in this codebase |
 | — | `POST /api/auth/logout` already wraps its audit-log insert in `.catch(() => {})` | #2 (already fixed) | **PASS** (reference the existing fix pattern) |
 | — | `admin/unlock`, `admin/unlock-requests/resolve`, `deo/request-unlock`, `admin/truncate-demo-data`, `pac-data/submit` all fold the audit-log insert into the same atomic `db.batch()` as the essential write(s) | #2 | **PASS** |
