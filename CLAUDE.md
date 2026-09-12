@@ -1,5 +1,7 @@
 # CLAUDE.md — Excise Revenue Recovery Portal
 
+> Rolling-session / OTP-skip logic: see [AUTH_ROLLING_SESSION.md](./AUTH_ROLLING_SESSION.md) — confirmed NOT present here, even though the sibling `up-excise-spatial-revenue-optimizer` project (same boilerplate) has it.
+
 Instructions for AI agents working in this repo. `api/CLAUDE.md` (`@AGENTS.md`) has a
 Next.js-version warning — read that too. See [ROADMAP.md](./ROADMAP.md) for what's shipped and
 what's left; this file documents how the shipped system works, not its build history.
